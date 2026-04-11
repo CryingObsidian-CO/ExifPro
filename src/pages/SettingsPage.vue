@@ -220,7 +220,7 @@ onMounted(async () => {
 }
 
 .page-header {
-  padding: 24px 32px;
+  padding: 16px 32px;
   border-bottom: 1px solid var(--color-border);
 }
 

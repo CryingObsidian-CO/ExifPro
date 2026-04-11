@@ -23,7 +23,7 @@ defineProps({
   background-color: var(--color-bg-secondary);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-md);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .card-header {
