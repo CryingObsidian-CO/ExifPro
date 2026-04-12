@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::exif::ExifInfo;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -31,16 +32,20 @@ impl fmt::Display for GroupType {
     }
 }
 
+#[inline]
+pub fn cmp_time(a: &ExifInfo, b: &ExifInfo) -> Ordering {
+    parse_capture_time(a)
+        .partial_cmp(&parse_capture_time(b))
+        .unwrap_or(Ordering::Equal)
+}
+
 pub fn group_photos(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
-    photos.sort_by(|a, b| match (&a.capture_time, &b.capture_time) {
-        (Some(t1), Some(t2)) => t1.cmp(t2),
-        (Some(_), None) => std::cmp::Ordering::Less,
-        (None, Some(_)) => std::cmp::Ordering::Greater,
-        (None, None) => a.file_name.cmp(&b.file_name),
-    });
+    photos.sort_by(|a, b| cmp_time(a, b));
     let mut groups = Vec::new();
     let mut used = vec![false; photos.len()];
     let mut group_id_counter = 0;
+
+    let mut ungrouped_photos = Vec::new();
 
     for i in 0..photos.len() {
         if used[i] {
@@ -118,16 +123,18 @@ pub fn group_photos(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
         }
 
         // TODO: 处理单张照片的情况
-        let group = Group {
-            id: format!("group_{}", group_id_counter),
-            group_type: GroupType::Single,
-            name: generate_group_name(&GroupType::Single, &[photos[i].clone()], config),
-            photos: vec![photos[i].clone()],
-        };
-        groups.push(group);
+
+        ungrouped_photos.push(photos[i].clone());
         used[i] = true;
-        group_id_counter += 1;
     }
+
+    let ungrouped_group = Group {
+        id: "ungrouped".to_string(),
+        group_type: GroupType::Single,
+        name: "未分组".to_string(),
+        photos: ungrouped_photos,
+    };
+    groups.push(ungrouped_group);
 
     groups
 }
@@ -155,10 +162,14 @@ fn parse_focus_distance(focus_distance: &str) -> Option<f64> {
     cleaned.parse::<f64>().ok()
 }
 
-fn parse_capture_time(time_str: &str) -> Option<DateTime<Utc>> {
-    if let Ok(dt) = DateTime::parse_from_str(time_str, "%Y:%m:%d %H:%M:%S") {
+fn parse_capture_time(time_info: &ExifInfo) -> Option<DateTime<Utc>> {
+    let capture = time_info.capture_time.as_deref().unwrap_or("");
+    let sub = time_info.sub_time.as_deref().unwrap_or("999");
+    let time_str = format!("{}.{}", capture, sub);
+
+    if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y:%m:%d %H:%M:%S.%f") {
         Some(dt.with_timezone(&Utc))
-    } else if let Ok(dt) = DateTime::parse_from_str(time_str, "%Y-%m-%d %H:%M:%S") {
+    } else if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y-%m-%d %H:%M:%S.%f") {
         Some(dt.with_timezone(&Utc))
     } else {
         None
@@ -170,7 +181,7 @@ fn parse_exposure_value(ev_str: &str) -> Option<f64> {
     cleaned.parse::<f64>().ok()
 }
 
-fn time_diff_seconds(a: &str, b: &str) -> Option<f64> {
+fn time_diff_seconds(a: &ExifInfo, b: &ExifInfo) -> Option<f64> {
     let dt_a = parse_capture_time(a)?;
     let dt_b = parse_capture_time(b)?;
     let diff = dt_a.signed_duration_since(dt_b);
@@ -198,12 +209,9 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
     }
     let first = groups.first().unwrap();
     let last = groups.last().unwrap();
-
-    if let (Some(first_time), Some(last_time)) = (&first.capture_time, &last.capture_time) {
-        if let Some(time_span) = time_diff_seconds(last_time, first_time) {
-            if time_span > config.time_thresholds.focus_bracket_max_span {
-                return false;
-            }
+    if let Some(time_span) = time_diff_seconds(last, first) {
+        if time_span > config.time_thresholds.focus_bracket_max_span {
+            return false;
         }
     }
 
@@ -243,11 +251,9 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
     let first = groups.first().unwrap();
     let last = groups.last().unwrap();
 
-    if let (Some(first_time), Some(last_time)) = (&first.capture_time, &last.capture_time) {
-        if let Some(time_span) = time_diff_seconds(last_time, first_time) {
-            if time_span > config.time_thresholds.aeb_max_span {
-                return false;
-            }
+    if let Some(time_span) = time_diff_seconds(last, first) {
+        if time_span > config.time_thresholds.aeb_max_span {
+            return false;
         }
     }
 
@@ -295,11 +301,9 @@ fn is_burst(groups: &[ExifInfo], config: &Config) -> bool {
     }
 
     for w in groups.windows(2) {
-        if let (Some(t1), Some(t2)) = (&w[0].capture_time, &w[1].capture_time) {
-            if let Some(time_span) = time_diff_seconds(t1, t2) {
-                if time_span > config.time_thresholds.burst_max_interval {
-                    return false;
-                }
+        if let Some(time_span) = time_diff_seconds(&w[0], &w[1]) {
+            if time_span > config.time_thresholds.burst_max_interval {
+                return false;
             }
         }
     }

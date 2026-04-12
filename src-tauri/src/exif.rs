@@ -9,6 +9,7 @@ pub struct ExifInfo {
     pub file_path: String,
     pub file_name: String,
     pub capture_time: Option<String>,
+    pub sub_time: Option<String>,
     pub shutter_speed: Option<String>,
     pub aperture: Option<String>,
     pub iso: Option<String>,
@@ -31,6 +32,7 @@ impl ExifInfo {
             file_path: file_path.to_string_lossy().to_string(),
             file_name,
             capture_time: None,
+            sub_time: None,
             shutter_speed: None,
             aperture: None,
             iso: None,
@@ -48,21 +50,27 @@ pub fn parse_exif(file_path: &Path) -> Result<ExifInfo, Error> {
     let mut reader = BufReader::new(file);
     let exif = exif::Reader::new().read_from_container(&mut reader)?;
 
+    // println!("\n\nEXIF tags for {}", exif_info.file_name);
+
     for field in exif.fields() {
         let tag = format!("{}", field.tag);
         let value = field.display_value().to_string();
+        // println!("{}: {}", tag, value);
 
         match tag.as_str() {
-            "DateTimeOriginal" | "DateTime" => {
+            "DateTimeOriginal" => {
                 exif_info.capture_time = Some(value);
             }
             "ExposureTime" => {
                 exif_info.shutter_speed = Some(value);
             }
+            "SubSecTimeOriginal" => {
+                exif_info.sub_time = Some(value);
+            }
             "FNumber" => {
                 exif_info.aperture = Some(value);
             }
-            "ISOSpeedRatings" => {
+            "PhotographicSensitivity" => {
                 exif_info.iso = Some(value);
             }
             "ExposureBiasValue" => {

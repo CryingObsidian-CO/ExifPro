@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="run dev" type="CompoundRunConfigurationType">
+    <toRun name="Run exifpro" type="CargoCommandRunConfiguration" />
+    <toRun name="run dev server" type="js.build_tools.npm" />
+    <method v="2" />
+  </configuration>
+</component>
