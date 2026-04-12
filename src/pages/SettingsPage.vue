@@ -4,17 +4,38 @@ import WinCard from "../component/WinCard.vue";
 import {useStore} from "../store/store.ts";
 import {useTauri} from "../composables/tauri.ts";
 import {Theme} from "../types";
-import {onMounted} from "vue";
+import {onMounted, ref} from "vue";
 import WinInput from "../component/WinInput.vue";
+import {onBeforeRouteLeave} from "vue-router";
 
 const store = useStore();
 const tauri = useTauri();
+const dirty = ref(false);
+
+function clampTimeValue(v: string | number): number {
+  const n = Number(v);
+  if (isNaN(n)) return 0;
+  if (n < 0 && n !== -1) return -1;
+  return n;
+}
+
+function markDirty() {
+  dirty.value = true;
+}
+
+function updateField(obj: any, key: string, value: any) {
+  if (obj) {
+    obj[key] = value;
+    markDirty();
+  }
+}
 
 async function saveSettings() {
   const config = store.getConfig();
   if (config) {
     try {
       await tauri.saveConfig(config);
+      dirty.value = false;
       alert('设置已保存');
     } catch (error) {
       console.error('保存设置失败:', error);
@@ -24,12 +45,53 @@ async function saveSettings() {
 }
 
 async function resetSettings() {
-  await tauri.resetConfig();
+  try {
+    const config = await tauri.resetConfig();
+    store.setConfig(config);
+    dirty.value = false;
+    alert('已重置为默认设置');
+  } catch (error) {
+    console.error('重置设置失败:', error);
+    alert('重置设置失败');
+  }
 }
 
 async function setTheme(theme: Theme) {
   store.setTheme(theme);
 }
+
+async function reloadConfig() {
+  try {
+    const config = await tauri.loadConfig();
+    store.setConfig(config);
+  } catch {
+    await tauri.resetConfig();
+  }
+}
+
+onBeforeRouteLeave(async (_to, _from, next) => {
+  if (!dirty.value) {
+    next();
+    return;
+  }
+  const save = confirm('设置已修改但未保存，是否保存？');
+  if (save) {
+    const config = store.getConfig();
+    if (config) {
+      try {
+        await tauri.saveConfig(config);
+      } catch (error) {
+        console.error('保存设置失败:', error);
+      }
+    }
+    dirty.value = false;
+    next();
+  } else {
+    await reloadConfig();
+    dirty.value = false;
+    next();
+  }
+});
 
 onMounted(async () => {
   if (!store.getConfig()) {
@@ -90,38 +152,29 @@ onMounted(async () => {
         <div class="settings-grid">
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="AEB 组中第一张与最后一张照片之间的最大允许时间差（秒）。首尾时间差超过此值的照片序列不会被识别为 AEB 组。通常 AEB 拍摄速度很快，建议设为 0.3~1.0 秒。"
+                   data-tooltip="AEB 组中第一张与最后一张照片之间的最大允许时间差（秒）。首尾时间差超过此值的照片序列不会被识别为 AEB 组。通常 AEB 拍摄速度很快，建议设为 0.3~1.0 秒。填写 -1 表示不限制此时间条件。"
             >首尾最大跨度（秒）</label>
             <WinInput type="number"
                       :modelValue="store.getConfig()?.aeb_settings.max_span || 0"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.aeb_settings.max_span = Number(v))
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'max_span', clampTimeValue(v))"
             />
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="AEB 组中相邻两张照片之间的最小时间间隔（秒）。间隔小于此值可能是同一张照片的重复记录而非独立拍摄，有助于过滤异常数据。建议设为 0.01~0.1 秒。"
+                   data-tooltip="AEB 组中相邻两张照片之间的最小时间间隔（秒）。间隔小于此值可能是同一张照片的重复记录而非独立拍摄，有助于过滤异常数据。建议设为 0.01~0.1 秒。填写 -1 表示不限制此时间条件。"
             >相邻最小间隔（秒）</label>
             <WinInput type="number"
                       :modelValue="store.getConfig()?.aeb_settings.min_consecutive_interval || 0"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.aeb_settings.min_consecutive_interval = Number(v))
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'min_consecutive_interval', clampTimeValue(v))"
             />
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="AEB 组中相邻两张照片之间的最大时间间隔（秒）。相邻照片间隔超过此值表明可能不属于同一 AEB 序列，有助于区分不同的 AEB 拍摄组。建议设为 0.1~0.5 秒。"
+                   data-tooltip="AEB 组中相邻两张照片之间的最大时间间隔（秒）。相邻照片间隔超过此值表明可能不属于同一 AEB 序列，有助于区分不同的 AEB 拍摄组。建议设为 0.1~0.5 秒。填写 -1 表示不限制此时间条件。"
             >相邻最大间隔（秒）</label>
             <WinInput type="number"
                       :modelValue="store.getConfig()?.aeb_settings.max_consecutive_interval || 0"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.aeb_settings.max_consecutive_interval = Number(v))
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'max_consecutive_interval', clampTimeValue(v))"
             />
           </div>
           <div class="setting-item">
@@ -130,10 +183,7 @@ onMounted(async () => {
             >最小数量</label>
             <WinInput type="number"
                       :modelValue="store.getConfig()?.aeb_settings.min_count || 0"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.aeb_settings.min_count = Number(v))
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'min_count', Number(v))"
             />
           </div>
         </div>
@@ -146,38 +196,29 @@ onMounted(async () => {
         <div class="settings-grid">
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="对焦包围组中第一张与最后一张照片之间的最大允许时间差（秒）。首尾时间差超过此值的照片序列不会被识别为对焦包围组。对焦包围通常拍摄张数较多，建议设为 0.5~2.0 秒。"
+                   data-tooltip="对焦包围组中第一张与最后一张照片之间的最大允许时间差（秒）。首尾时间差超过此值的照片序列不会被识别为对焦包围组。对焦包围通常拍摄张数较多，建议设为 0.5~2.0 秒。填写 -1 表示不限制此时间条件。"
             >首尾最大跨度（秒）</label>
             <WinInput type="number"
                       :modelValue="store.getConfig()?.focus_bracket_settings.max_span || 0"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.focus_bracket_settings.max_span = Number(v))
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'max_span', clampTimeValue(v))"
             />
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="对焦包围组中相邻两张照片之间的最小时间间隔（秒）。间隔小于此值可能是同一张照片的重复记录而非独立拍摄，有助于过滤异常数据。建议设为 0.01~0.05 秒。"
+                   data-tooltip="对焦包围组中相邻两张照片之间的最小时间间隔（秒）。间隔小于此值可能是同一张照片的重复记录而非独立拍摄，有助于过滤异常数据。建议设为 0.01~0.05 秒。填写 -1 表示不限制此时间条件。"
             >相邻最小间隔（秒）</label>
             <WinInput type="number"
                       :modelValue="store.getConfig()?.focus_bracket_settings.min_consecutive_interval || 0"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.focus_bracket_settings.min_consecutive_interval = Number(v))
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'min_consecutive_interval', clampTimeValue(v))"
             />
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="对焦包围组中相邻两张照片之间的最大时间间隔（秒）。相邻照片间隔超过此值表明可能不属于同一对焦包围序列，有助于区分不同的对焦包围拍摄组。建议设为 0.2~1.0 秒。"
+                   data-tooltip="对焦包围组中相邻两张照片之间的最大时间间隔（秒）。相邻照片间隔超过此值表明可能不属于同一对焦包围序列，有助于区分不同的对焦包围拍摄组。建议设为 0.2~1.0 秒。填写 -1 表示不限制此时间条件。"
             >相邻最大间隔（秒）</label>
             <WinInput type="number"
                       :modelValue="store.getConfig()?.focus_bracket_settings.max_consecutive_interval || 0"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.focus_bracket_settings.max_consecutive_interval = Number(v))
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'max_consecutive_interval', clampTimeValue(v))"
             />
           </div>
           <div class="setting-item">
@@ -186,10 +227,7 @@ onMounted(async () => {
             >最小数量</label>
             <WinInput type="number"
                       :modelValue="store.getConfig()?.focus_bracket_settings.min_count || 0"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.focus_bracket_settings.min_count = Number(v))
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'min_count', Number(v))"
             />
           </div>
         </div>
@@ -203,27 +241,21 @@ onMounted(async () => {
           <div class="setting-item">
             <label
                 class="setting-label has-tooltip"
-                data-tooltip="连拍组中相邻两张照片之间的最小时间间隔（秒）。间隔小于此值可能是同一张照片的重复记录而非独立拍摄，有助于过滤异常数据。建议设为 0.01~0.05 秒。"
+                data-tooltip="连拍组中相邻两张照片之间的最小时间间隔（秒）。间隔小于此值可能是同一张照片的重复记录而非独立拍摄，有助于过滤异常数据。建议设为 0.01~0.05 秒。填写 -1 表示不限制此时间条件。"
             >相邻最小间隔（秒）</label>
             <WinInput type="number"
                       :modelValue="store.getConfig()?.burst_settings.min_consecutive_interval || 0"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.burst_settings.min_consecutive_interval = Number(v))
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'min_consecutive_interval', clampTimeValue(v))"
             />
           </div>
           <div class="setting-item">
             <label
                 class="setting-label has-tooltip"
-                data-tooltip="连拍组中相邻两张照片之间的最大时间间隔（秒）。相邻照片间隔超过此值表明可能不属于同一连拍序列，有助于区分不同的连拍拍摄组。建议设为 0.3~1.0 秒，高速连拍可设更小值。"
+                data-tooltip="连拍组中相邻两张照片之间的最大时间间隔（秒）。相邻照片间隔超过此值表明可能不属于同一连拍序列，有助于区分不同的连拍拍摄组。建议设为 0.3~1.0 秒，高速连拍可设更小值。填写 -1 表示不限制此时间条件。"
             >相邻最大间隔（秒）</label>
             <WinInput type="number"
                       :modelValue="store.getConfig()?.burst_settings.max_consecutive_interval || 0"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.burst_settings.max_consecutive_interval = Number(v))
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'max_consecutive_interval', clampTimeValue(v))"
             />
           </div>
           <div class="setting-item">
@@ -233,10 +265,7 @@ onMounted(async () => {
             >最小数量</label>
             <WinInput type="number"
                       :modelValue="store.getConfig()?.burst_settings.min_count || 0"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.burst_settings.min_count = Number(v))
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'min_count', Number(v))"
             />
           </div>
         </div>
@@ -246,35 +275,26 @@ onMounted(async () => {
         <div class="settings-grid">
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="对焦包围组的输出目录名前缀。整理后的对焦包围照片将存放在以此前缀开头的目录中。例如前缀为 'FocusBracket_' 时，目录名为 'FocusBracket_DSC0001'。"
+                   data-tooltip="对焦包围组的输出目录名前缀。整理后的对焦包围照片将存放在以此前缀开头的目录中。例如前缀为 'FocusBracket_' 时，目录名为 'FocusBracket_xxxxxx'。"
             >对焦包围前缀</label>
             <WinInput :modelValue="store.getConfig()?.naming_rules.focus_bracketing_prefix || ''"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.naming_rules.focus_bracketing_prefix = v as string)
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.naming_rules, 'focus_bracketing_prefix', v as string)"
             />
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="AEB 包围曝光组的输出目录名前缀。整理后的 AEB 照片将存放在以此前缀开头的目录中。例如前缀为 'AEB_' 时，目录名为 'AEB_DSC0001'。"
+                   data-tooltip="AEB 包围曝光组的输出目录名前缀。整理后的 AEB 照片将存放在以此前缀开头的目录中。例如前缀为 'AEB_' 时，目录名为 'AEB_xxxxxx'。"
             >AEB 前缀</label>
             <WinInput :modelValue="store.getConfig()?.naming_rules.aeb_prefix || ''"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.naming_rules.aeb_prefix = v as string)
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.naming_rules, 'aeb_prefix', v as string)"
             />
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="连拍组的输出目录名前缀。整理后的连拍照片将存放在以此前缀开头的目录中。例如前缀为 'Burst_' 时，目录名为 'Burst_DSC0001'。"
+                   data-tooltip="连拍组的输出目录名前缀。整理后的连拍照片将存放在以此前缀开头的目录中。例如前缀为 'Burst_' 时，目录名为 'Burst_xxxxxx'。"
             >连拍前缀</label>
             <WinInput :modelValue="store.getConfig()?.naming_rules.burst_prefix || ''"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.naming_rules.burst_prefix = v as string)
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.naming_rules, 'burst_prefix', v as string)"
             />
           </div>
           <div class="setting-item">
@@ -282,10 +302,7 @@ onMounted(async () => {
                    data-tooltip="单张照片的输出目录名前缀。未被分组的单张照片将存放在以此前缀开头的目录中。留空表示单张照片不添加前缀，直接使用原文件名。"
             >单张前缀</label>
             <WinInput :modelValue="store.getConfig()?.naming_rules.single_prefix || ''"
-                      @update:modelValue="(v) =>
-                  store.getConfig() &&
-                  (store.getConfig()!.naming_rules.single_prefix = v as string)
-              "
+                      @update:modelValue="(v) => updateField(store.getConfig()?.naming_rules, 'single_prefix', v as string)"
             />
           </div>
         </div>

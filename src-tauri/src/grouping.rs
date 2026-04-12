@@ -39,6 +39,11 @@ pub fn cmp_time(a: &ExifInfo, b: &ExifInfo) -> Ordering {
         .unwrap_or(Ordering::Equal)
 }
 
+#[inline]
+fn is_unlimited(value: f64) -> bool {
+    value < 0.0
+}
+
 pub fn group_photos(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
     photos.sort_by(|a, b| cmp_time(a, b));
     let mut groups = Vec::new();
@@ -207,18 +212,29 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
     }
     let first = groups.first().unwrap();
     let last = groups.last().unwrap();
-    if let Some(time_span) = time_diff_seconds(last, first) {
-        if time_span > config.focus_bracket_settings.max_span {
-            return false;
+    if !is_unlimited(config.focus_bracket_settings.max_span) {
+        if let Some(time_span) = time_diff_seconds(last, first) {
+            if time_span > config.focus_bracket_settings.max_span {
+                return false;
+            }
         }
     }
 
-    for w in groups.windows(2) {
-        if let Some(interval) = time_diff_seconds(&w[0], &w[1]) {
-            if interval < config.focus_bracket_settings.min_consecutive_interval
-                || interval > config.focus_bracket_settings.max_consecutive_interval
-            {
-                return false;
+    if !is_unlimited(config.focus_bracket_settings.min_consecutive_interval)
+        || !is_unlimited(config.focus_bracket_settings.max_consecutive_interval)
+    {
+        for w in groups.windows(2) {
+            if let Some(interval) = time_diff_seconds(&w[0], &w[1]) {
+                if !is_unlimited(config.focus_bracket_settings.min_consecutive_interval)
+                    && interval < config.focus_bracket_settings.min_consecutive_interval
+                {
+                    return false;
+                }
+                if !is_unlimited(config.focus_bracket_settings.max_consecutive_interval)
+                    && interval > config.focus_bracket_settings.max_consecutive_interval
+                {
+                    return false;
+                }
             }
         }
     }
@@ -259,18 +275,29 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
     let first = groups.first().unwrap();
     let last = groups.last().unwrap();
 
-    if let Some(time_span) = time_diff_seconds(last, first) {
-        if time_span > config.aeb_settings.max_span {
-            return false;
+    if !is_unlimited(config.aeb_settings.max_span) {
+        if let Some(time_span) = time_diff_seconds(last, first) {
+            if time_span > config.aeb_settings.max_span {
+                return false;
+            }
         }
     }
 
-    for w in groups.windows(2) {
-        if let Some(interval) = time_diff_seconds(&w[0], &w[1]) {
-            if interval < config.aeb_settings.min_consecutive_interval
-                || interval > config.aeb_settings.max_consecutive_interval
-            {
-                return false;
+    if !is_unlimited(config.aeb_settings.min_consecutive_interval)
+        || !is_unlimited(config.aeb_settings.max_consecutive_interval)
+    {
+        for w in groups.windows(2) {
+            if let Some(interval) = time_diff_seconds(&w[0], &w[1]) {
+                if !is_unlimited(config.aeb_settings.min_consecutive_interval)
+                    && interval < config.aeb_settings.min_consecutive_interval
+                {
+                    return false;
+                }
+                if !is_unlimited(config.aeb_settings.max_consecutive_interval)
+                    && interval > config.aeb_settings.max_consecutive_interval
+                {
+                    return false;
+                }
             }
         }
     }
@@ -318,12 +345,21 @@ fn is_burst(groups: &[ExifInfo], config: &Config) -> bool {
         return false;
     }
 
-    for w in groups.windows(2) {
-        if let Some(interval) = time_diff_seconds(&w[0], &w[1]) {
-            if interval < config.burst_settings.min_consecutive_interval
-                || interval > config.burst_settings.max_consecutive_interval
-            {
-                return false;
+    if !is_unlimited(config.burst_settings.min_consecutive_interval)
+        || !is_unlimited(config.burst_settings.max_consecutive_interval)
+    {
+        for w in groups.windows(2) {
+            if let Some(interval) = time_diff_seconds(&w[0], &w[1]) {
+                if !is_unlimited(config.burst_settings.min_consecutive_interval)
+                    && interval < config.burst_settings.min_consecutive_interval
+                {
+                    return false;
+                }
+                if !is_unlimited(config.burst_settings.max_consecutive_interval)
+                    && interval > config.burst_settings.max_consecutive_interval
+                {
+                    return false;
+                }
             }
         }
     }
