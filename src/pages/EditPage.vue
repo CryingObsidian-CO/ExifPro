@@ -299,7 +299,13 @@ async function executeOrganize() {
                   @click="togglePhotoSelection(photo)"
               >
                 <div class="thumb-image">
-                  <span class="placeholder">🖼️</span>
+                  <img v-if="photo.thumbnail"
+                       :src="photo.thumbnail"
+                       :alt="photo.file_name"
+                       class="thumb-img"
+                       loading="lazy"
+                  />
+                  <span v-else class="placeholder">🖼️</span>
                 </div>
                 <div class="thumb-info">
                   <span class="thumb-name">{{ photo.file_name }}</span>
@@ -356,12 +362,6 @@ async function executeOrganize() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.sidebar .win-card {
-  border-radius: 0;
-  box-shadow: none;
-  border-bottom: 1px solid var(--color-border);
 }
 
 .action-group {
@@ -516,6 +516,13 @@ async function executeOrganize() {
   align-items: center;
   justify-content: center;
   background-color: var(--color-bg-tertiary);
+  overflow: hidden;
+}
+
+.thumb-image .thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .thumb-image .placeholder {
