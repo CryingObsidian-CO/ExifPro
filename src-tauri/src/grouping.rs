@@ -53,7 +53,7 @@ pub fn group_photos(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
         }
 
         let mut found_group = false;
-        for j in (config.group_parameters.focus_bracket_min_count..=photos.len() - i).rev() {
+        for j in (config.focus_bracket_settings.min_count..=photos.len() - i).rev() {
             let photo_group = &photos[i..i + j];
             if is_focus_bracketing(photo_group, config) {
                 let group = Group {
@@ -76,7 +76,7 @@ pub fn group_photos(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
             continue;
         }
 
-        for j in (config.group_parameters.aeb_min_count..=photos.len() - i).rev() {
+        for j in (config.aeb_settings.min_count..=photos.len() - i).rev() {
             let aeb_group = &photos[i..i + j];
             if is_aeb(aeb_group, config) {
                 let group = Group {
@@ -99,7 +99,7 @@ pub fn group_photos(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
             continue;
         }
 
-        for j in (config.group_parameters.burst_min_count..=photos.len() - i).rev() {
+        for j in (config.burst_settings.min_count..=photos.len() - i).rev() {
             let burst_group = &photos[i..i + j];
             if is_burst(burst_group, config) {
                 let group = Group {
@@ -121,8 +121,6 @@ pub fn group_photos(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
         if found_group {
             continue;
         }
-
-        // TODO: 处理单张照片的情况
 
         ungrouped_photos.push(photos[i].clone());
         used[i] = true;
@@ -204,14 +202,24 @@ fn is_monotonic(vec: &[Option<f64>]) -> bool {
 }
 
 fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
-    if groups.len() < config.group_parameters.focus_bracket_min_count {
+    if groups.len() < config.focus_bracket_settings.min_count {
         return false;
     }
     let first = groups.first().unwrap();
     let last = groups.last().unwrap();
     if let Some(time_span) = time_diff_seconds(last, first) {
-        if time_span > config.time_thresholds.focus_bracket_max_span {
+        if time_span > config.focus_bracket_settings.max_span {
             return false;
+        }
+    }
+
+    for w in groups.windows(2) {
+        if let Some(interval) = time_diff_seconds(&w[0], &w[1]) {
+            if interval < config.focus_bracket_settings.min_consecutive_interval
+                || interval > config.focus_bracket_settings.max_consecutive_interval
+            {
+                return false;
+            }
         }
     }
 
@@ -244,7 +252,7 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
 }
 
 fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
-    if groups.len() < config.group_parameters.aeb_min_count {
+    if groups.len() < config.aeb_settings.min_count {
         return false;
     }
 
@@ -252,8 +260,18 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
     let last = groups.last().unwrap();
 
     if let Some(time_span) = time_diff_seconds(last, first) {
-        if time_span > config.time_thresholds.aeb_max_span {
+        if time_span > config.aeb_settings.max_span {
             return false;
+        }
+    }
+
+    for w in groups.windows(2) {
+        if let Some(interval) = time_diff_seconds(&w[0], &w[1]) {
+            if interval < config.aeb_settings.min_consecutive_interval
+                || interval > config.aeb_settings.max_consecutive_interval
+            {
+                return false;
+            }
         }
     }
 
@@ -296,19 +314,21 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
 }
 
 fn is_burst(groups: &[ExifInfo], config: &Config) -> bool {
-    if groups.len() < config.group_parameters.burst_min_count {
+    if groups.len() < config.burst_settings.min_count {
         return false;
     }
 
     for w in groups.windows(2) {
-        if let Some(time_span) = time_diff_seconds(&w[0], &w[1]) {
-            if time_span > config.time_thresholds.burst_max_interval {
+        if let Some(interval) = time_diff_seconds(&w[0], &w[1]) {
+            if interval < config.burst_settings.min_consecutive_interval
+                || interval > config.burst_settings.max_consecutive_interval
+            {
                 return false;
             }
         }
     }
 
-    let same_shutter = groups.windows(2).all(|w| {
+    let same_params = groups.windows(2).all(|w| {
         w[0].shutter_speed == w[1].shutter_speed
             && w[0].aperture == w[1].aperture
             && w[0].iso == w[1].iso
@@ -316,5 +336,5 @@ fn is_burst(groups: &[ExifInfo], config: &Config) -> bool {
             && w[0].focal_length == w[1].focal_length
             && w[0].focus_distance == w[1].focus_distance
     });
-    same_shutter
+    same_params
 }

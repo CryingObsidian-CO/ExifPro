@@ -3,24 +3,33 @@ use std::path::PathBuf;
 use std::{env, fs};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
-    pub time_thresholds: TimeThresholds,
-    pub group_parameters: GroupParameters,
+    pub aeb_settings: AebSettings,
+    pub focus_bracket_settings: FocusBracketSettings,
+    pub burst_settings: BurstSettings,
     pub naming_rules: NamingRules,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TimeThresholds {
-    pub burst_max_interval: f64,
-    pub aeb_max_span: f64,
-    pub focus_bracket_max_span: f64,
-    pub min_group_interval: f64,
+pub struct AebSettings {
+    pub max_span: f64,
+    pub min_consecutive_interval: f64,
+    pub max_consecutive_interval: f64,
+    pub min_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GroupParameters {
-    pub burst_min_count: usize,
-    pub aeb_min_count: usize,
-    pub focus_bracket_min_count: usize,
+pub struct FocusBracketSettings {
+    pub max_span: f64,
+    pub min_consecutive_interval: f64,
+    pub max_consecutive_interval: f64,
+    pub min_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BurstSettings {
+    pub min_consecutive_interval: f64,
+    pub max_consecutive_interval: f64,
+    pub min_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,30 +42,42 @@ pub struct NamingRules {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            time_thresholds: TimeThresholds::default(),
-            group_parameters: GroupParameters::default(),
+            aeb_settings: AebSettings::default(),
+            focus_bracket_settings: FocusBracketSettings::default(),
+            burst_settings: BurstSettings::default(),
             naming_rules: NamingRules::default(),
         }
     }
 }
 
-impl Default for TimeThresholds {
+impl Default for AebSettings {
     fn default() -> Self {
-        TimeThresholds {
-            burst_max_interval: 0.5,
-            aeb_max_span: 0.3,
-            focus_bracket_max_span: 0.5,
-            min_group_interval: 2.0,
+        AebSettings {
+            max_span: 0.3,
+            min_consecutive_interval: 0.05,
+            max_consecutive_interval: 0.3,
+            min_count: 3,
         }
     }
 }
 
-impl Default for GroupParameters {
+impl Default for FocusBracketSettings {
     fn default() -> Self {
-        GroupParameters {
-            burst_min_count: 3,
-            aeb_min_count: 3,
-            focus_bracket_min_count: 5,
+        FocusBracketSettings {
+            max_span: 0.5,
+            min_consecutive_interval: 0.02,
+            max_consecutive_interval: 0.5,
+            min_count: 5,
+        }
+    }
+}
+
+impl Default for BurstSettings {
+    fn default() -> Self {
+        BurstSettings {
+            min_consecutive_interval: 0.02,
+            max_consecutive_interval: 0.5,
+            min_count: 3,
         }
     }
 }
@@ -106,8 +127,6 @@ impl Config {
 fn get_config_path() -> Result<PathBuf, String> {
     let exe_path = env::current_exe().map_err(|e| e.to_string())?;
     let exe_dir = exe_path.parent().ok_or("Failed to get parent directory")?;
-    // let config_dir = exe_dir.join(".config");
-    // fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
 
     let config_path = exe_dir.join("config.json");
     Ok(config_path)

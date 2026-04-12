@@ -43,17 +43,17 @@ const value = computed({
   outline: none;
 }
 
-.win-input:hover:not(:disabled):not(:readonly) {
+.win-input:hover:not(:disabled):not(:read-only) {
   border-color: var(--color-border-hover);
 }
 
-.win-input:focus:not(:disabled):not(:readonly) {
+.win-input:focus:not(:disabled):not(:read-only) {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 2px var(--color-accent-light);
 }
 
 .win-input:disabled,
-.win-input:readonly {
+.win-input:read-only {
   opacity: 0.6;
   cursor: not-allowed;
 }

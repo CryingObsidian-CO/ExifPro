@@ -30,7 +30,7 @@
   --color-focus-bracketing: #0078d4;
   --color-aeb: #ff8c00;
   --color-burst: #107c10;
-  --color-single: #107c1010;
+  --color-single: #6cd06a;
 }
 
 [data-theme='dark'] {
@@ -55,7 +55,7 @@
   --color-focus-bracketing: #0078d4;
   --color-aeb: #ff8c00;
   --color-burst: #107c10;
-  --color-single: #107c1010;
+  --color-single: #6cd06a;
 }
 
 * {

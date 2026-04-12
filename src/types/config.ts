@@ -1,14 +1,21 @@
-export interface TimeThresholds {
-  burst_max_interval: number;
-  aeb_max_span: number;
-  focus_bracket_max_span: number;
-  min_group_interval: number;
+export interface AebSettings {
+  max_span: number;
+  min_consecutive_interval: number;
+  max_consecutive_interval: number;
+  min_count: number;
 }
 
-export interface GroupParameters {
-  burst_min_count: number;
-  aeb_min_count: number;
-  focus_bracket_min_count: number;
+export interface FocusBracketSettings {
+  max_span: number;
+  min_consecutive_interval: number;
+  max_consecutive_interval: number;
+  min_count: number;
+}
+
+export interface BurstSettings {
+  min_consecutive_interval: number;
+  max_consecutive_interval: number;
+  min_count: number;
 }
 
 export interface NamingRules {
@@ -19,7 +26,8 @@ export interface NamingRules {
 }
 
 export interface Config {
-  time_thresholds: TimeThresholds;
-  group_parameters: GroupParameters;
+  aeb_settings: AebSettings;
+  focus_bracket_settings: FocusBracketSettings;
+  burst_settings: BurstSettings;
   naming_rules: NamingRules;
 }
