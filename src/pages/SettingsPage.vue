@@ -7,6 +7,7 @@ import {Theme} from "../types";
 import {onMounted, ref} from "vue";
 import WinInput from "../component/WinInput.vue";
 import {onBeforeRouteLeave} from "vue-router";
+import {confirm} from '@tauri-apps/plugin-dialog'
 
 const store = useStore();
 const tauri = useTauri();
@@ -69,12 +70,11 @@ async function reloadConfig() {
   }
 }
 
-onBeforeRouteLeave(async (_to, _from, next) => {
+onBeforeRouteLeave(async (_to, _from) => {
   if (!dirty.value) {
-    next();
     return;
   }
-  const save = confirm('设置已修改但未保存，是否保存？');
+  const save = await confirm('设置已修改但未保存，是否保存？');
   if (save) {
     const config = store.getConfig();
     if (config) {
@@ -85,22 +85,16 @@ onBeforeRouteLeave(async (_to, _from, next) => {
       }
     }
     dirty.value = false;
-    next();
   } else {
     await reloadConfig();
     dirty.value = false;
-    next();
+    return "/settings"
   }
 });
 
 onMounted(async () => {
   if (!store.getConfig()) {
-    try {
-      const config = await tauri.loadConfig();
-      store.setConfig(config);
-    } catch {
-      await tauri.resetConfig();
-    }
+    await reloadConfig()
   }
 });
 </script>
