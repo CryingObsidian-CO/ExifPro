@@ -8,10 +8,11 @@ import {onMounted, ref} from "vue";
 import WinInput from "../component/WinInput.vue";
 import WinToggle from "../component/WinToggle.vue";
 import {onBeforeRouteLeave} from "vue-router";
-import {confirm} from '@tauri-apps/plugin-dialog'
+import {useDialog} from "../composables/dialog.ts";
 
 const store = useStore();
 const tauri = useTauri();
+const {showAlert, showConfirm} = useDialog();
 const dirty = ref(false);
 
 function clampTimeValue(v: string | number): number {
@@ -38,10 +39,10 @@ async function saveSettings() {
     try {
       await tauri.saveConfig(config);
       dirty.value = false;
-      alert('设置已保存');
+      await showAlert('设置已保存', {title: '保存成功', tone: 'success'});
     } catch (error) {
       console.error('保存设置失败:', error);
-      alert('保存设置失败');
+      await showAlert('保存设置失败，请稍后重试。', {title: '保存失败', tone: 'error'});
     }
   }
 }
@@ -51,10 +52,10 @@ async function resetSettings() {
     const config = await tauri.resetConfig();
     store.setConfig(config);
     dirty.value = false;
-    alert('已重置为默认设置');
+    await showAlert('已重置为默认设置', {title: '重置成功', tone: 'success'});
   } catch (error) {
     console.error('重置设置失败:', error);
-    alert('重置设置失败');
+    await showAlert('重置设置失败，请稍后重试。', {title: '重置失败', tone: 'error'});
   }
 }
 
@@ -75,7 +76,13 @@ onBeforeRouteLeave(async (_to, _from) => {
   if (!dirty.value) {
     return;
   }
-  const save = await confirm('设置已修改但未保存，是否保存？');
+  const save = await showConfirm('设置已修改但未保存，是否保存后再离开？', {
+    title: '未保存的更改',
+    tone: 'warning',
+    confirmText: '保存并离开',
+    cancelText: '不保存并离开',
+    closeOnOverlay: false,
+  });
   if (save) {
     const config = store.getConfig();
     if (config) {
@@ -83,13 +90,14 @@ onBeforeRouteLeave(async (_to, _from) => {
         await tauri.saveConfig(config);
       } catch (error) {
         console.error('保存设置失败:', error);
+        await showAlert('保存失败，已取消离开页面。', {title: '保存失败', tone: 'error'});
+        return false;
       }
     }
     dirty.value = false;
   } else {
     await reloadConfig();
     dirty.value = false;
-    return "/settings"
   }
 });
 
@@ -356,11 +364,11 @@ onMounted(async () => {
 
 .page-content {
   flex: 1;
-  padding: 24px 32px;
+  padding: 20px 24px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
 
 .setting-section {
@@ -369,14 +377,16 @@ onMounted(async () => {
 
 .setting-label {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--color-text);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .setting-label.has-tooltip {
   cursor: help;
   position: relative;
+  display: inline-block;
+  align-self: flex-start;
 }
 
 .setting-label.has-tooltip::after {
@@ -408,7 +418,7 @@ onMounted(async () => {
 
 .theme-options {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 .theme-option {
@@ -416,8 +426,8 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px;
+  gap: 6px;
+  padding: 12px;
   border: 2px solid var(--color-border);
   border-radius: var(--border-radius);
   background-color: var(--color-bg-secondary);
@@ -439,14 +449,14 @@ onMounted(async () => {
 
 .settings-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
 }
 
 .setting-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .card-type-badge {
@@ -477,6 +487,18 @@ onMounted(async () => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding-top: 8px;
+  padding-top: 4px;
+}
+
+@media (min-width: 1100px) {
+  .settings-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1600px) {
+  .settings-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 </style>

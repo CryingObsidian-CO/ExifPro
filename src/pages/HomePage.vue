@@ -6,10 +6,12 @@ import WinCheckbox from "../component/WinCheckbox.vue";
 import {computed, onMounted} from "vue";
 import {useTauri} from "../composables/tauri.ts";
 import {useRouter} from "vue-router";
+import {useDialog} from "../composables/dialog.ts";
 
 const router = useRouter();
 const store = useStore();
 const tauriImpl = useTauri();
+const {showAlert} = useDialog();
 
 const selectSourceDir = async () => {
   const path = await tauriImpl.selectDirectory();
@@ -27,7 +29,7 @@ const selectOutputDir = async () => {
 
 const startAnalysis = async () => {
   if (!store.getSelectedDirectory()) {
-    alert('请选择有效的照片目录');
+    await showAlert('请选择有效的照片目录', {title: '目录无效', tone: 'warning'});
     return;
   }
 
@@ -41,11 +43,11 @@ const startAnalysis = async () => {
       store.setGroups(groups);
       await router.push('/edit');
     } else {
-      alert('请先配置分组参数');
+      await showAlert('请先配置分组参数', {title: '缺少配置', tone: 'warning'});
     }
   } catch (e) {
     console.error('分析失败:', e);
-    alert('分析失败: ' + (e as Error).message);
+    await showAlert('分析失败: ' + (e as Error).message, {title: '分析失败', tone: 'error'});
   } finally {
     store.setIsAnalyzing(false);
   }

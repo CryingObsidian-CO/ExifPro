@@ -6,11 +6,12 @@ import {useTauri} from "../composables/tauri.ts";
 import WinCard from "../component/WinCard.vue";
 import {ExifInfo, Group, GroupType} from "../types/photo.ts";
 import {ref} from "vue";
-import {confirm} from '@tauri-apps/plugin-dialog'
+import {useDialog} from "../composables/dialog.ts";
 
 const router = useRouter();
 const store = useStore();
 const tauriImpl = useTauri();
+const {showAlert, showConfirm} = useDialog();
 
 const selectedGroupIds = ref<string[]>([]);
 const selectedPhotos = ref<ExifInfo[]>([]);
@@ -62,15 +63,34 @@ function startRenaming(group: Group) {
 }
 
 async function handleBlur() {
-  if (!await confirm('确定要保存吗？')) {
+  if (!renamingGroupId.value) {
+    return;
+  }
+
+  if (!await showConfirm('确定要保存分组名称吗？', {
+    title: '确认重命名',
+    tone: 'warning',
+    confirmText: '保存',
+    cancelText: '取消',
+  })) {
+    cancelRenaming();
     return;
   }
   finishRenaming();
 }
 
+function cancelRenaming() {
+  renamingGroupId.value = null;
+  newGroupName.value = '';
+  const active = document.activeElement;
+  if (active instanceof HTMLElement) {
+    active.blur();
+  }
+}
+
 function finishRenaming() {
   if (renamingGroupId.value === 'ungrouped') {
-    alert('不能重命名未分组');
+    showAlert('不能重命名未分组', {title: '操作无效', tone: 'warning'});
     return;
   }
 
@@ -84,23 +104,28 @@ function finishRenaming() {
 
 async function disbandGroup(groupId: string) {
   if (groupId === 'ungrouped') {
-    alert('不能解散未分组');
+    await showAlert('不能解散未分组', {title: '操作无效', tone: 'warning'});
     return;
   }
 
   const group = store.findGroup(groupId);
   if (!group) return;
 
-  if (await confirm(`确定要解散分组 "${group.name}" 吗？照片将移动到未分组。`)) {
+  if (await showConfirm(`确定要解散分组 "${group.name}" 吗？照片将移动到未分组。`, {
+    title: '确认解散',
+    tone: 'warning',
+    confirmText: '确认解散',
+    cancelText: '取消',
+  })) {
     store.addToUngroupedPhotos(group.photos);
+    store.deleteGroup(groupId);
+    selectedGroupIds.value = selectedGroupIds.value.filter((id) => id !== groupId);
   }
-  store.deleteGroup(groupId);
-  selectedGroupIds.value = selectedGroupIds.value.filter((id) => id !== groupId);
 }
 
 async function createGroupFromSelected() {
   if (selectedPhotos.value.length === 0) {
-    alert('请选择照片');
+    await showAlert('请选择照片', {title: '未选择照片', tone: 'warning'});
     return;
   }
   const name = prompt('请输入分组名称:', '新分组');
@@ -111,9 +136,9 @@ async function createGroupFromSelected() {
   }
 }
 
-function moveSelectedToGroup() {
+async function moveSelectedToGroup() {
   if (selectedPhotos.value.length === 0) {
-    alert('请先选择照片');
+    await showAlert('请先选择照片', {title: '未选择照片', tone: 'warning'});
     return;
   }
 
@@ -123,7 +148,7 @@ function moveSelectedToGroup() {
 
   const targetGroup = store.findGroup(targetGroupId);
   if (!targetGroup) {
-    alert('未找到目标分组');
+    await showAlert('未找到目标分组', {title: '分组不存在', tone: 'error'});
     return;
   }
 
@@ -131,9 +156,9 @@ function moveSelectedToGroup() {
   selectedPhotos.value = [];
 }
 
-function mergeSelectedGroups() {
+async function mergeSelectedGroups() {
   if (selectedGroupIds.value.length < 2) {
-    alert('请选择至少两个分组');
+    await showAlert('请选择至少两个分组', {title: '选择不足', tone: 'warning'});
     return;
   }
   const name = prompt('请输入新分组名称:', '合并分组');
@@ -145,21 +170,28 @@ function mergeSelectedGroups() {
 
 async function executeOrganize() {
   if (!store.getOutputDirectory()) {
-    alert('请先选择输出目录');
+    await showAlert('请先选择输出目录', {title: '缺少输出目录', tone: 'warning'});
     await router.push('/');
     return;
   }
 
   if (store.getGroupsNumber() === 0) {
-    alert('没有可整理的分组');
+    await showAlert('没有可整理的分组', {title: '无可用分组', tone: 'warning'});
     return;
   }
 
   if (
-      !await confirm(
+      !await showConfirm(
           `确定要整理 ${store.getGroupsNumber()} 个分组吗？${
               store.getCopyMode() ? '文件将被复制到输出目录。' : '文件将被移动到输出目录。'
-          }`
+          }`,
+          {
+            title: '确认整理',
+            tone: 'warning',
+            confirmText: '开始整理',
+            cancelText: '取消',
+            closeOnOverlay: false,
+          }
       )
   ) {
     return;
@@ -172,9 +204,9 @@ async function executeOrganize() {
         store.getOutputDirectory(),
         store.getCopyMode(),
         store.getOverwrite());
-    alert('整理完成');
+    await showAlert('整理完成', {title: '整理完成', tone: 'success'});
   } catch (error) {
-    alert('整理失败: ' + (error as Error).message);
+    await showAlert('整理失败: ' + (error as Error).message, {title: '整理失败', tone: 'error'});
   } finally {
     store.setIsOrganizing(false);
   }
@@ -244,6 +276,7 @@ async function executeOrganize() {
                        v-model="newGroupName"
                        @blur="handleBlur"
                        @keyup.enter="finishRenaming"
+                       @keyup.esc="cancelRenaming"
                        ref="renameInput"
                        @focus="(e) => (e.target as HTMLInputElement).select()"
                 />

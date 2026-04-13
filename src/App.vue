@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {useRouter, useRoute} from 'vue-router';
 import {useStore} from "./store/store.ts";
+import WinDialogHost from "./component/WinDialogHost.vue";
 
 
 const router = useRouter();
@@ -47,6 +48,7 @@ const isEditPage = () => route?.path === '/edit';
     <div class="app-content">
       <router-view></router-view>
     </div>
+    <WinDialogHost />
   </div>
 </template>
 
