@@ -5,7 +5,7 @@ import {useRouter} from "vue-router";
 import {useTauri} from "../composables/tauri.ts";
 import WinCard from "../component/WinCard.vue";
 import {ExifInfo, Group, GroupType} from "../types/photo.ts";
-import {ref} from "vue";
+import {ref, watchEffect} from "vue";
 import {useDialog} from "../composables/dialog.ts";
 
 const router = useRouter();
@@ -15,8 +15,31 @@ const {showAlert, showConfirm} = useDialog();
 
 const selectedGroupIds = ref<string[]>([]);
 const selectedPhotos = ref<ExifInfo[]>([]);
+const selectedPhotoKeys = ref<string[]>([]);
+const lastAnchorPhotoKey = ref<string | null>(null);
 const renamingGroupId = ref<string | null>(null);
 const newGroupName = ref('');
+
+const mainContentRef = ref<HTMLElement | null>(null);
+const photosGridRef = ref<HTMLElement | null>(null);
+const selectionBox = ref({
+  visible: false,
+  left: 0,
+  top: 0,
+  width: 0,
+  height: 0,
+});
+
+type DragSelectState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  additive: boolean;
+  baseSelection: Set<string>;
+  dragging: boolean;
+};
+
+const dragSelectState = ref<DragSelectState | null>(null);
 
 function getGroupTypeLabel(type: GroupType) {
   const labels: Record<GroupType, string> = {
@@ -48,14 +71,220 @@ function toggleGroupSelection(groupId: string) {
   }
 }
 
-function togglePhotoSelection(photo: ExifInfo) {
-  const index = selectedPhotos.value.findIndex((p) => p.file_path === photo.file_path);
-  if (index === -1) {
-    selectedPhotos.value.push(photo);
-  } else {
-    selectedPhotos.value.splice(index, 1);
+function getPhotoCatalog() {
+  const keys: string[] = [];
+  const byKey = new Map<string, ExifInfo>();
+  for (const group of store.getGroups()) {
+    for (const photo of group.photos) {
+      keys.push(photo.file_path);
+      byKey.set(photo.file_path, photo);
+    }
   }
+  return {keys, byKey};
 }
+
+function applyPhotoSelection(keys: Iterable<string>) {
+  const uniqueKeys = Array.from(new Set(keys));
+  selectedPhotoKeys.value = uniqueKeys;
+  const {byKey} = getPhotoCatalog();
+  selectedPhotos.value = uniqueKeys
+  .map((key) => byKey.get(key))
+  .filter((photo): photo is ExifInfo => Boolean(photo));
+}
+
+function clearPhotoSelection() {
+  applyPhotoSelection([]);
+  lastAnchorPhotoKey.value = null;
+}
+
+function isPhotoSelected(photoKey: string) {
+  return selectedPhotoKeys.value.includes(photoKey);
+}
+
+function getRangeSelection(targetKey: string) {
+  const {keys} = getPhotoCatalog();
+  const anchorKey = lastAnchorPhotoKey.value ?? targetKey;
+  const start = keys.indexOf(anchorKey);
+  const end = keys.indexOf(targetKey);
+  if (start === -1 || end === -1) {
+    return [targetKey];
+  }
+
+  const [left, right] = start <= end ? [start, end] : [end, start];
+  return keys.slice(left, right + 1);
+}
+
+function handlePhotoClick(photo: ExifInfo, event: MouseEvent) {
+  const key = photo.file_path;
+  const isToggle = event.ctrlKey || event.metaKey;
+  const isRange = event.shiftKey;
+
+  if (isRange) {
+    const rangeKeys = getRangeSelection(key);
+    if (isToggle) {
+      const merged = new Set([...selectedPhotoKeys.value, ...rangeKeys]);
+      applyPhotoSelection(merged);
+    } else {
+      applyPhotoSelection(rangeKeys);
+    }
+    lastAnchorPhotoKey.value = key;
+    return;
+  }
+
+  if (isToggle) {
+    const next = new Set(selectedPhotoKeys.value);
+    next.has(key) ? next.delete(key) : next.add(key);
+    applyPhotoSelection(next);
+    lastAnchorPhotoKey.value = key;
+    return;
+  }
+  applyPhotoSelection([key]);
+  lastAnchorPhotoKey.value = key;
+}
+
+function rectanglesIntersect(a: DOMRect, b: DOMRect) {
+  return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+}
+
+function getIntersectedPhotoKeys(selectionRect: DOMRect) {
+  const root = photosGridRef.value;
+  if (!root) {
+    return [];
+  }
+
+  const elements = root.querySelectorAll<HTMLElement>('.photo-thumb[data-photo-key]');
+  const keys: string[] = [];
+  for (const element of elements) {
+    const key = element.dataset.photoKey;
+    if (!key) {
+      continue;
+    }
+
+    if (rectanglesIntersect(selectionRect, element.getBoundingClientRect())) {
+      keys.push(key);
+    }
+  }
+  return keys;
+}
+
+function updateSelectionBox(clientX: number, clientY: number) {
+  const container = mainContentRef.value;
+  if (!container) {
+    return;
+  }
+
+  const state = dragSelectState.value;
+  if (!state) {
+    return;
+  }
+
+  const containerRect = container.getBoundingClientRect();
+  const left = Math.min(state.startX, clientX);
+  const right = Math.max(state.startX, clientX);
+  const top = Math.min(state.startY, clientY);
+  const bottom = Math.max(state.startY, clientY);
+
+  selectionBox.value = {
+    visible: true,
+    left: left - containerRect.left + container.scrollLeft,
+    top: top - containerRect.top + container.scrollTop,
+    width: right - left,
+    height: bottom - top,
+  };
+}
+
+function handleMainContentPointerDown(event: PointerEvent) {
+  if (event.button !== 0) {
+    return;
+  }
+
+  if ((event.target as HTMLElement)?.closest('.photo-thumb')) {
+    return;
+  }
+
+  const container = mainContentRef.value;
+  if (!container) {
+    return;
+  }
+
+  dragSelectState.value = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    additive: event.ctrlKey || event.metaKey,
+    baseSelection: new Set(selectedPhotoKeys.value),
+    dragging: false,
+  };
+
+  container.setPointerCapture(event.pointerId);
+}
+
+function handleMainContentPointerMove(event: PointerEvent) {
+  const state = dragSelectState.value;
+  if (!state || event.pointerId !== state.pointerId) {
+    return;
+  }
+
+  const dx = event.clientX - state.startX;
+  const dy = event.clientY - state.startY;
+  if (!state.dragging && Math.hypot(dx, dy) < 4) {
+    return;
+  }
+
+  state.dragging = true;
+  updateSelectionBox(event.clientX, event.clientY);
+
+  const selectionRect = new DOMRect(
+      Math.min(state.startX, event.clientX),
+      Math.min(state.startY, event.clientY),
+      Math.abs(event.clientX - state.startX),
+      Math.abs(event.clientY - state.startY)
+  );
+  const intersected = getIntersectedPhotoKeys(selectionRect);
+  const selection = state.additive
+      ? new Set([...state.baseSelection, ...intersected])
+      : intersected;
+  applyPhotoSelection(selection);
+}
+
+function finishDragSelection(pointerId: number) {
+  const state = dragSelectState.value;
+  if (!state || state.pointerId !== pointerId) {
+    return;
+  }
+
+  if (state.dragging && selectedPhotoKeys.value.length > 0) {
+    lastAnchorPhotoKey.value = selectedPhotoKeys.value[selectedPhotoKeys.value.length - 1];
+  }
+
+  const container = mainContentRef.value;
+  if (container?.hasPointerCapture(pointerId)) {
+    container.releasePointerCapture(pointerId);
+  }
+
+  dragSelectState.value = null;
+  selectionBox.value.visible = false;
+}
+
+function handleMainContentPointerUp(event: PointerEvent) {
+  finishDragSelection(event.pointerId);
+}
+
+function handleMainContentPointerCancel(event: PointerEvent) {
+  finishDragSelection(event.pointerId);
+}
+
+watchEffect(() => {
+  const {keys} = getPhotoCatalog();
+  const validKeys = new Set(keys);
+  const filtered = selectedPhotoKeys.value.filter((key) => validKeys.has(key));
+  if (filtered.length !== selectedPhotoKeys.value.length) {
+    applyPhotoSelection(filtered);
+  }
+  if (lastAnchorPhotoKey.value && !validKeys.has(lastAnchorPhotoKey.value)) {
+    lastAnchorPhotoKey.value = null;
+  }
+});
 
 function startRenaming(group: Group) {
   renamingGroupId.value = group.id;
@@ -132,7 +361,7 @@ async function createGroupFromSelected() {
   if (name) {
     const newGroup = store.createGroup(name);
     store.movePhotoToGroup(selectedPhotos.value, newGroup.id);
-    selectedPhotos.value = [];
+    clearPhotoSelection();
   }
 }
 
@@ -153,7 +382,7 @@ async function moveSelectedToGroup() {
   }
 
   store.movePhotoToGroup(selectedPhotos.value, targetGroupId);
-  selectedPhotos.value = [];
+  clearPhotoSelection();
 }
 
 async function mergeSelectedGroups() {
@@ -312,8 +541,15 @@ async function executeOrganize() {
           </div>
         </div>
       </div>
-      <div class="main-content">
-        <div class="photos-grid">
+      <div class="main-content"
+           ref="mainContentRef"
+           @pointerdown="handleMainContentPointerDown"
+           @pointermove="handleMainContentPointerMove"
+           @pointerup="handleMainContentPointerUp"
+           @pointercancel="handleMainContentPointerCancel"
+           @selectstart.prevent
+      >
+        <div class="photos-grid" ref="photosGridRef">
           <div
               v-for="group in store.getGroups()"
               :key="group.id"
@@ -328,8 +564,10 @@ async function executeOrganize() {
                   v-for="photo in group.photos"
                   :key="photo.file_path"
                   class="photo-thumb"
-                  :class="{ selected: selectedPhotos.some((p) => p.file_path === photo.file_path) }"
-                  @click="togglePhotoSelection(photo)"
+                  :data-photo-key="photo.file_path"
+                  :class="{ selected: isPhotoSelected(photo.file_path) }"
+                  @click="handlePhotoClick(photo, $event)"
+                  @dragstart.prevent
               >
                 <div class="thumb-image">
                   <img v-if="photo.thumbnail"
@@ -347,6 +585,15 @@ async function executeOrganize() {
             </div>
           </div>
         </div>
+        <div v-if="selectionBox.visible"
+             class="selection-box"
+             :style="{
+               left: `${selectionBox.left}px`,
+               top: `${selectionBox.top}px`,
+               width: `${selectionBox.width}px`,
+               height: `${selectionBox.height}px`
+             }"
+        />
       </div>
     </div>
   </div>
@@ -499,6 +746,9 @@ async function executeOrganize() {
   flex: 1;
   overflow: auto;
   padding: 24px;
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .photos-grid {
@@ -532,6 +782,15 @@ async function executeOrganize() {
   border: 2px solid transparent;
   cursor: pointer;
   transition: all var(--transition-fast);
+}
+
+.selection-box {
+  position: absolute;
+  border: 1px solid var(--color-accent);
+  background-color: var(--color-accent-light);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 10;
 }
 
 .photo-thumb:hover {
