@@ -309,6 +309,15 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
         return false;
     }
 
+    if config.aeb_settings.auto_bracket_only {
+        let all_auto_bracket = groups
+            .iter()
+            .all(|p| p.exposure_mode == Some(2));
+        if !all_auto_bracket {
+            return false;
+        }
+    }
+
     let ev_values: Vec<Option<f64>> = groups
         .iter()
         .map(|p| {

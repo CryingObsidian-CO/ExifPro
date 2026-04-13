@@ -3,6 +3,7 @@ export interface AebSettings {
   min_consecutive_interval: number;
   max_consecutive_interval: number;
   min_count: number;
+  auto_bracket_only: boolean;
 }
 
 export interface FocusBracketSettings {

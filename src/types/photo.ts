@@ -9,6 +9,7 @@ export interface ExifInfo {
   aperture?: string;
   iso?: string;
   exposure_compensation?: string;
+  exposure_mode?: number;
   focal_length?: string;
   focus_distance?: string;
   camera_make?: string;

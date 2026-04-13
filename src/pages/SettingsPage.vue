@@ -6,6 +6,7 @@ import {useTauri} from "../composables/tauri.ts";
 import {Theme} from "../types";
 import {onMounted, ref} from "vue";
 import WinInput from "../component/WinInput.vue";
+import WinToggle from "../component/WinToggle.vue";
 import {onBeforeRouteLeave} from "vue-router";
 import {confirm} from '@tauri-apps/plugin-dialog'
 
@@ -149,6 +150,7 @@ onMounted(async () => {
                    data-tooltip="AEB 组中第一张与最后一张照片之间的最大允许时间差（秒）。首尾时间差超过此值的照片序列不会被识别为 AEB 组。通常 AEB 拍摄速度很快，建议设为 0.3~1.0 秒。填写 -1 表示不限制此时间条件。"
             >首尾最大跨度（秒）</label>
             <WinInput type="number"
+                      :step="0.1"
                       :modelValue="store.getConfig()?.aeb_settings.max_span || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'max_span', clampTimeValue(v))"
             />
@@ -158,6 +160,7 @@ onMounted(async () => {
                    data-tooltip="AEB 组中相邻两张照片之间的最小时间间隔（秒）。间隔小于此值可能是同一张照片的重复记录而非独立拍摄，有助于过滤异常数据。建议设为 0.01~0.1 秒。填写 -1 表示不限制此时间条件。"
             >相邻最小间隔（秒）</label>
             <WinInput type="number"
+                      :step="0.1"
                       :modelValue="store.getConfig()?.aeb_settings.min_consecutive_interval || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'min_consecutive_interval', clampTimeValue(v))"
             />
@@ -167,6 +170,7 @@ onMounted(async () => {
                    data-tooltip="AEB 组中相邻两张照片之间的最大时间间隔（秒）。相邻照片间隔超过此值表明可能不属于同一 AEB 序列，有助于区分不同的 AEB 拍摄组。建议设为 0.1~0.5 秒。填写 -1 表示不限制此时间条件。"
             >相邻最大间隔（秒）</label>
             <WinInput type="number"
+                      :step="0.1"
                       :modelValue="store.getConfig()?.aeb_settings.max_consecutive_interval || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'max_consecutive_interval', clampTimeValue(v))"
             />
@@ -176,8 +180,18 @@ onMounted(async () => {
                    data-tooltip="构成 AEB 组所需的最少照片数量。少于该数量的照片序列不会被识别为 AEB 组。典型 AEB 拍摄为 3 张（欠曝、正常、过曝），部分相机支持 5 张或 7 张。"
             >最小数量</label>
             <WinInput type="number"
+                      :step="1"
                       :modelValue="store.getConfig()?.aeb_settings.min_count || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'min_count', Number(v))"
+            />
+          </div>
+          <div class="setting-item">
+            <label class="setting-label has-tooltip"
+                   data-tooltip="开启后，仅当照片的 EXIF 曝光模式（ExposureMode）为「自动包围」（值为 2）时，才会被识别为 AEB 组。手动包围曝光（手动多次拍摄不同曝光参数的照片）将不被识别为 AEB。关闭此选项则不检查曝光模式，仅依据曝光参数变化进行识别。"
+            >仅允许自动包围曝光</label>
+            <WinToggle
+                :modelValue="store.getConfig()?.aeb_settings.auto_bracket_only || false"
+                @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'auto_bracket_only', v)"
             />
           </div>
         </div>
@@ -193,6 +207,7 @@ onMounted(async () => {
                    data-tooltip="对焦包围组中第一张与最后一张照片之间的最大允许时间差（秒）。首尾时间差超过此值的照片序列不会被识别为对焦包围组。对焦包围通常拍摄张数较多，建议设为 0.5~2.0 秒。填写 -1 表示不限制此时间条件。"
             >首尾最大跨度（秒）</label>
             <WinInput type="number"
+                      :step="0.1"
                       :modelValue="store.getConfig()?.focus_bracket_settings.max_span || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'max_span', clampTimeValue(v))"
             />
@@ -202,6 +217,7 @@ onMounted(async () => {
                    data-tooltip="对焦包围组中相邻两张照片之间的最小时间间隔（秒）。间隔小于此值可能是同一张照片的重复记录而非独立拍摄，有助于过滤异常数据。建议设为 0.01~0.05 秒。填写 -1 表示不限制此时间条件。"
             >相邻最小间隔（秒）</label>
             <WinInput type="number"
+                      :step="0.1"
                       :modelValue="store.getConfig()?.focus_bracket_settings.min_consecutive_interval || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'min_consecutive_interval', clampTimeValue(v))"
             />
@@ -211,6 +227,7 @@ onMounted(async () => {
                    data-tooltip="对焦包围组中相邻两张照片之间的最大时间间隔（秒）。相邻照片间隔超过此值表明可能不属于同一对焦包围序列，有助于区分不同的对焦包围拍摄组。建议设为 0.2~1.0 秒。填写 -1 表示不限制此时间条件。"
             >相邻最大间隔（秒）</label>
             <WinInput type="number"
+                      :step="0.1"
                       :modelValue="store.getConfig()?.focus_bracket_settings.max_consecutive_interval || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'max_consecutive_interval', clampTimeValue(v))"
             />
@@ -220,6 +237,7 @@ onMounted(async () => {
                    data-tooltip="构成对焦包围组所需的最少照片数量。少于该数量的照片序列不会被识别为对焦包围组。对焦包围通常需要较多张数以覆盖完整景深范围，建议设为 3~7 张。"
             >最小数量</label>
             <WinInput type="number"
+                      :step="1"
                       :modelValue="store.getConfig()?.focus_bracket_settings.min_count || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'min_count', Number(v))"
             />
@@ -238,6 +256,7 @@ onMounted(async () => {
                 data-tooltip="连拍组中相邻两张照片之间的最小时间间隔（秒）。间隔小于此值可能是同一张照片的重复记录而非独立拍摄，有助于过滤异常数据。建议设为 0.01~0.05 秒。填写 -1 表示不限制此时间条件。"
             >相邻最小间隔（秒）</label>
             <WinInput type="number"
+                      :step="0.1"
                       :modelValue="store.getConfig()?.burst_settings.min_consecutive_interval || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'min_consecutive_interval', clampTimeValue(v))"
             />
@@ -248,6 +267,7 @@ onMounted(async () => {
                 data-tooltip="连拍组中相邻两张照片之间的最大时间间隔（秒）。相邻照片间隔超过此值表明可能不属于同一连拍序列，有助于区分不同的连拍拍摄组。建议设为 0.3~1.0 秒，高速连拍可设更小值。填写 -1 表示不限制此时间条件。"
             >相邻最大间隔（秒）</label>
             <WinInput type="number"
+                      :step="0.1"
                       :modelValue="store.getConfig()?.burst_settings.max_consecutive_interval || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'max_consecutive_interval', clampTimeValue(v))"
             />
@@ -258,6 +278,7 @@ onMounted(async () => {
                 data-tooltip="构成连拍组所需的最少照片数量。少于该数量的照片序列不会被识别为连拍组。通常连拍至少需要 3 张以上才有意义。"
             >最小数量</label>
             <WinInput type="number"
+                      :step="1"
                       :modelValue="store.getConfig()?.burst_settings.min_count || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'min_count', Number(v))"
             />

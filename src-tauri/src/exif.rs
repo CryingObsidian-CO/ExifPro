@@ -21,6 +21,8 @@ pub struct ExifInfo {
     pub iso: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exposure_compensation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exposure_mode: Option<u32>,
     pub focal_length: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub focus_distance: Option<String>,
@@ -48,6 +50,7 @@ impl ExifInfo {
             aperture: None,
             iso: None,
             exposure_compensation: None,
+            exposure_mode: None,
             focal_length: None,
             focus_distance: None,
             camera_make: None,
@@ -109,6 +112,9 @@ pub fn parse_exif(file_path: &Path) -> Result<ExifInfo, Error> {
     exif_info.aperture = get_field_value(&exif, Tag::FNumber, In::PRIMARY);
     exif_info.iso = get_field_value(&exif, Tag::PhotographicSensitivity, In::PRIMARY);
     exif_info.exposure_compensation = get_field_value(&exif, Tag::ExposureBiasValue, In::PRIMARY);
+    exif_info.exposure_mode = exif
+        .get_field(Tag::ExposureMode, In::PRIMARY)
+        .and_then(|f| f.value.get_uint(0));
     exif_info.focal_length = get_field_value(&exif, Tag::FocalLength, In::PRIMARY);
     exif_info.focus_distance = get_field_value(&exif, Tag::SubjectDistance, In::PRIMARY);
     exif_info.camera_make = get_field_value(&exif, Tag::Make, In::PRIMARY);

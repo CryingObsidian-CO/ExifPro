@@ -15,6 +15,7 @@ pub struct AebSettings {
     pub min_consecutive_interval: f64,
     pub max_consecutive_interval: f64,
     pub min_count: usize,
+    pub auto_bracket_only: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,6 +58,7 @@ impl Default for AebSettings {
             min_consecutive_interval: 0.05,
             max_consecutive_interval: 0.3,
             min_count: 3,
+            auto_bracket_only: false,
         }
     }
 }

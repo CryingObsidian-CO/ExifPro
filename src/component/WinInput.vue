@@ -7,6 +7,7 @@ const props = defineProps<{
   placeholder?: string;
   disabled?: boolean;
   readonly?: boolean;
+  step?: string | number;
 }>();
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string | number): void;
@@ -25,6 +26,7 @@ const value = computed({
       :placeholder="placeholder"
       :disabled="disabled"
       :readonly="readonly"
+      :step="step"
       @input="(e) => (value = (e.target as HTMLInputElement).value)"
       class="win-input"
   />
@@ -57,4 +59,19 @@ const value = computed({
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+[data-theme='light'] .win-input[type='number'] {
+  color-scheme: light;
+}
+
+[data-theme='dark'] .win-input[type='number'] {
+  color-scheme: dark;
+}
+
+.win-input::-webkit-outer-spin-button,
+.win-input::-webkit-inner-spin-button {
+  opacity: 0.85;
+}
+
+
 </style>
