@@ -13,6 +13,25 @@ const store = useStore();
 const tauriImpl = useTauri();
 const {showAlert} = useDialog();
 
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) {
+      return message;
+    }
+  }
+
+  return '未知错误';
+};
+
 const selectSourceDir = async () => {
   const path = await tauriImpl.selectDirectory();
   if (path) {
@@ -45,9 +64,10 @@ const startAnalysis = async () => {
     } else {
       await showAlert('请先配置分组参数', {title: '缺少配置', tone: 'warning'});
     }
-  } catch (e) {
-    console.error('分析失败:', e);
-    await showAlert('分析失败: ' + (e as Error).message, {title: '分析失败', tone: 'error'});
+  } catch (error) {
+    const message = getErrorMessage(error);
+    console.error('分析失败:', error);
+    await showAlert('分析失败: ' + message, {title: '分析失败', tone: 'error'});
   } finally {
     store.setIsAnalyzing(false);
   }
@@ -68,14 +88,27 @@ const overwrite = computed({
   set: (val) => store.setOverwrite(val),
 });
 
+const selectedDirectory = computed({
+  get: () => store.getSelectedDirectory(),
+  set: (val) => store.setSelectedDirectory(val),
+});
+
+const outputDirectory = computed({
+  get: () => store.getOutputDirectory(),
+  set: (val) => store.setOutputDirectory(val),
+});
+
+
 onMounted(async () => {
   if (!store.getConfig()) {
     try {
       const config = await tauriImpl.loadConfig();
       store.setConfig(config);
-    } catch {
+    } catch (error) {
+      console.error('加载配置失败，已重置默认配置:', error);
       const config = await tauriImpl.resetConfig();
       store.setConfig(config);
+      await showAlert('配置文件读取失败，已恢复为默认配置。', {title: '配置已重置', tone: 'warning'});
     }
   }
 });
@@ -93,8 +126,7 @@ onMounted(async () => {
         <div class="input-group">
           <div class="path-input">
             <input type="text"
-                   :value="store.getSelectedDirectory()"
-                   readonly
+                   v-model="selectedDirectory"
                    placeholder="请选择照片目录...">
           </div>
           <WinButton @click="selectSourceDir">浏览...</WinButton>
@@ -112,8 +144,7 @@ onMounted(async () => {
         <div class="input-group">
           <div class="path-input">
             <input type="text"
-                   :value="store.getOutputDirectory()"
-                   readonly
+                   v-model="outputDirectory"
                    placeholder="请选择输出目录..."
             />
           </div>

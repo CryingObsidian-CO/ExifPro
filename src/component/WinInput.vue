@@ -8,6 +8,10 @@ const props = defineProps<{
   disabled?: boolean;
   readonly?: boolean;
   step?: string | number;
+  min?: string | number;
+  max?: string | number;
+  integerOnly?: boolean;
+  allowNegativeOne?: boolean;
 }>();
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string | number): void;
@@ -17,6 +21,39 @@ const value = computed({
   get: () => props.modelValue,
   set: (val) => emit('update:modelValue', val),
 });
+
+const handleInput = (e: Event) => {
+  const input = e.target as HTMLInputElement;
+  if (!input) {
+    return;
+  }
+
+  let nextValue = input.value.trim();
+  if (props.type === 'number' && props.integerOnly) {
+    // 整数正则：允许空、负数、0，不允许小数点
+    const integerReg = /^-?\d*$/;
+    if (!integerReg.test(nextValue)) {
+      return;
+    }
+  }
+  if (props.type === 'number' && nextValue !== '') {
+    const num = parseFloat(nextValue);
+    // 限制 min
+    if (props.min !== undefined && num < parseFloat(props.min as string)) {
+      if (props.allowNegativeOne && num == -1) {
+        nextValue = "-1";
+      } else {
+        nextValue = String(props.min);
+      }
+    }
+    // 限制 max
+    if (props.max !== undefined && num > parseFloat(props.max as string)) {
+      nextValue = String(props.max);
+    }
+  }
+  input.value = nextValue;
+  value.value = nextValue;
+};
 </script>
 
 <template>
@@ -27,7 +64,9 @@ const value = computed({
       :disabled="disabled"
       :readonly="readonly"
       :step="step"
-      @input="(e) => (value = (e.target as HTMLInputElement).value)"
+      :min="min"
+      :max="max"
+      @blur="handleInput"
       class="win-input"
   />
 </template>

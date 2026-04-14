@@ -15,13 +15,6 @@ const tauri = useTauri();
 const {showAlert, showConfirm} = useDialog();
 const dirty = ref(false);
 
-function clampTimeValue(v: string | number): number {
-  const n = Number(v);
-  if (isNaN(n)) return 0;
-  if (n < 0 && n !== -1) return -1;
-  return n;
-}
-
 function markDirty() {
   dirty.value = true;
 }
@@ -38,6 +31,7 @@ async function saveSettings() {
   if (config) {
     try {
       await tauri.saveConfig(config);
+      await reloadConfig();
       dirty.value = false;
       await showAlert('设置已保存', {title: '保存成功', tone: 'success'});
     } catch (error) {
@@ -67,8 +61,11 @@ async function reloadConfig() {
   try {
     const config = await tauri.loadConfig();
     store.setConfig(config);
-  } catch {
-    await tauri.resetConfig();
+  } catch (error) {
+    console.error('加载配置失败，已重置默认配置:', error);
+    const config = await tauri.resetConfig();
+    store.setConfig(config);
+    await showAlert('配置文件读取失败，已恢复为默认配置。', {title: '配置已重置', tone: 'warning'});
   }
 }
 
@@ -88,6 +85,7 @@ onBeforeRouteLeave(async (_to, _from) => {
     if (config) {
       try {
         await tauri.saveConfig(config);
+        await reloadConfig();
       } catch (error) {
         console.error('保存设置失败:', error);
         await showAlert('保存失败，已取消离开页面。', {title: '保存失败', tone: 'error'});
@@ -159,8 +157,10 @@ onMounted(async () => {
             >首尾最大跨度（秒）</label>
             <WinInput type="number"
                       :step="0.1"
+                      :min="0"
+                      allow-negative-one
                       :modelValue="store.getConfig()?.aeb_settings.max_span || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'max_span', clampTimeValue(v))"
+                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'max_span', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -169,8 +169,10 @@ onMounted(async () => {
             >相邻最小间隔（秒）</label>
             <WinInput type="number"
                       :step="0.1"
+                      :min="0"
+                      allow-negative-one
                       :modelValue="store.getConfig()?.aeb_settings.min_consecutive_interval || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'min_consecutive_interval', clampTimeValue(v))"
+                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'min_consecutive_interval', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -179,8 +181,10 @@ onMounted(async () => {
             >相邻最大间隔（秒）</label>
             <WinInput type="number"
                       :step="0.1"
+                      :min="0"
+                      allow-negative-one
                       :modelValue="store.getConfig()?.aeb_settings.max_consecutive_interval || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'max_consecutive_interval', clampTimeValue(v))"
+                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'max_consecutive_interval', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -189,6 +193,9 @@ onMounted(async () => {
             >最小数量</label>
             <WinInput type="number"
                       :step="1"
+                      :min="2"
+                      inputmode="numeric"
+                      :integerOnly="true"
                       :modelValue="store.getConfig()?.aeb_settings.min_count || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'min_count', Number(v))"
             />
@@ -216,8 +223,10 @@ onMounted(async () => {
             >首尾最大跨度（秒）</label>
             <WinInput type="number"
                       :step="0.1"
+                      :min="0"
+                      allow-negative-one
                       :modelValue="store.getConfig()?.focus_bracket_settings.max_span || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'max_span', clampTimeValue(v))"
+                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'max_span', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -226,8 +235,10 @@ onMounted(async () => {
             >相邻最小间隔（秒）</label>
             <WinInput type="number"
                       :step="0.1"
+                      :min="0"
+                      allow-negative-one
                       :modelValue="store.getConfig()?.focus_bracket_settings.min_consecutive_interval || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'min_consecutive_interval', clampTimeValue(v))"
+                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'min_consecutive_interval', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -236,8 +247,10 @@ onMounted(async () => {
             >相邻最大间隔（秒）</label>
             <WinInput type="number"
                       :step="0.1"
+                      :min="0"
+                      allow-negative-one
                       :modelValue="store.getConfig()?.focus_bracket_settings.max_consecutive_interval || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'max_consecutive_interval', clampTimeValue(v))"
+                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'max_consecutive_interval', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -246,6 +259,8 @@ onMounted(async () => {
             >最小数量</label>
             <WinInput type="number"
                       :step="1"
+                      :min="2"
+                      :integerOnly="true"
                       :modelValue="store.getConfig()?.focus_bracket_settings.min_count || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'min_count', Number(v))"
             />
@@ -265,8 +280,10 @@ onMounted(async () => {
             >相邻最小间隔（秒）</label>
             <WinInput type="number"
                       :step="0.1"
+                      :min="0"
+                      allow-negative-one
                       :modelValue="store.getConfig()?.burst_settings.min_consecutive_interval || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'min_consecutive_interval', clampTimeValue(v))"
+                      @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'min_consecutive_interval', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -276,8 +293,10 @@ onMounted(async () => {
             >相邻最大间隔（秒）</label>
             <WinInput type="number"
                       :step="0.1"
+                      :min="0"
+                      allow-negative-one
                       :modelValue="store.getConfig()?.burst_settings.max_consecutive_interval || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'max_consecutive_interval', clampTimeValue(v))"
+                      @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'max_consecutive_interval', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -287,6 +306,8 @@ onMounted(async () => {
             >最小数量</label>
             <WinInput type="number"
                       :step="1"
+                      :min="2"
+                      :integerOnly="true"
                       :modelValue="store.getConfig()?.burst_settings.min_count || 0"
                       @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'min_count', Number(v))"
             />

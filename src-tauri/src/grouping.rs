@@ -49,6 +49,9 @@ pub fn group_photos(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
     let mut groups = Vec::new();
     let mut used = vec![false; photos.len()];
     let mut group_id_counter = 0;
+    let focus_min_count = config.focus_bracket_settings.min_count.max(2);
+    let aeb_min_count = config.aeb_settings.min_count.max(2);
+    let burst_min_count = config.burst_settings.min_count.max(2);
 
     let mut ungrouped_photos = Vec::new();
 
@@ -58,7 +61,7 @@ pub fn group_photos(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
         }
 
         let mut found_group = false;
-        for j in (config.focus_bracket_settings.min_count..=photos.len() - i).rev() {
+        for j in (focus_min_count..=photos.len() - i).rev() {
             let photo_group = &photos[i..i + j];
             if is_focus_bracketing(photo_group, config) {
                 let group = Group {
@@ -81,7 +84,7 @@ pub fn group_photos(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
             continue;
         }
 
-        for j in (config.aeb_settings.min_count..=photos.len() - i).rev() {
+        for j in (aeb_min_count..=photos.len() - i).rev() {
             let aeb_group = &photos[i..i + j];
             if is_aeb(aeb_group, config) {
                 let group = Group {
@@ -104,7 +107,7 @@ pub fn group_photos(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
             continue;
         }
 
-        for j in (config.burst_settings.min_count..=photos.len() - i).rev() {
+        for j in (burst_min_count..=photos.len() - i).rev() {
             let burst_group = &photos[i..i + j];
             if is_burst(burst_group, config) {
                 let group = Group {

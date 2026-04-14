@@ -15,13 +15,12 @@ pub fn scan_directory(dir: &Path, recursive: bool) -> Result<Vec<PathBuf>, Strin
             }
         }
     } else {
-        if let Ok(entries) = fs::read_dir(dir) {
-            for entry in entries {
-                let entry = entry.map_err(|err| err.to_string())?;
-                let path = entry.path();
-                if path.is_file() && is_image_file(&path) {
-                    image_paths.push(path);
-                }
+        let entries = fs::read_dir(dir).map_err(|err| err.to_string())?;
+        for entry in entries {
+            let entry = entry.map_err(|err| err.to_string())?;
+            let path = entry.path();
+            if path.is_file() && is_image_file(&path) {
+                image_paths.push(path);
             }
         }
     }

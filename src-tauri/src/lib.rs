@@ -41,8 +41,8 @@ async fn save_config_command(config: Config) -> Result<(), String> {
         .map_err(|e| format!("Failed to save config: {}", e))
 }
 #[tauri::command]
-async fn load_config_command() -> Config {
-    Config::load().unwrap_or(Config::default())
+async fn load_config_command() -> Result<Config, String> {
+    Config::load().map_err(|e| format!("Failed to load config: {}", e))
 }
 
 #[tauri::command]
