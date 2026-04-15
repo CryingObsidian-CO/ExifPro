@@ -3,7 +3,14 @@ use std::io::Error;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-pub fn scan_directory(dir: &Path, recursive: bool) -> Result<Vec<PathBuf>, String> {
+pub async fn scan_directory(dir: &Path, recursive: bool) -> Result<Vec<PathBuf>, String> {
+    let dir = dir.to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || scan_directory_sync(&dir, recursive))
+        .await
+        .map_err(|err| format!("Failed to join scan task: {}", err))?
+}
+
+fn scan_directory_sync(dir: &Path, recursive: bool) -> Result<Vec<PathBuf>, String> {
     let mut image_paths = Vec::new();
 
     if recursive {

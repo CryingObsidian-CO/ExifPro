@@ -10,9 +10,10 @@ use crate::grouping::{group_photos, Group};
 use std::path::Path;
 
 #[tauri::command]
-fn scan_directory_command(path: String, recursive: bool) -> Result<Vec<ExifInfo>, String> {
+async fn scan_directory_command(path: String, recursive: bool) -> Result<Vec<ExifInfo>, String> {
     let dir_path = Path::new(&path);
     let image_paths = scan_directory(dir_path, recursive)
+        .await
         .map_err(|e| format!("Failed to scan directory: {}", e))?;
 
     let mut exif_infos = Vec::new();
@@ -31,7 +32,7 @@ async fn group_photos_command(
     config: Option<Config>,
 ) -> Result<Vec<Group>, String> {
     let config = config.unwrap_or(Config::default());
-    Ok(group_photos(photos, &config))
+    group_photos(photos, config).await
 }
 
 #[tauri::command]

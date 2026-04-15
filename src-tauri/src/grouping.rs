@@ -44,7 +44,13 @@ fn is_unlimited(value: f64) -> bool {
     value < 0.0
 }
 
-pub fn group_photos(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
+pub async fn group_photos(photos: Vec<ExifInfo>, config: Config) -> Result<Vec<Group>, String> {
+    tauri::async_runtime::spawn_blocking(move || group_photos_sync(photos, &config))
+        .await
+        .map_err(|err| format!("Failed to join grouping task: {}", err))
+}
+
+fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
     photos.sort_by(|a, b| cmp_time(a, b));
     let mut groups = Vec::new();
     let mut used = vec![false; photos.len()];
