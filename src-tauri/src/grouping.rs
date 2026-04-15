@@ -216,9 +216,18 @@ fn is_monotonic(vec: &[Option<f64>]) -> bool {
 }
 
 fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
+    // 是否小于最小数量
     if groups.len() < config.focus_bracket_settings.min_count {
         return false;
     }
+
+    //是否存在自动曝光模式
+    if groups.iter().any(|p| p.exposure_mode == Some(2)) {
+        return false;
+    }
+
+    // 是否限制了最大时间间隔?
+    // T : 首位时间间隔是否小于最大时间间隔
     let first = groups.first().unwrap();
     let last = groups.last().unwrap();
     if !is_unlimited(config.focus_bracket_settings.max_span) {
@@ -229,6 +238,8 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
         }
     }
 
+    // 是否限制了相邻时间间隔?
+    // T : 相邻时间间隔是否在最小时间间隔和最大时间间隔之间
     if !is_unlimited(config.focus_bracket_settings.min_consecutive_interval)
         || !is_unlimited(config.focus_bracket_settings.max_consecutive_interval)
     {
@@ -248,6 +259,7 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
         }
     }
 
+    // 是否照片的参数都相同 （快门速度、光圈、ISO、曝光补偿、焦距）
     let same_shutter = groups
         .windows(2)
         .all(|w| w[0].shutter_speed == w[1].shutter_speed);
@@ -264,6 +276,7 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
         return false;
     }
 
+    // 对焦距离变化是否是单调的
     let focus_distances: Vec<Option<f64>> = groups
         .iter()
         .map(|p| {
@@ -277,13 +290,15 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
 }
 
 fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
+    // 是否小于最小数量
     if groups.len() < config.aeb_settings.min_count {
         return false;
     }
 
+    // 是否限制了最大时间间隔?
+    // T : 首位时间间隔是否小于最大时间间隔
     let first = groups.first().unwrap();
     let last = groups.last().unwrap();
-
     if !is_unlimited(config.aeb_settings.max_span) {
         if let Some(time_span) = time_diff_seconds(last, first) {
             if time_span > config.aeb_settings.max_span {
@@ -292,6 +307,8 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
         }
     }
 
+    // 是否限制了相邻时间间隔?
+    // T : 相邻时间间隔是否在最小时间间隔和最大时间间隔之间
     if !is_unlimited(config.aeb_settings.min_consecutive_interval)
         || !is_unlimited(config.aeb_settings.max_consecutive_interval)
     {
@@ -311,6 +328,7 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
         }
     }
 
+    // 是否照片的参数都相同 （焦距）
     let same_focal = groups
         .windows(2)
         .all(|w| w[0].focal_length == w[1].focal_length);
@@ -318,15 +336,17 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
         return false;
     }
 
+    // 是否仅允许自动曝光模式?
+    // T : 是否所有照片都是自动曝光模式
     if config.aeb_settings.auto_bracket_only {
-        let all_auto_bracket = groups
-            .iter()
-            .all(|p| p.exposure_mode == Some(2));
+        let all_auto_bracket = groups.iter().all(|p| p.exposure_mode == Some(2));
         if !all_auto_bracket {
             return false;
         }
     }
 
+    // 曝光补偿是否有 正 负 零
+    // TODO 优化相应逻辑，从是否有的判断改为是否对称变化
     let ev_values: Vec<Option<f64>> = groups
         .iter()
         .map(|p| {
@@ -335,7 +355,6 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
                 .and_then(|s| parse_exposure_value(s))
         })
         .collect();
-
     let has_zero = ev_values.iter().any(|&ev| ev == Some(0.0));
     let has_positive = ev_values
         .iter()
@@ -343,12 +362,11 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
     let has_negative = ev_values
         .iter()
         .any(|&ev| ev.map(|e| e < 0.0).unwrap_or(false));
-
-    // TODO 优化相应逻辑，从是否有的判断改为是否对称变化
     if !has_zero || !has_positive || !has_negative {
         return false;
     }
 
+    // 是否照片的参数都不同 （快门速度、光圈、ISO）
     let param_different = groups.windows(2).any(|w| {
         w[0].shutter_speed != w[1].shutter_speed
             || w[0].aperture != w[1].aperture
@@ -359,10 +377,13 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
 }
 
 fn is_burst(groups: &[ExifInfo], config: &Config) -> bool {
+    // 是否小于最小数量
     if groups.len() < config.burst_settings.min_count {
         return false;
     }
 
+    // 是否限制了相邻时间间隔?
+    // T : 相邻时间间隔是否在最小时间间隔和最大时间间隔之间
     if !is_unlimited(config.burst_settings.min_consecutive_interval)
         || !is_unlimited(config.burst_settings.max_consecutive_interval)
     {
@@ -382,6 +403,7 @@ fn is_burst(groups: &[ExifInfo], config: &Config) -> bool {
         }
     }
 
+    // 是否照片的参数都相同 （快门速度、光圈、ISO、曝光补偿、焦距、对焦距离）
     let same_params = groups.windows(2).all(|w| {
         w[0].shutter_speed == w[1].shutter_speed
             && w[0].aperture == w[1].aperture

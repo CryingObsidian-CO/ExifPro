@@ -5,7 +5,7 @@ import {useRouter} from "vue-router";
 import {useTauri} from "../composables/tauri.ts";
 import WinCard from "../component/WinCard.vue";
 import {ExifInfo, Group, GroupType} from "../types/photo.ts";
-import {ref, watchEffect} from "vue";
+import {onMounted, onUnmounted, ref, watchEffect} from "vue";
 import {useDialog} from "../composables/dialog.ts";
 
 const router = useRouter();
@@ -16,6 +16,7 @@ const {showAlert, showConfirm} = useDialog();
 const selectedGroupIds = ref<string[]>([]);
 const selectedPhotos = ref<ExifInfo[]>([]);
 const selectedPhotoKeys = ref<string[]>([]);
+const detailPhoto = ref<ExifInfo | null>(null);
 const lastAnchorPhotoKey = ref<string | null>(null);
 const renamingGroupId = ref<string | null>(null);
 const newGroupName = ref('');
@@ -99,6 +100,103 @@ function clearPhotoSelection() {
 
 function isPhotoSelected(photoKey: string) {
   return selectedPhotoKeys.value.includes(photoKey);
+}
+
+function stripWrappingQuotes(value: string) {
+  let text = value.trim();
+  while (
+      text.length >= 2
+      && ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'")))
+      ) {
+    text = text.slice(1, -1).trim();
+  }
+  return text;
+}
+
+function toCleanText(value?: string | number) {
+  if (value === undefined || value === null) {
+    return '';
+  }
+  const text = stripWrappingQuotes(String(value));
+  return text.trim();
+}
+
+function displayValue(value?: string | number) {
+  const text = toCleanText(value);
+  return text.length > 0 ? text : '—';
+}
+
+function formatWithUnit(value: string | number | undefined, unit: string) {
+  const text = toCleanText(value);
+  if (!text) {
+    return '—';
+  }
+  const lowerText = text.toLowerCase();
+  const lowerUnit = unit.toLowerCase();
+  if (lowerText.includes(lowerUnit)) {
+    return text;
+  }
+  return `${text} ${unit}`;
+}
+
+function formatAperture(value: string | undefined) {
+  const text = toCleanText(value);
+  if (!text) {
+    return '—';
+  }
+  if (/^f\s*\//i.test(text)) {
+    return text;
+  }
+  return `f/${text}`;
+}
+
+function formatIso(value: string | undefined) {
+  const text = toCleanText(value);
+  if (!text) {
+    return '—';
+  }
+  if (/^iso\s*/i.test(text)) {
+    return text;
+  }
+  return `ISO ${text}`;
+}
+
+function formatExposureMode(value?: number) {
+  if (value === undefined || value === null) {
+    return '—';
+  }
+  const labels: Record<number, string> = {
+    0: '自动曝光',
+    1: '手动曝光',
+    2: '自动包围曝光',
+  };
+  return labels[value] ?? `未知(${value})`;
+}
+
+function formatCaptureTime(photo: ExifInfo) {
+  const captureTime = toCleanText(photo.capture_time);
+  const subSecond = toCleanText(photo.sub_time).replace(/^\.+/, '');
+  if (!captureTime) {
+    return '—';
+  }
+  if (!subSecond) {
+    return captureTime;
+  }
+  return `${captureTime}.${subSecond}`;
+}
+
+function openPhotoDetail(photo: ExifInfo) {
+  detailPhoto.value = photo;
+}
+
+function closePhotoDetail() {
+  detailPhoto.value = null;
+}
+
+function handleWindowKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && detailPhoto.value) {
+    closePhotoDetail();
+  }
 }
 
 function getRangeSelection(targetKey: string) {
@@ -284,6 +382,17 @@ watchEffect(() => {
   if (lastAnchorPhotoKey.value && !validKeys.has(lastAnchorPhotoKey.value)) {
     lastAnchorPhotoKey.value = null;
   }
+  if (detailPhoto.value && !validKeys.has(detailPhoto.value.file_path)) {
+    detailPhoto.value = null;
+  }
+});
+
+onMounted(() => {
+  window.addEventListener('keydown', handleWindowKeydown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleWindowKeydown);
 });
 
 function startRenaming(group: Group) {
@@ -567,6 +676,7 @@ async function executeOrganize() {
                   :data-photo-key="photo.file_path"
                   :class="{ selected: isPhotoSelected(photo.file_path) }"
                   @click="handlePhotoClick(photo, $event)"
+                  @dblclick.stop="openPhotoDetail(photo)"
                   @dragstart.prevent
               >
                 <div class="thumb-image">
@@ -594,6 +704,70 @@ async function executeOrganize() {
                height: `${selectionBox.height}px`
              }"
         />
+      </div>
+
+      <div v-if="detailPhoto" class="photo-detail-overlay" @click.self="closePhotoDetail">
+        <div class="photo-detail-dialog" role="dialog" aria-modal="true">
+          <div class="photo-detail-header">
+            <h3>图片详情</h3>
+            <WinButton variant="secondary" @click="closePhotoDetail">关闭</WinButton>
+          </div>
+
+          <div class="photo-detail-body">
+            <div class="photo-detail-preview">
+              <img v-if="detailPhoto.thumbnail"
+                   :src="detailPhoto.thumbnail"
+                   :alt="detailPhoto.file_name"
+                   class="photo-detail-image"
+              />
+              <div v-else class="photo-detail-placeholder">无预览图</div>
+            </div>
+
+            <div class="photo-detail-grid">
+              <div class="detail-item">
+                <span>文件名</span><strong>{{ displayValue(detailPhoto.file_name) }}</strong></div>
+              <div class="detail-item">
+                <span>文件路径</span><strong>{{ displayValue(detailPhoto.file_path) }}</strong>
+              </div>
+              <div class="detail-item">
+                <span>拍摄时间</span><strong>{{ formatCaptureTime(detailPhoto) }}</strong>
+              </div>
+              <div class="detail-item">
+                <span>快门速度</span><strong>{{
+                  formatWithUnit(detailPhoto.shutter_speed, 's')
+                }}</strong>
+              </div>
+              <div class="detail-item">
+                <span>光圈</span><strong>{{ formatAperture(detailPhoto.aperture) }}</strong></div>
+              <div class="detail-item"><span>ISO</span><strong>{{
+                  formatIso(detailPhoto.iso)
+                }}</strong></div>
+              <div class="detail-item"><span>曝光补偿</span><strong>{{
+                  formatWithUnit(detailPhoto.exposure_compensation, 'EV')
+                }}</strong></div>
+              <div class="detail-item">
+                <span>曝光模式</span><strong>{{
+                  formatExposureMode(detailPhoto.exposure_mode)
+                }}</strong>
+              </div>
+              <div class="detail-item">
+                <span>焦距</span><strong>{{
+                  formatWithUnit(detailPhoto.focal_length, 'mm')
+                }}</strong></div>
+              <div class="detail-item">
+                <span>对焦距离</span><strong>{{
+                  formatWithUnit(detailPhoto.focus_distance, 'm')
+                }}</strong>
+              </div>
+              <div class="detail-item">
+                <span>相机品牌</span><strong>{{ displayValue(detailPhoto.camera_make) }}</strong>
+              </div>
+              <div class="detail-item">
+                <span>相机型号</span><strong>{{ displayValue(detailPhoto.camera_model) }}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -791,6 +965,108 @@ async function executeOrganize() {
   opacity: 0.5;
   pointer-events: none;
   z-index: 10;
+}
+
+.photo-detail-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.photo-detail-dialog {
+  width: min(900px, 100%);
+  max-height: min(85vh, 820px);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.photo-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.photo-detail-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.photo-detail-body {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1fr);
+  gap: 16px;
+  padding: 16px;
+  overflow: auto;
+}
+
+.photo-detail-preview {
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-sm);
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.photo-detail-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.photo-detail-placeholder {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.photo-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.detail-item {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.detail-item span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.detail-item strong {
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 860px) {
+  .photo-detail-body {
+    grid-template-columns: 1fr;
+  }
+
+  .photo-detail-preview {
+    min-height: 220px;
+  }
 }
 
 .photo-thumb:hover {
