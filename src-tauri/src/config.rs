@@ -54,7 +54,7 @@ impl Default for Config {
 impl Default for AebSettings {
     fn default() -> Self {
         AebSettings {
-            max_span: 0.3,
+            max_span: 1.0,
             min_consecutive_interval: 0.05,
             max_consecutive_interval: 0.3,
             min_count: 3,
@@ -66,7 +66,7 @@ impl Default for AebSettings {
 impl Default for FocusBracketSettings {
     fn default() -> Self {
         FocusBracketSettings {
-            max_span: 0.5,
+            max_span: 1.0,
             min_consecutive_interval: 0.02,
             max_consecutive_interval: 0.5,
             min_count: 5,

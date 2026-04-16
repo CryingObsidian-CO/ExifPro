@@ -177,11 +177,16 @@ fn parse_focus_distance(focus_distance: &str) -> Option<f64> {
 fn parse_capture_time(time_info: &ExifInfo) -> Option<DateTime<Utc>> {
     let capture = time_info.capture_time.as_deref().unwrap_or("");
     let sub = time_info.sub_time.as_deref().unwrap_or("999");
-    let time_str = format!("{}.{}", capture, sub);
+    let offset = time_info
+        .offset_time_original
+        .as_deref()
+        .unwrap_or("+00:00");
+    let time_str = format!("{}.{} {}", capture, sub, offset);
 
-    if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y:%m:%d %H:%M:%S.%f") {
+    // TODO 处理时区转换
+    if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y:%m:%d %H:%M:%S.%3f %z") {
         Some(dt.with_timezone(&Utc))
-    } else if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y-%m-%d %H:%M:%S.%f") {
+    } else if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y-%m-%d %H:%M:%S.%3f %z") {
         Some(dt.with_timezone(&Utc))
     } else {
         None
@@ -193,11 +198,45 @@ fn parse_exposure_value(ev_str: &str) -> Option<f64> {
     cleaned.parse::<f64>().ok()
 }
 
+fn is_symmetric_ev_bracket(ev_values: &[f64]) -> bool {
+    const EPS: f64 = 1e-6;
+
+    if ev_values.len() < 3 {
+        return false;
+    }
+
+    let mut sorted = ev_values.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+
+    let mid = sorted.len() / 2;
+    let center = if sorted.len() % 2 == 1 {
+        sorted[mid]
+    } else {
+        (sorted[mid - 1] + sorted[mid]) / 2.0
+    };
+
+    let has_lower = sorted.iter().any(|v| *v < center - EPS);
+    let has_upper = sorted.iter().any(|v| *v > center + EPS);
+    if !has_lower || !has_upper {
+        return false;
+    }
+
+    let expected_sum = 2.0 * center;
+    for i in 0..(sorted.len() / 2) {
+        let pair_sum = sorted[i] + sorted[sorted.len() - 1 - i];
+        if (pair_sum - expected_sum).abs() > EPS {
+            return false;
+        }
+    }
+
+    true
+}
+
 fn time_diff_seconds(a: &ExifInfo, b: &ExifInfo) -> Option<f64> {
     let dt_a = parse_capture_time(a)?;
     let dt_b = parse_capture_time(b)?;
     let diff = dt_a.signed_duration_since(dt_b);
-    Some(diff.num_milliseconds() as f64 / 1000.0)
+    Some(diff.abs().num_milliseconds() as f64 / 1000.0)
 }
 
 fn is_monotonic(vec: &[Option<f64>]) -> bool {
@@ -341,13 +380,13 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
     if config.aeb_settings.auto_bracket_only {
         let all_auto_bracket = groups.iter().all(|p| p.exposure_mode == Some(2));
         if !all_auto_bracket {
+            println!("001?");
             return false;
         }
     }
 
-    // 曝光补偿是否有 正 负 零
-    // TODO 优化相应逻辑，从是否有的判断改为是否对称变化
-    let ev_values: Vec<Option<f64>> = groups
+    // 曝光补偿应围绕某个中心值对称变化（中心值不必是 0）
+    let ev_values: Option<Vec<f64>> = groups
         .iter()
         .map(|p| {
             p.exposure_compensation
@@ -355,14 +394,10 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
                 .and_then(|s| parse_exposure_value(s))
         })
         .collect();
-    let has_zero = ev_values.iter().any(|&ev| ev == Some(0.0));
-    let has_positive = ev_values
-        .iter()
-        .any(|&ev| ev.map(|e| e > 0.0).unwrap_or(false));
-    let has_negative = ev_values
-        .iter()
-        .any(|&ev| ev.map(|e| e < 0.0).unwrap_or(false));
-    if !has_zero || !has_positive || !has_negative {
+    let Some(ev_values) = ev_values else {
+        return false;
+    };
+    if !is_symmetric_ev_bracket(&ev_values) {
         return false;
     }
 

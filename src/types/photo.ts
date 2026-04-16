@@ -5,6 +5,7 @@ export interface ExifInfo {
   file_name: string;
   capture_time?: string;
   sub_time?: string;
+  offset_time_original?: string;
   shutter_speed?: string;
   aperture?: string;
   iso?: string;

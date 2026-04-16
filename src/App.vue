@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import {useRouter, useRoute} from 'vue-router';
-import {useStore} from "./store/store.ts";
+import {store} from "./store/store.ts";
 import WinDialogHost from "./component/WinDialogHost.vue";
 
 
 const router = useRouter();
 const route = useRoute();
-const store = useStore();
 
 const navItems = [
   {path: '/', name: '首页', icon: '🏠'},
@@ -38,10 +37,10 @@ const isEditPage = () => route?.path === '/edit';
 
       <div class="nav-theme">
         <button class="theme-toggle"
-                @click="store.setTheme(store.getTheme() === 'light' ? 'dark' : store.getTheme() === 'dark' ? 'system' : 'light')"
-                :title="'当前主题: ' + store.getTheme()"
+                @click="store.theme = store.theme === 'light' ? 'dark' : store.theme === 'dark' ? 'system' : 'light'"
+                :title="'当前主题: ' + store.theme"
         >
-          {{ store.getTheme() === 'light' ? '☀️' : store.getTheme() === 'dark' ? '🌙' : '💻' }}
+          {{ store.theme === 'light' ? '☀️' : store.theme === 'dark' ? '🌙' : '💻' }}
         </button>
       </div>
     </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {useStore} from "../store/store.ts";
+import {store} from "../store/store.ts";
 import WinButton from "../component/WinButton.vue";
 import {useRouter} from "vue-router";
 import {useTauri} from "../composables/tauri.ts";
@@ -9,7 +9,6 @@ import {onMounted, onUnmounted, ref, watchEffect} from "vue";
 import {useDialog} from "../composables/dialog.ts";
 
 const router = useRouter();
-const store = useStore();
 const tauriImpl = useTauri();
 const {showAlert, showConfirm} = useDialog();
 
@@ -75,7 +74,7 @@ function toggleGroupSelection(groupId: string) {
 function getPhotoCatalog() {
   const keys: string[] = [];
   const byKey = new Map<string, ExifInfo>();
-  for (const group of store.getGroups()) {
+  for (const group of store.groups) {
     for (const photo of group.photos) {
       keys.push(photo.file_path);
       byKey.set(photo.file_path, photo);
@@ -176,13 +175,13 @@ function formatExposureMode(value?: number) {
 function formatCaptureTime(photo: ExifInfo) {
   const captureTime = toCleanText(photo.capture_time);
   const subSecond = toCleanText(photo.sub_time).replace(/^\.+/, '');
+  const offsetTime = toCleanText(photo.offset_time_original);
   if (!captureTime) {
     return '—';
   }
-  if (!subSecond) {
-    return captureTime;
-  }
-  return `${captureTime}.${subSecond}`;
+
+  const withSubSecond = subSecond ? `${captureTime}.${subSecond}` : captureTime;
+  return offsetTime ? `${withSubSecond} ${offsetTime}` : withSubSecond;
 }
 
 function openPhotoDetail(photo: ExifInfo) {
@@ -507,21 +506,21 @@ async function mergeSelectedGroups() {
 }
 
 async function executeOrganize() {
-  if (!store.getOutputDirectory()) {
+  if (!store.outputDirectory) {
     await showAlert('请先选择输出目录', {title: '缺少输出目录', tone: 'warning'});
     await router.push('/');
     return;
   }
 
-  if (store.getGroupsNumber() === 0) {
+  if (store.groupsNumber === 0) {
     await showAlert('没有可整理的分组', {title: '无可用分组', tone: 'warning'});
     return;
   }
 
   if (
       !await showConfirm(
-          `确定要整理 ${store.getGroupsNumber()} 个分组吗？${
-              store.getCopyMode() ? '文件将被复制到输出目录。' : '文件将被移动到输出目录。'
+          `确定要整理 ${store.groupsNumber} 个分组吗？${
+              store.copyMode ? '文件将被复制到输出目录。' : '文件将被移动到输出目录。'
           }`,
           {
             title: '确认整理',
@@ -535,18 +534,18 @@ async function executeOrganize() {
     return;
   }
 
-  store.setIsOrganizing(true);
+  store.isOrganizing = true;
   try {
     await tauriImpl.organizeFiles(
-        store.getGroups(),
-        store.getOutputDirectory(),
-        store.getCopyMode(),
-        store.getOverwrite());
+        store.groups,
+        store.outputDirectory,
+        store.copyMode,
+        store.overwrite);
     await showAlert('整理完成', {title: '整理完成', tone: 'success'});
   } catch (error) {
     await showAlert('整理失败: ' + (error as Error).message, {title: '整理失败', tone: 'error'});
   } finally {
-    store.setIsOrganizing(false);
+    store.isOrganizing = false;
   }
 }
 </script>
@@ -556,15 +555,15 @@ async function executeOrganize() {
     <div class="page-header">
       <div class="header-left">
         <h1>编辑配置</h1>
-        <p>{{ store.getGroupsNumber() }} 个分组，共 {{ store.getPhotosNumber() }} 张照片</p>
+        <p>{{ store.groupsNumber }} 个分组，共 {{ store.photosNumber }} 张照片</p>
       </div>
       <div class="header-actions">
         <WinButton @click="$router.push('/')">返回</WinButton>
         <WinButton variant="primary"
-                   :disabled="store.getIsOrganizing()"
+                   :disabled="store.isOrganizing"
                    @click="executeOrganize"
         >
-          {{ store.getIsOrganizing() ? '保存中...' : '保存' }}
+          {{ store.isOrganizing ? '保存中...' : '保存' }}
         </WinButton>
       </div>
     </div>
@@ -602,7 +601,7 @@ async function executeOrganize() {
         </WinCard>
 
         <div class="group-list">
-          <div v-for="group in store.getGroups()"
+          <div v-for="group in store.groups"
                :key="group.id"
                class="group-item"
                :class="{ selected: selectedGroupIds.includes(group.id) }"
@@ -660,7 +659,7 @@ async function executeOrganize() {
       >
         <div class="photos-grid" ref="photosGridRef">
           <div
-              v-for="group in store.getGroups()"
+              v-for="group in store.groups"
               :key="group.id"
               class="photo-group-section"
           >

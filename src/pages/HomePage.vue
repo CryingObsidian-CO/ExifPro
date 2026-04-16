@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import WinCard from "../component/WinCard.vue";
-import {useStore} from "../store/store.ts";
+import {store} from "../store/store.ts";
 import WinButton from "../component/WinButton.vue";
 import WinCheckbox from "../component/WinCheckbox.vue";
 import {computed, onMounted} from "vue";
@@ -9,7 +9,6 @@ import {useRouter} from "vue-router";
 import {useDialog} from "../composables/dialog.ts";
 
 const router = useRouter();
-const store = useStore();
 const tauriImpl = useTauri();
 const {showAlert} = useDialog();
 
@@ -35,31 +34,30 @@ const getErrorMessage = (error: unknown) => {
 const selectSourceDir = async () => {
   const path = await tauriImpl.selectDirectory();
   if (path) {
-    store.setSelectedDirectory(path);
+    store.selectedDirectory = path;
   }
 };
 
 const selectOutputDir = async () => {
   const path = await tauriImpl.selectDirectory();
   if (path) {
-    store.setOutputDirectory(path);
+    store.outputDirectory = path;
   }
 };
 
 const startAnalysis = async () => {
-  if (!store.getSelectedDirectory()) {
+  if (!store.selectedDirectory) {
     await showAlert('请选择有效的照片目录', {title: '目录无效', tone: 'warning'});
     return;
   }
 
-  store.setIsAnalyzing(true);
+  store.isAnalyzing = true;
   try {
-    const photos = await tauriImpl.scanDirectory(store.getSelectedDirectory(), store.getRecursive());
-    store.setPhotos(photos);
+    const photos = await tauriImpl.scanDirectory(store.selectedDirectory, store.recursive);
+    store.photos = photos;
 
-    if (store.getConfig()) {
-      const groups = await tauriImpl.groupPhotos(photos, store.getConfig());
-      store.setGroups(groups);
+    if (store.config) {
+      store.groups = await tauriImpl.groupPhotos(photos, store.config);
       await router.push('/edit');
     } else {
       await showAlert('请先配置分组参数', {title: '缺少配置', tone: 'warning'});
@@ -69,45 +67,43 @@ const startAnalysis = async () => {
     console.error('分析失败:', error);
     await showAlert('分析失败: ' + message, {title: '分析失败', tone: 'error'});
   } finally {
-    store.setIsAnalyzing(false);
+    store.isAnalyzing = false;
   }
 };
 
 const recursive = computed({
-  get: () => store.getRecursive(),
-  set: (val) => store.setRecursive(val),
+  get: () => store.recursive,
+  set: (val) => store.recursive = val,
 });
 
 const copyMode = computed({
-  get: () => store.getCopyMode(),
-  set: (val) => store.setCopyMode(val),
+  get: () => store.copyMode,
+  set: (val) => store.copyMode = val,
 });
 
 const overwrite = computed({
-  get: () => store.getOverwrite(),
-  set: (val) => store.setOverwrite(val),
+  get: () => store.overwrite,
+  set: (val) => store.overwrite = val,
 });
 
 const selectedDirectory = computed({
-  get: () => store.getSelectedDirectory(),
-  set: (val) => store.setSelectedDirectory(val),
+  get: () => store.selectedDirectory,
+  set: (val) => store.selectedDirectory = val,
 });
 
 const outputDirectory = computed({
-  get: () => store.getOutputDirectory(),
-  set: (val) => store.setOutputDirectory(val),
+  get: () => store.outputDirectory,
+  set: (val) => store.outputDirectory = val,
 });
 
 
 onMounted(async () => {
-  if (!store.getConfig()) {
+  if (!store.config) {
     try {
-      const config = await tauriImpl.loadConfig();
-      store.setConfig(config);
+      store.config = await tauriImpl.loadConfig();
     } catch (error) {
       console.error('加载配置失败，已重置默认配置:', error);
-      const config = await tauriImpl.resetConfig();
-      store.setConfig(config);
+      store.config = await tauriImpl.resetConfig();
       await showAlert('配置文件读取失败，已恢复为默认配置。', {title: '配置已重置', tone: 'warning'});
     }
   }
@@ -156,23 +152,23 @@ onMounted(async () => {
         <div class="status-info">
           <div class="status-item">
             <span class="label">照片数量:</span>
-            <span class="value">{{ store.getPhotosNumber() }}</span>
+            <span class="value">{{ store.photosNumber }}</span>
           </div>
           <div class="status-item">
             <span class="label">分组数量:</span>
-            <span class="value">{{ store.getGroupsNumber() }}</span>
+            <span class="value">{{ store.groupsNumber }}</span>
           </div>
         </div>
         <div class="action-buttons">
           <WinButton variant="primary"
                      size="large"
-                     :disabled="store.getIsAnalyzing() || !store.getSelectedDirectory()"
+                     :disabled="store.isAnalyzing || !store.selectedDirectory"
                      @click="startAnalysis"
           >
-            {{ store.getIsAnalyzing() ? '分析中...' : '开始分析' }}
+            {{ store.isAnalyzing ? '分析中...' : '开始分析' }}
           </WinButton>
           <WinButton size="large"
-                     :disabled="store.getGroupsNumber() === 0"
+                     :disabled="store.groupsNumber === 0"
                      @click="$router.push('/edit')"
           >
             编辑分组

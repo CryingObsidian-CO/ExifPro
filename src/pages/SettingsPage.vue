@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import WinButton from "../component/WinButton.vue";
 import WinCard from "../component/WinCard.vue";
-import {useStore} from "../store/store.ts";
+import {store} from "../store/store.ts";
 import {useTauri} from "../composables/tauri.ts";
 import {Theme} from "../types";
 import {onMounted, ref} from "vue";
@@ -10,7 +10,6 @@ import WinToggle from "../component/WinToggle.vue";
 import {onBeforeRouteLeave} from "vue-router";
 import {useDialog} from "../composables/dialog.ts";
 
-const store = useStore();
 const tauri = useTauri();
 const {showAlert, showConfirm} = useDialog();
 const dirty = ref(false);
@@ -27,7 +26,7 @@ function updateField(obj: any, key: string, value: any) {
 }
 
 async function saveSettings() {
-  const config = store.getConfig();
+  const config = store.config;
   if (config) {
     try {
       await tauri.saveConfig(config);
@@ -43,8 +42,7 @@ async function saveSettings() {
 
 async function resetSettings() {
   try {
-    const config = await tauri.resetConfig();
-    store.setConfig(config);
+    store.config = await tauri.resetConfig();
     dirty.value = false;
     await showAlert('已重置为默认设置', {title: '重置成功', tone: 'success'});
   } catch (error) {
@@ -54,17 +52,15 @@ async function resetSettings() {
 }
 
 async function setTheme(theme: Theme) {
-  store.setTheme(theme);
+  store.theme = theme;
 }
 
 async function reloadConfig() {
   try {
-    const config = await tauri.loadConfig();
-    store.setConfig(config);
+    store.config = await tauri.loadConfig();
   } catch (error) {
     console.error('加载配置失败，已重置默认配置:', error);
-    const config = await tauri.resetConfig();
-    store.setConfig(config);
+    store.config = await tauri.resetConfig();
     await showAlert('配置文件读取失败，已恢复为默认配置。', {title: '配置已重置', tone: 'warning'});
   }
 }
@@ -81,7 +77,7 @@ onBeforeRouteLeave(async (_to, _from) => {
     closeOnOverlay: false,
   });
   if (save) {
-    const config = store.getConfig();
+    const config = store.config;
     if (config) {
       try {
         await tauri.saveConfig(config);
@@ -100,7 +96,7 @@ onBeforeRouteLeave(async (_to, _from) => {
 });
 
 onMounted(async () => {
-  if (!store.getConfig()) {
+  if (!store.config) {
     await reloadConfig()
   }
 });
@@ -120,7 +116,7 @@ onMounted(async () => {
           <div class="theme-options">
             <button
                 class="theme-option"
-                :class="{ active: store.getTheme() === 'light' }"
+                :class="{ active: store.theme === 'light' }"
                 @click="setTheme('light')"
             >
               <span class="theme-icon">☀️</span>
@@ -128,7 +124,7 @@ onMounted(async () => {
             </button>
             <button
                 class="theme-option"
-                :class="{ active: store.getTheme() === 'dark' }"
+                :class="{ active: store.theme === 'dark' }"
                 @click="setTheme('dark')"
             >
               <span class="theme-icon">🌙</span>
@@ -136,7 +132,7 @@ onMounted(async () => {
             </button>
             <button
                 class="theme-option"
-                :class="{ active: store.getTheme() === 'system' }"
+                :class="{ active: store.theme === 'system' }"
                 @click="setTheme('system')"
             >
               <span class="theme-icon">💻</span>
@@ -159,8 +155,8 @@ onMounted(async () => {
                       :step="0.1"
                       :min="0"
                       allow-negative-one
-                      :modelValue="store.getConfig()?.aeb_settings.max_span || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'max_span', Number(v))"
+                      :modelValue="store.config?.aeb_settings.max_span || 0"
+                      @update:modelValue="(v) => updateField(store.config?.aeb_settings, 'max_span', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -171,8 +167,8 @@ onMounted(async () => {
                       :step="0.1"
                       :min="0"
                       allow-negative-one
-                      :modelValue="store.getConfig()?.aeb_settings.min_consecutive_interval || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'min_consecutive_interval', Number(v))"
+                      :modelValue="store.config?.aeb_settings.min_consecutive_interval || 0"
+                      @update:modelValue="(v) => updateField(store.config?.aeb_settings, 'min_consecutive_interval', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -183,8 +179,8 @@ onMounted(async () => {
                       :step="0.1"
                       :min="0"
                       allow-negative-one
-                      :modelValue="store.getConfig()?.aeb_settings.max_consecutive_interval || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'max_consecutive_interval', Number(v))"
+                      :modelValue="store.config?.aeb_settings.max_consecutive_interval || 0"
+                      @update:modelValue="(v) => updateField(store.config?.aeb_settings, 'max_consecutive_interval', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -196,8 +192,8 @@ onMounted(async () => {
                       :min="2"
                       inputmode="numeric"
                       :integerOnly="true"
-                      :modelValue="store.getConfig()?.aeb_settings.min_count || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'min_count', Number(v))"
+                      :modelValue="store.config?.aeb_settings.min_count || 0"
+                      @update:modelValue="(v) => updateField(store.config?.aeb_settings, 'min_count', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -205,8 +201,8 @@ onMounted(async () => {
                    data-tooltip="开启后，仅当照片的 EXIF 曝光模式（ExposureMode）为「自动包围」（值为 2）时，才会被识别为 AEB 组。手动包围曝光（手动多次拍摄不同曝光参数的照片）将不被识别为 AEB。关闭此选项则不检查曝光模式，仅依据曝光参数变化进行识别。"
             >仅允许自动包围曝光</label>
             <WinToggle
-                :modelValue="store.getConfig()?.aeb_settings.auto_bracket_only || false"
-                @update:modelValue="(v) => updateField(store.getConfig()?.aeb_settings, 'auto_bracket_only', v)"
+                :modelValue="store.config?.aeb_settings.auto_bracket_only || false"
+                @update:modelValue="(v) => updateField(store.config?.aeb_settings, 'auto_bracket_only', v)"
             />
           </div>
         </div>
@@ -225,8 +221,8 @@ onMounted(async () => {
                       :step="0.1"
                       :min="0"
                       allow-negative-one
-                      :modelValue="store.getConfig()?.focus_bracket_settings.max_span || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'max_span', Number(v))"
+                      :modelValue="store.config?.focus_bracket_settings.max_span || 0"
+                      @update:modelValue="(v) => updateField(store.config?.focus_bracket_settings, 'max_span', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -237,8 +233,8 @@ onMounted(async () => {
                       :step="0.1"
                       :min="0"
                       allow-negative-one
-                      :modelValue="store.getConfig()?.focus_bracket_settings.min_consecutive_interval || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'min_consecutive_interval', Number(v))"
+                      :modelValue="store.config?.focus_bracket_settings.min_consecutive_interval || 0"
+                      @update:modelValue="(v) => updateField(store.config?.focus_bracket_settings, 'min_consecutive_interval', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -249,8 +245,8 @@ onMounted(async () => {
                       :step="0.1"
                       :min="0"
                       allow-negative-one
-                      :modelValue="store.getConfig()?.focus_bracket_settings.max_consecutive_interval || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'max_consecutive_interval', Number(v))"
+                      :modelValue="store.config?.focus_bracket_settings.max_consecutive_interval || 0"
+                      @update:modelValue="(v) => updateField(store.config?.focus_bracket_settings, 'max_consecutive_interval', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -261,8 +257,8 @@ onMounted(async () => {
                       :step="1"
                       :min="2"
                       :integerOnly="true"
-                      :modelValue="store.getConfig()?.focus_bracket_settings.min_count || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.focus_bracket_settings, 'min_count', Number(v))"
+                      :modelValue="store.config?.focus_bracket_settings.min_count || 0"
+                      @update:modelValue="(v) => updateField(store.config?.focus_bracket_settings, 'min_count', Number(v))"
             />
           </div>
         </div>
@@ -282,8 +278,8 @@ onMounted(async () => {
                       :step="0.1"
                       :min="0"
                       allow-negative-one
-                      :modelValue="store.getConfig()?.burst_settings.min_consecutive_interval || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'min_consecutive_interval', Number(v))"
+                      :modelValue="store.config?.burst_settings.min_consecutive_interval || 0"
+                      @update:modelValue="(v) => updateField(store.config?.burst_settings, 'min_consecutive_interval', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -295,8 +291,8 @@ onMounted(async () => {
                       :step="0.1"
                       :min="0"
                       allow-negative-one
-                      :modelValue="store.getConfig()?.burst_settings.max_consecutive_interval || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'max_consecutive_interval', Number(v))"
+                      :modelValue="store.config?.burst_settings.max_consecutive_interval || 0"
+                      @update:modelValue="(v) => updateField(store.config?.burst_settings, 'max_consecutive_interval', Number(v))"
             />
           </div>
           <div class="setting-item">
@@ -308,8 +304,8 @@ onMounted(async () => {
                       :step="1"
                       :min="2"
                       :integerOnly="true"
-                      :modelValue="store.getConfig()?.burst_settings.min_count || 0"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.burst_settings, 'min_count', Number(v))"
+                      :modelValue="store.config?.burst_settings.min_count || 0"
+                      @update:modelValue="(v) => updateField(store.config?.burst_settings, 'min_count', Number(v))"
             />
           </div>
         </div>
@@ -321,32 +317,32 @@ onMounted(async () => {
             <label class="setting-label has-tooltip"
                    data-tooltip="对焦包围组的输出目录名前缀。整理后的对焦包围照片将存放在以此前缀开头的目录中。例如前缀为 'FocusBracket_' 时，目录名为 'FocusBracket_xxxxxx'。"
             >对焦包围前缀</label>
-            <WinInput :modelValue="store.getConfig()?.naming_rules.focus_bracketing_prefix || ''"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.naming_rules, 'focus_bracketing_prefix', v as string)"
+            <WinInput :modelValue="store.config?.naming_rules.focus_bracketing_prefix || ''"
+                      @update:modelValue="(v) => updateField(store.config?.naming_rules, 'focus_bracketing_prefix', v as string)"
             />
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
                    data-tooltip="AEB 包围曝光组的输出目录名前缀。整理后的 AEB 照片将存放在以此前缀开头的目录中。例如前缀为 'AEB_' 时，目录名为 'AEB_xxxxxx'。"
             >AEB 前缀</label>
-            <WinInput :modelValue="store.getConfig()?.naming_rules.aeb_prefix || ''"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.naming_rules, 'aeb_prefix', v as string)"
+            <WinInput :modelValue="store.config?.naming_rules.aeb_prefix || ''"
+                      @update:modelValue="(v) => updateField(store.config?.naming_rules, 'aeb_prefix', v as string)"
             />
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
                    data-tooltip="连拍组的输出目录名前缀。整理后的连拍照片将存放在以此前缀开头的目录中。例如前缀为 'Burst_' 时，目录名为 'Burst_xxxxxx'。"
             >连拍前缀</label>
-            <WinInput :modelValue="store.getConfig()?.naming_rules.burst_prefix || ''"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.naming_rules, 'burst_prefix', v as string)"
+            <WinInput :modelValue="store.config?.naming_rules.burst_prefix || ''"
+                      @update:modelValue="(v) => updateField(store.config?.naming_rules, 'burst_prefix', v as string)"
             />
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
                    data-tooltip="单张照片的输出目录名前缀。未被分组的单张照片将存放在以此前缀开头的目录中。留空表示单张照片不添加前缀，直接使用原文件名。"
             >单张前缀</label>
-            <WinInput :modelValue="store.getConfig()?.naming_rules.single_prefix || ''"
-                      @update:modelValue="(v) => updateField(store.getConfig()?.naming_rules, 'single_prefix', v as string)"
+            <WinInput :modelValue="store.config?.naming_rules.single_prefix || ''"
+                      @update:modelValue="(v) => updateField(store.config?.naming_rules, 'single_prefix', v as string)"
             />
           </div>
         </div>

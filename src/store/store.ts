@@ -20,90 +20,134 @@ function loadThemeFromStorage() {
   return (saved as Theme) || 'system';
 }
 
-const state = reactive<AppState>({
-  selectedDirectory: '',
-  recursive: true,
-  copyMode: true,
-  overwrite: false,
-  outputDirectory: '',
-  photos: [],
-  groups: [],
-  config: null,
-  theme: loadThemeFromStorage(),
-  isAnalyzing: false,
-  isOrganizing: false,
-})
-
-// TODO 主页设置要不要持久化？
-watch(() => state.theme, (newTheme) => {
-      // TODO 你也去文件
-      localStorage.setItem('theme', newTheme);
-      applyTheme(newTheme);
-    },
-    {immediate: true});
-
-if (window.matchMedia) {
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (state.theme === 'system') {
-      applyTheme('system');
-    }
+export class Store {
+  private readonly state = reactive<AppState>({
+    selectedDirectory: '',
+    recursive: true,
+    copyMode: true,
+    overwrite: false,
+    outputDirectory: '',
+    photos: [],
+    groups: [],
+    config: null,
+    theme: loadThemeFromStorage(),
+    isAnalyzing: false,
+    isOrganizing: false,
   });
-}
 
-export function useStore() {
-  function setSelectedDirectory(dic: string) {
-    state.selectedDirectory = dic;
+  constructor() {
+    watch(() => this.state.theme, (newTheme) => {
+          localStorage.setItem('theme', newTheme);
+          applyTheme(newTheme);
+        },
+        {immediate: true});
+
+    if (window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (this.state.theme === 'system') {
+          applyTheme('system');
+        }
+      });
+    }
   }
 
-  function getSelectedDirectory() {
-    return state.selectedDirectory;
+  get selectedDirectory() {
+    return this.state.selectedDirectory;
   }
 
-  function setRecursive(recursive: boolean) {
-    state.recursive = recursive;
+  set selectedDirectory(selectedDirectory: string) {
+    this.state.selectedDirectory = selectedDirectory;
   }
 
-  function getRecursive() {
-    return state.recursive;
+  get recursive() {
+    return this.state.recursive;
   }
 
-  function setCopyMode(copyMode: boolean) {
-    state.copyMode = copyMode;
+  set recursive(recursive: boolean) {
+    this.state.recursive = recursive;
   }
 
-  function getCopyMode() {
-    return state.copyMode;
+  get copyMode() {
+    return this.state.copyMode;
   }
 
-  function setOverwrite(overwrite: boolean) {
-    state.overwrite = overwrite;
+  set copyMode(copyMode: boolean) {
+    this.state.copyMode = copyMode;
   }
 
-  function getOverwrite() {
-    return state.overwrite;
+  get overwrite() {
+    return this.state.overwrite;
   }
 
-  function setOutputDirectory(outputDirectory: string) {
-    state.outputDirectory = outputDirectory;
+  set overwrite(overwrite: boolean) {
+    this.state.overwrite = overwrite;
   }
 
-  function getOutputDirectory() {
-    return state.outputDirectory;
+  get outputDirectory() {
+    return this.state.outputDirectory;
   }
 
-  function setPhotos(photos: ExifInfo[]) {
-    state.photos = photos;
+  set outputDirectory(outputDirectory: string) {
+    this.state.outputDirectory = outputDirectory;
   }
 
-  function setGroups(groups: Group[]) {
-    state.groups = groups;
+  get photos() {
+    return this.state.photos;
   }
 
-  function getGroups() {
-    return state.groups;
+  set photos(photos: ExifInfo[]) {
+    this.state.photos = photos;
   }
 
-  function createGroup(name: string, id: string = `group_${name}`) {
+  get groups() {
+    return this.state.groups;
+  }
+
+  set groups(groups: Group[]) {
+    this.state.groups = groups;
+  }
+
+  get config() {
+    return this.state.config;
+  }
+
+  set config(config: Config | null) {
+    this.state.config = config;
+  }
+
+  get theme() {
+    return this.state.theme;
+  }
+
+  set theme(theme: Theme) {
+    this.state.theme = theme;
+  }
+
+  get isAnalyzing() {
+    return this.state.isAnalyzing;
+  }
+
+  set isAnalyzing(isAnalyzing: boolean) {
+    this.state.isAnalyzing = isAnalyzing;
+  }
+
+  get isOrganizing() {
+    return this.state.isOrganizing;
+  }
+
+  set isOrganizing(isOrganizing: boolean) {
+    this.state.isOrganizing = isOrganizing;
+  }
+
+  get photosNumber() {
+    return this.state.photos.length;
+  }
+
+  get groupsNumber() {
+    return this.state.groups.length;
+  }
+
+  createGroup(name: string, id: string = `group_${name}`) {
     const newGroup: Group = {
       id,
       group_type: 'Single',
@@ -111,53 +155,53 @@ export function useStore() {
       photos: [],
     };
 
-    state.groups.push(newGroup);
+    this.state.groups.push(newGroup);
     return newGroup;
   }
 
-  function updateGroup(groupId: string, updates: Partial<Group>) {
+  updateGroup(groupId: string, updates: Partial<Group>) {
     if (groupId === 'ungrouped') {
       return;
     }
-    const index = state.groups.findIndex((g) => g.id === groupId);
+    const index = this.state.groups.findIndex((g) => g.id === groupId);
     if (index !== -1) {
-      state.groups[index] = {...state.groups[index], ...updates};
+      this.state.groups[index] = {...this.state.groups[index], ...updates};
     }
   }
 
-  function deleteGroup(groupId: string) {
+  deleteGroup(groupId: string) {
     if (groupId === 'ungrouped') {
       return;
     }
-    state.groups = state.groups.filter((g) => g.id !== groupId);
+    this.state.groups = this.state.groups.filter((g) => g.id !== groupId);
   }
 
-  function deleteGroups(groupIds: string[]) {
-    const groups = findGroups(groupIds);
+  private deleteGroups(groupIds: string[]) {
+    const groups = this.findGroups(groupIds);
     groups.forEach((group) => {
-      deleteGroup(group.id);
+      this.deleteGroup(group.id);
     });
   }
 
-  function findGroup(groupId: string) {
-    return state.groups.find((g) => g.id === groupId);
+  findGroup(groupId: string) {
+    return this.state.groups.find((g) => g.id === groupId);
   }
 
-  function findGroups(groupIds: string[]) {
-    return state.groups.filter((g) => groupIds.includes(g.id));
+  private findGroups(groupIds: string[]) {
+    return this.state.groups.filter((g) => groupIds.includes(g.id));
   }
 
-  function movePhotoToGroup(photos: ExifInfo[], groupId: string) {
-    let group = findGroup(groupId);
+  movePhotoToGroup(photos: ExifInfo[], groupId: string) {
+    const group = this.findGroup(groupId);
     if (!group) {
       return;
     }
     group.photos.push(...photos);
-    deletePhotosInAllGroups(photos, [groupId]);
+    this.deletePhotosInAllGroups(photos, [groupId]);
   }
 
-  function mergeGroups(groupIds: string[], name: string) {
-    const groupsToMerge = findGroups(groupIds);
+  mergeGroups(groupIds: string[], name: string) {
+    const groupsToMerge = this.findGroups(groupIds);
     const allPhotos = groupsToMerge.flatMap((g) => g.photos);
 
     const mergedGroup: Group = {
@@ -167,102 +211,31 @@ export function useStore() {
       photos: allPhotos,
     };
 
-    state.groups.push(mergedGroup);
-    deleteGroups(groupIds);
+    this.state.groups.push(mergedGroup);
+    this.deleteGroups(groupIds);
 
     return mergedGroup;
   }
 
-  function deletePhotosInAllGroups(photos: ExifInfo[], exceptGroupId: string[] = []) {
-    state.groups.forEach((group) => {
+  private deletePhotosInAllGroups(photos: ExifInfo[], exceptGroupId: string[] = []) {
+    this.state.groups.forEach((group) => {
       if (exceptGroupId.includes(group.id)) {
         return;
       }
       group.photos = group.photos.filter((p) => !photos.includes(p));
       if (group.photos.length === 0) {
-        deleteGroup(group.id);
+        this.deleteGroup(group.id);
       }
     });
   }
 
-  function addToUngroupedPhotos(photos: ExifInfo[]) {
-    let ungroupedPhotos = findGroup('ungrouped');
+  addToUngroupedPhotos(photos: ExifInfo[]) {
+    let ungroupedPhotos = this.findGroup('ungrouped');
     if (!ungroupedPhotos) {
-      ungroupedPhotos = createGroup('未分组', 'ungrouped');
+      ungroupedPhotos = this.createGroup('未分组', 'ungrouped');
     }
     ungroupedPhotos.photos.push(...photos);
   }
-
-  function setConfig(config: Config) {
-    state.config = config;
-  }
-
-  function getConfig() {
-    return state.config;
-  }
-
-  function setTheme(theme: Theme) {
-    state.theme = theme;
-  }
-
-  function getTheme() {
-    return state.theme;
-  }
-
-  function setIsAnalyzing(isAnalyzing: boolean) {
-    state.isAnalyzing = isAnalyzing;
-  }
-
-  function getIsAnalyzing() {
-    return state.isAnalyzing;
-  }
-
-  function setIsOrganizing(isOrganizing: boolean) {
-    state.isOrganizing = isOrganizing;
-  }
-
-  function getIsOrganizing() {
-    return state.isOrganizing;
-  }
-
-  function getPhotosNumber() {
-    return state.photos.length;
-  }
-
-  function getGroupsNumber() {
-    return state.groups.length;
-  }
-
-  return {
-    setSelectedDirectory,
-    getSelectedDirectory,
-    setRecursive,
-    getRecursive,
-    setCopyMode,
-    getCopyMode,
-    setOverwrite,
-    getOverwrite,
-    setOutputDirectory,
-    getOutputDirectory,
-    setPhotos,
-    setGroups,
-    getGroups,
-    createGroup,
-    updateGroup,
-    deleteGroup,
-    movePhotoToGroup,
-    findGroup,
-    mergeGroups,
-    addToUngroupedPhotos,
-    setConfig,
-    getConfig,
-    getTheme,
-    setTheme,
-    setIsAnalyzing,
-    getIsAnalyzing,
-    setIsOrganizing,
-    getIsOrganizing,
-    getPhotosNumber,
-    getGroupsNumber,
-  }
 }
+
+export const store = new Store();

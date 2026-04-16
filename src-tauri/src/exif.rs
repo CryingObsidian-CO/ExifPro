@@ -14,6 +14,8 @@ pub struct ExifInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sub_time: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub offset_time_original: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub shutter_speed: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aperture: Option<String>,
@@ -46,6 +48,7 @@ impl ExifInfo {
             file_name,
             capture_time: None,
             sub_time: None,
+            offset_time_original: None,
             shutter_speed: None,
             aperture: None,
             iso: None,
@@ -95,9 +98,33 @@ fn detect_mime_type(data: &[u8]) -> &'static str {
     }
 }
 
+fn enhance_prase_focus_distance(exif: &Exif, camera_make: &str) -> Option<String> {
+    match camera_make {
+        "SONY" => {
+            let makernote = get_field_value(&exif, Tag::MakerNote, In::PRIMARY)?;
+            // TODO ing
+            None
+        }
+        _ => None,
+    }
+}
+
 fn get_field_value(exif: &Exif, tag: Tag, in_: In) -> Option<String> {
     exif.get_field(tag, in_)
         .map(|field| field.display_value().to_string())
+}
+
+// 解决字段包含引号的问题
+fn to_clean_text(value: Option<String>) -> Option<String> {
+    if let Some(text) = value {
+        let clean_text = text
+            .trim_matches(|c| c == '"' || c == '\'')
+            .trim()
+            .to_string();
+        Some(clean_text)
+    } else {
+        None
+    }
 }
 
 pub fn parse_exif(file_path: &Path) -> Result<ExifInfo, Error> {
@@ -106,9 +133,22 @@ pub fn parse_exif(file_path: &Path) -> Result<ExifInfo, Error> {
     let mut buf_reader = BufReader::new(file);
     let exif = exif::Reader::new().read_from_container(&mut buf_reader)?;
 
+    /*
+        // 打印所有字段
+        for field in exif.fields() {
+            let tag = field.tag.to_string();
+            let value = field.display_value().to_string();
+            println!("{}: {}", tag, value);
+        }
+        println!("\n\n");
+    */
+
     exif_info.capture_time = get_field_value(&exif, Tag::DateTimeOriginal, In::PRIMARY);
+    exif_info.sub_time =
+        to_clean_text(get_field_value(&exif, Tag::SubSecTimeOriginal, In::PRIMARY));
+    exif_info.offset_time_original =
+        to_clean_text(get_field_value(&exif, Tag::OffsetTimeOriginal, In::PRIMARY));
     exif_info.shutter_speed = get_field_value(&exif, Tag::ExposureTime, In::PRIMARY);
-    exif_info.sub_time = get_field_value(&exif, Tag::SubSecTimeOriginal, In::PRIMARY);
     exif_info.aperture = get_field_value(&exif, Tag::FNumber, In::PRIMARY);
     exif_info.iso = get_field_value(&exif, Tag::PhotographicSensitivity, In::PRIMARY);
     exif_info.exposure_compensation = get_field_value(&exif, Tag::ExposureBiasValue, In::PRIMARY);
@@ -117,8 +157,13 @@ pub fn parse_exif(file_path: &Path) -> Result<ExifInfo, Error> {
         .and_then(|f| f.value.get_uint(0));
     exif_info.focal_length = get_field_value(&exif, Tag::FocalLength, In::PRIMARY);
     exif_info.focus_distance = get_field_value(&exif, Tag::SubjectDistance, In::PRIMARY);
-    exif_info.camera_make = get_field_value(&exif, Tag::Make, In::PRIMARY);
-    exif_info.camera_model = get_field_value(&exif, Tag::Model, In::PRIMARY);
+    exif_info.camera_make = to_clean_text(get_field_value(&exif, Tag::Make, In::PRIMARY));
+    exif_info.camera_model = to_clean_text(get_field_value(&exif, Tag::Model, In::PRIMARY));
+
+    if (exif_info.focus_distance.is_none() && exif_info.camera_make.is_some()) {
+        exif_info.focus_distance =
+            enhance_prase_focus_distance(&exif, exif_info.camera_make.as_ref().unwrap());
+    }
 
     exif_info.thumbnail = extract_thumbnail(file_path, &exif);
 
