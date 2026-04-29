@@ -31,6 +31,8 @@
   --color-aeb: #ff8c00;
   --color-burst: #107c10;
   --color-single: #6cd06a;
+  --color-plugin: #8b5cf6;
+  --color-plugin-light: #f0e6ff;
 }
 
 [data-theme='dark'] {
@@ -56,6 +58,8 @@
   --color-aeb: #ff8c00;
   --color-burst: #107c10;
   --color-single: #6cd06a;
+  --color-plugin: #8b5cf6;
+  --color-plugin-light: #f0e6ff;
 }
 
 * {

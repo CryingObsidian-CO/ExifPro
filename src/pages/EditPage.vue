@@ -42,24 +42,33 @@ type DragSelectState = {
 const dragSelectState = ref<DragSelectState | null>(null);
 
 function getGroupTypeLabel(type: GroupType) {
-  const labels: Record<GroupType, string> = {
+  const labels: Partial<Record<GroupType, string>> = {
     FocusBracketing: '对焦包围',
     AEB: 'AEB',
     Burst: '连拍',
     Single: '单张',
   };
-  return labels[type];
+  return labels[type] || type;
 }
 
-// TODO 配置颜色？
+const CUSTOM_TYPE_COLORS = [
+  '#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b', '#10b981',
+  '#6366f1', '#ef4444', '#14b8a6', '#f97316', '#84cc16',
+];
+
 function getGroupTypeColor(type: GroupType) {
-  const colors: Record<GroupType, string> = {
+  const colors: Partial<Record<GroupType, string>> = {
     FocusBracketing: 'var(--color-focus-bracketing)',
     AEB: 'var(--color-aeb)',
     Burst: 'var(--color-burst)',
     Single: 'var(--color-single)',
   };
-  return colors[type];
+  if (colors[type]) return colors[type]!;
+  let hash = 0;
+  for (let i = 0; i < type.length; i++) {
+    hash = type.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return CUSTOM_TYPE_COLORS[Math.abs(hash) % CUSTOM_TYPE_COLORS.length];
 }
 
 function toggleGroupSelection(groupId: string) {

@@ -3,7 +3,7 @@ import WinCard from "../component/WinCard.vue";
 import {store} from "../store/store.ts";
 import WinButton from "../component/WinButton.vue";
 import WinCheckbox from "../component/WinCheckbox.vue";
-import {computed, onMounted} from "vue";
+import {computed} from "vue";
 import {useTauri} from "../composables/tauri.ts";
 import {useRouter} from "vue-router";
 import {useDialog} from "../composables/dialog.ts";
@@ -94,19 +94,6 @@ const selectedDirectory = computed({
 const outputDirectory = computed({
   get: () => store.outputDirectory,
   set: (val) => store.outputDirectory = val,
-});
-
-
-onMounted(async () => {
-  if (!store.config) {
-    try {
-      store.config = await tauriImpl.loadConfig();
-    } catch (error) {
-      console.error('加载配置失败，已重置默认配置:', error);
-      store.config = await tauriImpl.resetConfig();
-      await showAlert('配置文件读取失败，已恢复为默认配置。', {title: '配置已重置', tone: 'warning'});
-    }
-  }
 });
 </script>
 

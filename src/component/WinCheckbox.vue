@@ -41,6 +41,7 @@ const checked = computed({
   gap: 8px;
   cursor: pointer;
   user-select: none;
+  position: relative;
 }
 
 .win-checkbox.disabled {

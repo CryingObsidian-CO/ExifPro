@@ -27,4 +27,5 @@ walkdir = "2.5"
 tauri-plugin-dialog = "2.7"
 chrono = "0.4"
 base64 = "0.22"
+zip = "8.5"
 

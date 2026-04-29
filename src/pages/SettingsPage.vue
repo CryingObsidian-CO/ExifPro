@@ -4,6 +4,7 @@ import WinCard from "../component/WinCard.vue";
 import {store} from "../store/store.ts";
 import {useTauri} from "../composables/tauri.ts";
 import {Theme} from "../types";
+import type {Config} from "../types/config.ts";
 import {onMounted, ref} from "vue";
 import WinInput from "../component/WinInput.vue";
 import WinToggle from "../component/WinToggle.vue";
@@ -25,11 +26,97 @@ function updateField(obj: any, key: string, value: any) {
   }
 }
 
+function normalizeConfig(config: Config) {
+  if (!config.plugin_settings) {
+    config.plugin_settings = {};
+  }
+  if (!config.enabled_plugins) {
+    config.enabled_plugins = [];
+  }
+}
+
+// NOTE 确保存在插件配置对象，暂时保留
+function ensurePluginConfig(pluginId: string) {
+  const config = store.config;
+  if (!config) {
+    return null;
+  }
+  normalizeConfig(config);
+  const existing = config.plugin_settings[pluginId];
+  if (!existing || typeof existing !== 'object') {
+    config.plugin_settings[pluginId] = {};
+  }
+  return config.plugin_settings[pluginId];
+}
+
+function syncPluginConfigDefaults() {
+  const config = store.config;
+  if (!config) {
+    return;
+  }
+  normalizeConfig(config);
+  let changed = false;
+  for (const plugin of store.plugins) {
+    const schema = plugin.manifest.config_schema;
+    if (!schema) {
+      continue;
+    }
+    const target = ensurePluginConfig(plugin.manifest.id);
+    if (!target) {
+      continue;
+    }
+    for (const [key, item] of Object.entries(schema)) {
+      if (target[key] === undefined && item.default !== undefined) {
+        target[key] = item.default;
+        changed = true;
+      }
+    }
+  }
+  if (changed) {
+    markDirty();
+  }
+}
+
+function getPluginConfigValue(
+    pluginId: string,
+    key: string,
+    schema: { type: string; default?: any }
+) {
+  const target = ensurePluginConfig(pluginId);
+  if (!target) {
+    return schema.default;
+  }
+  if (target[key] === undefined && schema.default !== undefined) {
+    target[key] = schema.default;
+  }
+  return target[key];
+}
+
+function updatePluginConfig(pluginId: string, key: string, value: any) {
+  const target = ensurePluginConfig(pluginId);
+  if (!target) {
+    return;
+  }
+  target[key] = value;
+  markDirty();
+}
+
+function isPluginEnabled(pluginId: string) {
+  const config = store.config;
+  if (!config) {
+    return false;
+  }
+  normalizeConfig(config);
+  return config.enabled_plugins.includes(pluginId);
+}
+
 async function saveSettings() {
   const config = store.config;
   if (config) {
     try {
+      normalizeConfig(config);
       await tauri.saveConfig(config);
+      await store.syncPluginsEnabled(config.enabled_plugins);
       await reloadConfig();
       dirty.value = false;
       await showAlert('设置已保存', {title: '保存成功', tone: 'success'});
@@ -42,7 +129,10 @@ async function saveSettings() {
 
 async function resetSettings() {
   try {
-    store.config = await tauri.resetConfig();
+    const config = await tauri.resetConfig();
+    normalizeConfig(config);
+    store.config = config;
+    await store.syncPluginsEnabled(config.enabled_plugins);
     dirty.value = false;
     await showAlert('已重置为默认设置', {title: '重置成功', tone: 'success'});
   } catch (error) {
@@ -57,10 +147,15 @@ async function setTheme(theme: Theme) {
 
 async function reloadConfig() {
   try {
-    store.config = await tauri.loadConfig();
+    const config = await tauri.loadConfig();
+    normalizeConfig(config);
+    store.config = config;
+    syncPluginConfigDefaults();
   } catch (error) {
     console.error('加载配置失败，已重置默认配置:', error);
-    store.config = await tauri.resetConfig();
+    const config = await tauri.resetConfig();
+    normalizeConfig(config);
+    store.config = config;
     await showAlert('配置文件读取失败，已恢复为默认配置。', {title: '配置已重置', tone: 'warning'});
   }
 }
@@ -80,7 +175,9 @@ onBeforeRouteLeave(async (_to, _from) => {
     const config = store.config;
     if (config) {
       try {
+        normalizeConfig(config);
         await tauri.saveConfig(config);
+        await store.syncPluginsEnabled(config.enabled_plugins);
         await reloadConfig();
       } catch (error) {
         console.error('保存设置失败:', error);
@@ -99,7 +196,29 @@ onMounted(async () => {
   if (!store.config) {
     await reloadConfig()
   }
+  syncPluginConfigDefaults();
 });
+
+async function loadPlugins() {
+  await store.loadPlugins();
+  syncPluginConfigDefaults();
+}
+
+async function togglePlugin(pluginId: string, enabled: boolean) {
+  const config = store.config;
+  if (!config) {
+    return;
+  }
+  normalizeConfig(config);
+  if (enabled) {
+    if (!config.enabled_plugins.includes(pluginId)) {
+      config.enabled_plugins.push(pluginId);
+    }
+  } else {
+    config.enabled_plugins = config.enabled_plugins.filter((id) => id !== pluginId);
+  }
+  markDirty();
+}
 </script>
 
 <template>
@@ -348,6 +467,86 @@ onMounted(async () => {
         </div>
       </WinCard>
 
+      <WinCard title="插件管理">
+        <template #header-extra>
+          <span class="card-type-badge plugin-badge">Plugins</span>
+        </template>
+        <div class="plugin-section">
+          <div v-if="!store.pluginsInitialized" class="plugin-loading">
+            <WinButton variant="secondary" @click="loadPlugins">加载插件</WinButton>
+          </div>
+          <div v-else-if="store.plugins.length === 0" class="plugin-empty">
+            <p>未发现插件</p>
+            <p class="plugin-hint">将插件 ZIP 文件放入程序目录下的 plugins/ 文件夹</p>
+          </div>
+          <div v-else class="plugin-list">
+            <div v-for="plugin in store.plugins" :key="plugin.manifest.id" class="plugin-item">
+              <div class="plugin-info">
+                <div class="plugin-header">
+                  <span class="plugin-name">{{ plugin.manifest.name }}</span>
+                  <span class="plugin-version">v{{ plugin.manifest.version }}</span>
+                </div>
+                <p v-if="plugin.manifest.description" class="plugin-description">
+                  {{ plugin.manifest.description }}
+                </p>
+                <div class="plugin-meta">
+                  <span v-if="plugin.manifest.author"
+                        class="plugin-author">{{ plugin.manifest.author }}</span>
+                  <span class="plugin-id">{{ plugin.manifest.id }}</span>
+                </div>
+                <div class="plugin-capabilities">
+                  <span v-if="plugin.manifest.capabilities.grouping"
+                        class="capability-tag">分组</span>
+                  <span v-if="plugin.manifest.capabilities.merging"
+                        class="capability-tag">合并</span>
+                  <span v-if="plugin.manifest.capabilities.exif_enhancement" class="capability-tag">EXIF增强</span>
+                  <span v-for="gt in (plugin.manifest.capabilities.custom_group_types || [])"
+                        :key="gt" class="capability-tag custom">
+                    {{ gt }}
+                  </span>
+                </div>
+                <div v-if="isPluginEnabled(plugin.manifest.id) && plugin.manifest.config_schema" class="plugin-config">
+                  <div v-for="(schema, key) in plugin.manifest.config_schema"
+                       :key="key"
+                       class="plugin-config-item">
+                    <label class="setting-label">
+                      {{ schema.description || key }}
+                    </label>
+                    <WinToggle
+                        v-if="schema.type === 'boolean'"
+                        :modelValue="Boolean(getPluginConfigValue(plugin.manifest.id, key, schema))"
+                        @update:modelValue="(v: boolean) => updatePluginConfig(plugin.manifest.id, key, v)"
+                    />
+                    <!--TODO 加入一个配置来配置步长-->
+                    <WinInput
+                        v-else
+                        :type="schema.type === 'string' ? 'text' : 'number'"
+                    :step="schema.type === 'integer' ? 1 : 0.1"
+                    :min="schema.min"
+                    :max="schema.max"
+                    :integerOnly="schema.type === 'integer'"
+                    :modelValue="getPluginConfigValue(plugin.manifest.id, key, schema) ??
+                    (schema.type === 'string' ? '' : 0)"
+                    @update:modelValue="(v) => updatePluginConfig(
+                    plugin.manifest.id,
+                    key,
+                    schema.type === 'string' ? v : Number(v)
+                    )"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="plugin-actions">
+                <WinToggle
+                    :modelValue="isPluginEnabled(plugin.manifest.id)"
+                    @update:modelValue="(v: boolean) => togglePlugin(plugin.manifest.id, v)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </WinCard>
+
       <div class="action-buttons">
         <WinButton variant="danger" @click="resetSettings">重置默认</WinButton>
         <WinButton variant="primary" @click="saveSettings">保存设置</WinButton>
@@ -498,6 +697,123 @@ onMounted(async () => {
 .burst-badge {
   background-color: var(--color-burst);
   color: #fff;
+}
+
+.plugin-badge {
+  background-color: var(--color-plugin);
+  color: #fff;
+}
+
+.plugin-section {
+  min-height: 60px;
+}
+
+.plugin-loading {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+.plugin-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--color-text-secondary);
+}
+
+.plugin-hint {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plugin-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background-color: var(--color-bg-secondary);
+}
+
+.plugin-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.plugin-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.plugin-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.plugin-version {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.plugin-description {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+
+.plugin-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.plugin-capabilities {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.plugin-config {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.plugin-config-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.capability-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background-color: var(--color-accent-light);
+  color: var(--color-accent);
+}
+
+.capability-tag.custom {
+  background-color: var(--color-plugin-light);
+  color: var(--color-plugin);
+}
+
+.plugin-actions {
+  flex-shrink: 0;
+  margin-left: 16px;
 }
 
 .action-buttons {

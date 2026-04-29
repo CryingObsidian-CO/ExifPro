@@ -3,7 +3,6 @@ import {ExifInfo, Group} from "./photo.ts";
 
 export type Theme = 'light' | 'dark' | 'system';
 
-
 export interface AppState {
   selectedDirectory: string;
   recursive: boolean;

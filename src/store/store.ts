@@ -2,6 +2,7 @@ import {AppState, Theme} from "../types";
 import {reactive, watch} from "vue";
 import {ExifInfo, Group} from "../types/photo.ts";
 import {Config} from "../types/config.ts";
+import {pluginManager} from "../composables/pluginManager.ts";
 
 function getSystemTheme() {
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -20,6 +21,7 @@ function loadThemeFromStorage() {
   return (saved as Theme) || 'system';
 }
 
+// TODO 更好的单例控制，避免多个实例
 export class Store {
   private readonly state = reactive<AppState>({
     selectedDirectory: '',
@@ -30,6 +32,7 @@ export class Store {
     photos: [],
     groups: [],
     config: null,
+    // TODO Theme 移入 Config 中
     theme: loadThemeFromStorage(),
     isAnalyzing: false,
     isOrganizing: false,
@@ -139,6 +142,14 @@ export class Store {
     this.state.isOrganizing = isOrganizing;
   }
 
+  get plugins() {
+    return pluginManager.getPlugins();
+  }
+
+  get pluginsInitialized() {
+    return pluginManager.isInitialized;
+  }
+
   get photosNumber() {
     return this.state.photos.length;
   }
@@ -235,6 +246,50 @@ export class Store {
       ungroupedPhotos = this.createGroup('未分组', 'ungrouped');
     }
     ungroupedPhotos.photos.push(...photos);
+  }
+
+  async loadPlugins() {
+    if (pluginManager.isInitialized) {
+      return;
+    }
+    try {
+      await pluginManager.initialize();
+    } catch (e) {
+      console.error('Failed to load plugins:', e);
+    }
+  }
+
+  async syncPluginsEnabled(enabledPluginIds: string[]) {
+    const desired = new Set(enabledPluginIds);
+    for (const plugin of this.plugins) {
+      if (desired.has(plugin.manifest.id)) {
+        if (!plugin.enabled) {
+          await pluginManager.enablePlugin(plugin.manifest.id);
+        }
+      } else if (plugin.enabled) {
+        await pluginManager.disablePlugin(plugin.manifest.id);
+      }
+    }
+  }
+
+  getPlugin(pluginId: string) {
+    return this.plugins.find((p) => p.manifest.id === pluginId);
+  }
+
+  async enablePlugin(pluginId: string) {
+    try {
+      await pluginManager.enablePlugin(pluginId);
+    } catch (e) {
+      console.error('Failed to enable plugin:', e);
+    }
+  }
+
+  async disablePlugin(pluginId: string) {
+    try {
+      await pluginManager.disablePlugin(pluginId);
+    } catch (e) {
+      console.error('Failed to disable plugin:', e);
+    }
   }
 }
 

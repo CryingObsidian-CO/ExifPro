@@ -1,0 +1,42 @@
+{
+  "id": "com.example.example",
+  "version": "1.0.0",
+  "name": "测试插件",
+  "description": "测试插件描述",
+  "author": "ExifPro Team",
+  "api_version": 1,
+  "entry_point": "index.ts",
+  "capabilities": {
+    "grouping": true,
+    "merging": true,
+    "exif_enhancement": true,
+    "custom_group_types": [
+      "Test"
+    ]
+  },
+  "config_schema": {
+    "test_count": {
+      "type": "integer",
+      "default": 3,
+      "min": 2,
+      "description": "测试"
+    },
+    "test_number": {
+      "type": "number",
+      "default": 2.0,
+      "min": 0.0,
+      "max": 3.0,
+      "description": "测试数字"
+    },
+    "test_string": {
+      "type": "string",
+      "default": "test",
+      "description": "测试字符串"
+    },
+    "test_boolean": {
+      "type": "boolean",
+      "default": true,
+      "description": "测试布尔值"
+    }
+  }
+}

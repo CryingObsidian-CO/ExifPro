@@ -2,10 +2,14 @@
 import {useRouter, useRoute} from 'vue-router';
 import {store} from "./store/store.ts";
 import WinDialogHost from "./component/WinDialogHost.vue";
-
+import { onMounted } from 'vue';
+import { useTauri } from './composables/tauri';
+import { useDialog } from './composables/dialog';
 
 const router = useRouter();
 const route = useRoute();
+const tauriImpl = useTauri();
+const { showAlert } = useDialog();
 
 const navItems = [
   {path: '/', name: '首页', icon: '🏠'},
@@ -13,6 +17,22 @@ const navItems = [
 ];
 
 const isEditPage = () => route?.path === '/edit';
+
+onMounted(async () => {
+  if (!store.config) {
+    try {
+      store.config = await tauriImpl.loadConfig();
+    } catch (error) {
+      console.error('加载配置失败，已重置默认配置:', error);
+      store.config = await tauriImpl.resetConfig();
+      await showAlert('配置文件读取失败，已恢复为默认配置。', { title: '配置已重置', tone: 'warning' });
+    }
+  }
+
+  if (!store.pluginsInitialized) {
+    await store.loadPlugins();
+  }
+});
 </script>
 
 <template>

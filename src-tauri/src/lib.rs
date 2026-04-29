@@ -2,11 +2,14 @@ pub mod config;
 pub mod exif;
 pub mod file_ops;
 pub mod grouping;
+pub mod plugin;
 
 use crate::config::Config;
 use crate::exif::{parse_exif, ExifInfo};
 use crate::file_ops::{create_dirs_if_not_exist, safe_copy, safe_move, scan_directory};
 use crate::grouping::{group_photos, Group};
+use crate::plugin::loader::PluginLoader;
+use crate::plugin::manifest::PluginInfo;
 use std::path::Path;
 
 #[tauri::command]
@@ -84,6 +87,91 @@ async fn organize_files_command(
     Ok(())
 }
 
+#[tauri::command]
+async fn list_plugins_command() -> Result<Vec<PluginInfo>, String> {
+    let plugins = PluginLoader::discover_plugins()?;
+    let config = Config::load().unwrap_or_default();
+    Ok(plugins
+        .into_iter()
+        .map(|p| PluginInfo {
+            enabled: config.enabled_plugins.contains(&p.manifest.id),
+            manifest: p.manifest,
+            zip_path: p.zip_path.to_string_lossy().to_string(),
+        })
+        .collect())
+}
+
+#[tauri::command]
+async fn read_plugin_file_command(zip_path: String, file_name: String) -> Result<String, String> {
+    let path = Path::new(&zip_path);
+    let bytes = PluginLoader::read_file_from_zip(path, &file_name)?;
+    String::from_utf8(bytes).map_err(|e| format!("File is not valid UTF-8: {}", e))
+}
+
+#[tauri::command]
+async fn read_plugin_binary_command(
+    zip_path: String,
+    file_name: String,
+) -> Result<Vec<u8>, String> {
+    let path = Path::new(&zip_path);
+    PluginLoader::read_file_from_zip(path, &file_name)
+}
+
+#[tauri::command]
+async fn enable_plugin_command(plugin_id: String) -> Result<(), String> {
+    let mut config = Config::load().unwrap_or_default();
+    if !config.enabled_plugins.contains(&plugin_id) {
+        config.enabled_plugins.push(plugin_id);
+        config.save().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn disable_plugin_command(plugin_id: String) -> Result<(), String> {
+    let mut config = Config::load().unwrap_or_default();
+    config.enabled_plugins.retain(|id| id != &plugin_id);
+    config.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_plugin_config_command(plugin_id: String) -> Result<serde_json::Value, String> {
+    let config = Config::load().unwrap_or_default();
+    Ok(config
+        .plugin_settings
+        .get(&plugin_id)
+        .cloned()
+        .unwrap_or(serde_json::Value::Null))
+}
+
+#[tauri::command]
+async fn set_plugin_config_command(
+    plugin_id: String,
+    plugin_config: serde_json::Value,
+) -> Result<(), String> {
+    let mut config = Config::load().unwrap_or_default();
+    config.plugin_settings.insert(plugin_id, plugin_config);
+    config.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn plugin_file_op_command(
+    operation: String,
+    path: String,
+    data: Option<Vec<u8>>,
+) -> Result<(), String> {
+    match operation.as_str() {
+        "mkdir" => create_dirs_if_not_exist(Path::new(&path)).map_err(|e| e.to_string()),
+        "write" => {
+            let data = data.ok_or("No data provided for write operation")?;
+            std::fs::write(Path::new(&path), data).map_err(|e| e.to_string())
+        }
+        _ => Err(format!("Unknown file operation: {}", operation)),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -96,6 +184,14 @@ pub fn run() {
             load_config_command,
             reset_config_command,
             organize_files_command,
+            list_plugins_command,
+            read_plugin_file_command,
+            read_plugin_binary_command,
+            enable_plugin_command,
+            disable_plugin_command,
+            get_plugin_config_command,
+            set_plugin_config_command,
+            plugin_file_op_command,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

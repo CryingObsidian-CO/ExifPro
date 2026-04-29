@@ -1,4 +1,4 @@
-export type GroupType = 'FocusBracketing' | 'AEB' | 'Burst' | 'Single';
+export type GroupType = 'FocusBracketing' | 'AEB' | 'Burst' | 'Single' | string;
 
 export interface ExifInfo {
   file_path: string;

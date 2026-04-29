@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{env, fs};
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -7,6 +8,10 @@ pub struct Config {
     pub focus_bracket_settings: FocusBracketSettings,
     pub burst_settings: BurstSettings,
     pub naming_rules: NamingRules,
+    #[serde(default)]
+    pub plugin_settings: HashMap<String, serde_json::Value>,
+    #[serde(default)]
+    pub enabled_plugins: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,6 +52,8 @@ impl Default for Config {
             focus_bracket_settings: FocusBracketSettings::default(),
             burst_settings: BurstSettings::default(),
             naming_rules: NamingRules::default(),
+            plugin_settings: HashMap::new(),
+            enabled_plugins: Vec::new(),
         }
     }
 }

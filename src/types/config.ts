@@ -31,4 +31,6 @@ export interface Config {
   focus_bracket_settings: FocusBracketSettings;
   burst_settings: BurstSettings;
   naming_rules: NamingRules;
+  plugin_settings: Record<string, Record<string, any>>;
+  enabled_plugins: string[];
 }

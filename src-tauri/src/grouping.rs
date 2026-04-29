@@ -11,6 +11,7 @@ pub enum GroupType {
     AEB,
     Burst,
     Single,
+    Custom(String),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -28,6 +29,7 @@ impl fmt::Display for GroupType {
             GroupType::AEB => write!(f, "AEB"),
             GroupType::Burst => write!(f, "Burst"),
             GroupType::Single => write!(f, "Single"),
+            GroupType::Custom(name) => write!(f, "{}", name),
         }
     }
 }
@@ -157,6 +159,7 @@ fn generate_group_name(group_type: &GroupType, groups: &[ExifInfo], config: &Con
         GroupType::AEB => &config.naming_rules.aeb_prefix,
         GroupType::Burst => &config.naming_rules.burst_prefix,
         GroupType::Single => &config.naming_rules.single_prefix,
+        GroupType::Custom(name) => name,
     };
     let base_name = groups
         .first()

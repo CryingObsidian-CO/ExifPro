@@ -35,6 +35,7 @@ const checked = computed({
   align-items: center;
   cursor: pointer;
   user-select: none;
+  position: relative;
 }
 
 .win-toggle.disabled {
