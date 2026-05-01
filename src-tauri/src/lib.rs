@@ -19,9 +19,13 @@ async fn scan_directory_command(path: String, recursive: bool) -> Result<Vec<Exi
         .await
         .map_err(|e| format!("Failed to scan directory: {}", e))?;
 
+    // NOTE 如果后续还有别的配置项再改为传入 config
+    let config = Config::load().unwrap_or_default();
+    let max_preview_bytes = config.preview_max_mb.saturating_mul(1024 * 1024);
+
     let mut exif_infos = Vec::new();
     for image_path in image_paths {
-        match parse_exif(&image_path) {
+        match parse_exif(&image_path, max_preview_bytes) {
             Ok(info) => exif_infos.push(info),
             Err(e) => eprintln!("Warning: Failed to parse EXIF from {:?}: {}", image_path, e),
         }

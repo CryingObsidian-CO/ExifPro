@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use exif::{Error, Exif, In, Tag};
 use serde::{Deserialize, Serialize};
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 
@@ -63,6 +63,42 @@ impl ExifInfo {
     }
 }
 
+fn is_previewable_extension(path: &Path) -> bool {
+    let ext = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let previewable_exts = [
+        "jpg", "jpeg", "png", "gif", "bmp", "tif", "tiff", "webp", "heic", "heif",
+    ];
+    previewable_exts.contains(&ext.as_str())
+}
+
+// TODO 考虑超大文件的提示处理
+// TODO 对于超大文件，利用插件生成小文件后显示
+fn extract_file_preview(file_path: &Path, max_preview_bytes: u64) -> Option<String> {
+    if max_preview_bytes == 0 {
+        return None;
+    }
+    if !is_previewable_extension(file_path) {
+        return None;
+    }
+    let metadata = fs::metadata(file_path).ok()?;
+    if metadata.len() > max_preview_bytes {
+        return None;
+    }
+    let mut file = File::open(file_path).ok()?;
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf).ok()?;
+    if buf.is_empty() {
+        return None;
+    }
+    let mime = detect_mime_type(&buf);
+    let encoded = BASE64.encode(&buf);
+    Some(format!("data:{};base64,{}", mime, encoded))
+}
+
 fn extract_thumbnail(file_path: &Path, exif: &Exif) -> Option<String> {
     let thumb_offset = exif.get_field(Tag::JPEGInterchangeFormat, In::PRIMARY)?;
     let thumb_length = exif.get_field(Tag::JPEGInterchangeFormatLength, In::PRIMARY)?;
@@ -102,7 +138,7 @@ fn enhance_prase_focus_distance(exif: &Exif, camera_make: &str) -> Option<String
     match camera_make {
         "SONY" => {
             let makernote = get_field_value(&exif, Tag::MakerNote, In::PRIMARY)?;
-            // TODO ing
+            // TODO 去除这一部分改为插件实现了对焦距离解析
             None
         }
         _ => None,
@@ -127,7 +163,7 @@ fn to_clean_text(value: Option<String>) -> Option<String> {
     }
 }
 
-pub fn parse_exif(file_path: &Path) -> Result<ExifInfo, Error> {
+pub fn parse_exif(file_path: &Path, max_preview_bytes: u64) -> Result<ExifInfo, Error> {
     let mut exif_info = ExifInfo::new(file_path);
     let file = File::open(file_path)?;
     let mut buf_reader = BufReader::new(file);
@@ -160,12 +196,13 @@ pub fn parse_exif(file_path: &Path) -> Result<ExifInfo, Error> {
     exif_info.camera_make = to_clean_text(get_field_value(&exif, Tag::Make, In::PRIMARY));
     exif_info.camera_model = to_clean_text(get_field_value(&exif, Tag::Model, In::PRIMARY));
 
-    if (exif_info.focus_distance.is_none() && exif_info.camera_make.is_some()) {
+    if exif_info.focus_distance.is_none() && exif_info.camera_make.is_some() {
         exif_info.focus_distance =
             enhance_prase_focus_distance(&exif, exif_info.camera_make.as_ref().unwrap());
     }
 
-    exif_info.thumbnail = extract_thumbnail(file_path, &exif);
+    exif_info.thumbnail = extract_thumbnail(file_path, &exif)
+        .or_else(|| extract_file_preview(file_path, max_preview_bytes));
 
     Ok(exif_info)
 }

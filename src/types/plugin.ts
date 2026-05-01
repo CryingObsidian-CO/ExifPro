@@ -27,6 +27,7 @@ export interface ConfigSchemaItem {
   description?: string;
   min?: number;
   max?: number;
+  step?: number;
 }
 
 export interface PluginInfo {

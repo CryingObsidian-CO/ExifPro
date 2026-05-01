@@ -51,24 +51,17 @@ function getGroupTypeLabel(type: GroupType) {
   return labels[type] || type;
 }
 
-const CUSTOM_TYPE_COLORS = [
-  '#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b', '#10b981',
-  '#6366f1', '#ef4444', '#14b8a6', '#f97316', '#84cc16',
-];
-
+// TODO 配置颜色？
+// TODO 更好的方案解决 custom 类型的颜色问题
 function getGroupTypeColor(type: GroupType) {
-  const colors: Partial<Record<GroupType, string>> = {
+  const colors: Record<GroupType, string> = {
     FocusBracketing: 'var(--color-focus-bracketing)',
     AEB: 'var(--color-aeb)',
     Burst: 'var(--color-burst)',
     Single: 'var(--color-single)',
+    // Custom: 'var(--color-custom)',
   };
-  if (colors[type]) return colors[type]!;
-  let hash = 0;
-  for (let i = 0; i < type.length; i++) {
-    hash = type.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return CUSTOM_TYPE_COLORS[Math.abs(hash) % CUSTOM_TYPE_COLORS.length];
+  return colors[type];
 }
 
 function toggleGroupSelection(groupId: string) {
@@ -723,7 +716,7 @@ async function executeOrganize() {
 
           <div class="photo-detail-body">
             <div class="photo-detail-preview">
-              <img v-if="detailPhoto.thumbnail"
+              <img v-if="detailPhoto?.thumbnail"
                    :src="detailPhoto.thumbnail"
                    :alt="detailPhoto.file_name"
                    class="photo-detail-image"

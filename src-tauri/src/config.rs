@@ -8,6 +8,7 @@ pub struct Config {
     pub focus_bracket_settings: FocusBracketSettings,
     pub burst_settings: BurstSettings,
     pub naming_rules: NamingRules,
+    pub preview_max_mb: u64,
     #[serde(default)]
     pub plugin_settings: HashMap<String, serde_json::Value>,
     #[serde(default)]
@@ -25,6 +26,7 @@ pub struct AebSettings {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FocusBracketSettings {
+    pub enabled: bool,
     pub max_span: f64,
     pub min_consecutive_interval: f64,
     pub max_consecutive_interval: f64,
@@ -52,6 +54,7 @@ impl Default for Config {
             focus_bracket_settings: FocusBracketSettings::default(),
             burst_settings: BurstSettings::default(),
             naming_rules: NamingRules::default(),
+            preview_max_mb: 8,
             plugin_settings: HashMap::new(),
             enabled_plugins: Vec::new(),
         }
@@ -73,6 +76,7 @@ impl Default for AebSettings {
 impl Default for FocusBracketSettings {
     fn default() -> Self {
         FocusBracketSettings {
+            enabled: false,
             max_span: 1.0,
             min_consecutive_interval: 0.02,
             max_consecutive_interval: 0.5,

@@ -57,6 +57,7 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
     let mut groups = Vec::new();
     let mut used = vec![false; photos.len()];
     let mut group_id_counter = 0;
+    let focus_enabled = config.focus_bracket_settings.enabled;
     let focus_min_count = config.focus_bracket_settings.min_count.max(2);
     let aeb_min_count = config.aeb_settings.min_count.max(2);
     let burst_min_count = config.burst_settings.min_count.max(2);
@@ -69,22 +70,24 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
         }
 
         let mut found_group = false;
-        for j in (focus_min_count..=photos.len() - i).rev() {
-            let photo_group = &photos[i..i + j];
-            if is_focus_bracketing(photo_group, config) {
-                let group = Group {
-                    id: format!("group_{}", group_id_counter),
-                    group_type: GroupType::FocusBracketing,
-                    name: generate_group_name(&GroupType::FocusBracketing, photo_group, config),
-                    photos: photo_group.to_vec(),
-                };
-                groups.push(group);
-                for k in i..i + j {
-                    used[k] = true;
+        if focus_enabled {
+            for j in (focus_min_count..=photos.len() - i).rev() {
+                let photo_group = &photos[i..i + j];
+                if is_focus_bracketing(photo_group, config) {
+                    let group = Group {
+                        id: format!("group_{}", group_id_counter),
+                        group_type: GroupType::FocusBracketing,
+                        name: generate_group_name(&GroupType::FocusBracketing, photo_group, config),
+                        photos: photo_group.to_vec(),
+                    };
+                    groups.push(group);
+                    for k in i..i + j {
+                        used[k] = true;
+                    }
+                    group_id_counter += 1;
+                    found_group = true;
+                    break;
                 }
-                group_id_counter += 1;
-                found_group = true;
-                break;
             }
         }
 

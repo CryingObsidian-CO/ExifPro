@@ -19,6 +19,7 @@
       "type": "integer",
       "default": 3,
       "min": 2,
+      "step": 1,
       "description": "测试"
     },
     "test_number": {
@@ -26,6 +27,7 @@
       "default": 2.0,
       "min": 0.0,
       "max": 3.0,
+      "step": 0.1,
       "description": "测试数字"
     },
     "test_string": {

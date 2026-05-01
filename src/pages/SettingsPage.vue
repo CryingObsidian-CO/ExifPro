@@ -219,6 +219,17 @@ async function togglePlugin(pluginId: string, enabled: boolean) {
   }
   markDirty();
 }
+
+function getSortedPlugins() {
+  return [...store.plugins].sort((a, b) => {
+    const nameA = a.manifest.name?.toLowerCase() ?? '';
+    const nameB = b.manifest.name?.toLowerCase() ?? '';
+    if (nameA && nameB && nameA !== nameB) {
+      return nameA.localeCompare(nameB);
+    }
+    return a.manifest.id.localeCompare(b.manifest.id);
+  });
+}
 </script>
 
 <template>
@@ -257,6 +268,23 @@ async function togglePlugin(pluginId: string, enabled: boolean) {
               <span class="theme-icon">💻</span>
               <span>跟随系统</span>
             </button>
+          </div>
+        </div>
+      </WinCard>
+
+      <WinCard title="预览设置">
+        <div class="settings-grid">
+          <div class="setting-item">
+            <label class="setting-label has-tooltip"
+                   data-tooltip="单张图片预览的最大大小（MB）。超过此大小时不生成预览。设置为 0 可禁用预览。当前仅对常见位图格式生效，RAW 预览暂不生效。"
+            >预览最大大小（MB）</label>
+            <WinInput type="number"
+                      :step="1"
+                      :min="0"
+                      :integerOnly="true"
+                      :modelValue="store.config?.preview_max_mb || 8"
+                      @update:modelValue="(v) => updateField(store.config, 'preview_max_mb', Number(v))"
+            />
           </div>
         </div>
       </WinCard>
@@ -332,6 +360,15 @@ async function togglePlugin(pluginId: string, enabled: boolean) {
           <span class="card-type-badge focus-badge">对焦包围</span>
         </template>
         <div class="settings-grid">
+          <div class="setting-item">
+            <label class="setting-label has-tooltip"
+                   data-tooltip="关闭后不再识别对焦包围组，以避免与连拍混淆；仅在需要对焦包围时再开启。"
+            >启用对焦包围识别</label>
+            <WinToggle
+                :modelValue="store.config?.focus_bracket_settings.enabled || false"
+                @update:modelValue="(v) => updateField(store.config?.focus_bracket_settings, 'enabled', v)"
+            />
+          </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
                    data-tooltip="对焦包围组中第一张与最后一张照片之间的最大允许时间差（秒）。首尾时间差超过此值的照片序列不会被识别为对焦包围组。对焦包围通常拍摄张数较多，建议设为 0.5~2.0 秒。填写 -1 表示不限制此时间条件。"
@@ -480,7 +517,7 @@ async function togglePlugin(pluginId: string, enabled: boolean) {
             <p class="plugin-hint">将插件 ZIP 文件放入程序目录下的 plugins/ 文件夹</p>
           </div>
           <div v-else class="plugin-list">
-            <div v-for="plugin in store.plugins" :key="plugin.manifest.id" class="plugin-item">
+            <div v-for="plugin in getSortedPlugins()" :key="plugin.manifest.id" class="plugin-item">
               <div class="plugin-info">
                 <div class="plugin-header">
                   <span class="plugin-name">{{ plugin.manifest.name }}</span>
@@ -521,13 +558,13 @@ async function togglePlugin(pluginId: string, enabled: boolean) {
                     <WinInput
                         v-else
                         :type="schema.type === 'string' ? 'text' : 'number'"
-                    :step="schema.type === 'integer' ? 1 : 0.1"
-                    :min="schema.min"
-                    :max="schema.max"
-                    :integerOnly="schema.type === 'integer'"
-                    :modelValue="getPluginConfigValue(plugin.manifest.id, key, schema) ??
+                        :step="schema.step ?? (schema.type === 'integer' ? 1 : 0.1)"
+                        :min="schema.min"
+                        :max="schema.max"
+                        :integerOnly="schema.type === 'integer'"
+                        :modelValue="getPluginConfigValue(plugin.manifest.id, key, schema) ??
                     (schema.type === 'string' ? '' : 0)"
-                    @update:modelValue="(v) => updatePluginConfig(
+                        @update:modelValue="(v) => updatePluginConfig(
                     plugin.manifest.id,
                     key,
                     schema.type === 'string' ? v : Number(v)

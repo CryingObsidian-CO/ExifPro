@@ -7,6 +7,7 @@ export interface AebSettings {
 }
 
 export interface FocusBracketSettings {
+  enabled: boolean;
   max_span: number;
   min_consecutive_interval: number;
   max_consecutive_interval: number;
@@ -31,6 +32,7 @@ export interface Config {
   focus_bracket_settings: FocusBracketSettings;
   burst_settings: BurstSettings;
   naming_rules: NamingRules;
+  preview_max_mb: number;
   plugin_settings: Record<string, Record<string, any>>;
   enabled_plugins: string[];
 }

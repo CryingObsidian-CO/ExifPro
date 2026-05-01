@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use indexmap::IndexMap;
 
 pub const CURRENT_API_VERSION: u32 = 1;
 
@@ -8,9 +9,7 @@ pub struct PluginManifest {
     pub id: String,
     pub version: String,
     pub name: String,
-    #[serde(default)]
     pub description: Option<String>,
-    #[serde(default)]
     pub author: Option<String>,
     pub api_version: u32,
     pub entry_point: String,
@@ -18,7 +17,7 @@ pub struct PluginManifest {
     #[serde(default)]
     pub dependencies: HashMap<String, String>,
     #[serde(default)]
-    pub config_schema: HashMap<String, ConfigSchemaItem>,
+    pub config_schema: IndexMap<String, ConfigSchemaItem>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,14 +33,11 @@ pub struct PluginCapabilities {
 pub struct ConfigSchemaItem {
     #[serde(rename = "type")]
     pub item_type: String,
-    #[serde(default)]
     pub default: Option<serde_json::Value>,
-    #[serde(default)]
     pub description: Option<String>,
-    #[serde(default)]
-    pub min: Option<serde_json::Value>,
-    #[serde(default)]
-    pub max: Option<serde_json::Value>,
+    pub min: Option<f64>,
+    pub max: Option<f64>,
+    pub step: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]

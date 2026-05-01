@@ -41,18 +41,34 @@ fn is_image_file(path: &Path) -> bool {
         .and_then(|s| s.to_str())
         .unwrap_or("")
         .to_lowercase();
-    // TODO 允许更多后缀
-    ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "arw"
+    let allowed_exts = [
+        "jpg",
+        "jpeg",
+        "png",
+        "gif",
+        "bmp",
+        "tif",
+        "tiff",
+        "webp",
+        "heic",
+        "heif",
+        "arw",
+        "cr2",
+        "cr3",
+        "nef",
+        "dng",
+        "raf",
+        "rw2",
+        "orf",
+        "srw",
+        "pef",
+        "x3f",
+    ];
+    allowed_exts.contains(&ext.as_str())
 }
 
 pub fn safe_copy(src: &Path, dest: &Path, overwrite: bool) -> Result<(), String> {
-    if dest.exists() {
-        if overwrite {
-            fs::remove_file(dest).map_err(|e| format!("Failed to remove file: {}", e))?;
-        } else {
-            return Err(format!("Destination file already exists: {:?}", dest));
-        }
-    }
+    ensure_dest_writable(dest, overwrite)?;
 
     if let Some(parent) = dest.parent() {
         create_dirs_if_not_exist(parent)
@@ -64,13 +80,7 @@ pub fn safe_copy(src: &Path, dest: &Path, overwrite: bool) -> Result<(), String>
 }
 
 pub fn safe_move(src: &Path, dest: &Path, overwrite: bool) -> Result<(), String> {
-    if dest.exists() {
-        if overwrite {
-            fs::remove_file(dest).map_err(|e| format!("Failed to remove file: {}", e))?;
-        } else {
-            return Err(format!("Destination file already exists: {:?}", dest));
-        }
-    }
+    ensure_dest_writable(dest, overwrite)?;
 
     if let Some(parent) = dest.parent() {
         create_dirs_if_not_exist(parent)
@@ -78,6 +88,17 @@ pub fn safe_move(src: &Path, dest: &Path, overwrite: bool) -> Result<(), String>
     }
 
     fs::rename(src, dest).map_err(|e| format!("Failed to move file: {}", e))?;
+    Ok(())
+}
+
+fn ensure_dest_writable(dest: &Path, overwrite: bool) -> Result<(), String> {
+    if dest.exists() {
+        if overwrite {
+            fs::remove_file(dest).map_err(|e| format!("Failed to remove file: {}", e))?;
+        } else {
+            return Err(format!("Destination file already exists: {:?}", dest));
+        }
+    }
     Ok(())
 }
 
