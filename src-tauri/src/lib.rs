@@ -10,7 +10,11 @@ use crate::file_ops::{create_dirs_if_not_exist, safe_copy, safe_move, scan_direc
 use crate::grouping::{group_photos, Group};
 use crate::plugin::loader::PluginLoader;
 use crate::plugin::manifest::PluginInfo;
-use std::path::Path;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::env::current_exe;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 #[tauri::command]
 async fn scan_directory_command(path: String, recursive: bool) -> Result<Vec<ExifInfo>, String> {
@@ -101,6 +105,7 @@ async fn list_plugins_command() -> Result<Vec<PluginInfo>, String> {
             enabled: config.enabled_plugins.contains(&p.manifest.id),
             manifest: p.manifest,
             zip_path: p.zip_path.to_string_lossy().to_string(),
+            builtin: p.builtin,
         })
         .collect())
 }
@@ -176,6 +181,18 @@ async fn plugin_file_op_command(
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScriptResult {
+    pub exit_code: i32,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+fn get_photoshop_args_file_path() -> Result<PathBuf, String> {
+    let args_dir = std::env::temp_dir().join("ExifPro");
+    create_dirs_if_not_exist(&args_dir).map_err(|e| e.to_string())?;
+    Ok(args_dir.join("exifpro_ps_args.json"))
+}
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()

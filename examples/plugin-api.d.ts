@@ -29,6 +29,23 @@ export interface MergeResult {
   message?: string;
 }
 
+export interface GroupActionDeclaration {
+  id: string;
+  label: string;
+  icon?: string;
+  groupTypes: string[];
+}
+
+export interface UIExtensionDeclaration {
+  groupActions: GroupActionDeclaration[];
+}
+
+export interface ScriptResult {
+  exit_code: number;
+  stdout: string;
+  stderr: string;
+}
+
 export interface ExifProHostAPI {
   log(message: string): void;
 
@@ -45,6 +62,8 @@ export interface ExifProHostAPI {
   writeFile(path: string, data: Uint8Array): Promise<void>;
 
   createDirectory(path: string): Promise<void>;
+
+  executePhotoshopScript(scriptPath: string, photoPaths: string[], outputDir: string, extraArgs?: Record<string, string>): Promise<ScriptResult>;
 }
 
 export interface ExifProPluginHooks {
@@ -57,6 +76,10 @@ export interface ExifProPluginHooks {
   onGroupsCreated?(groups: Group[], ungrouped: ExifInfo[], config: any): Group[];
 
   onGroupMerge?(group: Group, outputDir: string): MergeResult | undefined;
+
+  onRegisterUIExtensions?(): UIExtensionDeclaration;
+
+  onGroupAction?(actionId: string, group: Group): void | Promise<void>;
 }
 
 declare global {

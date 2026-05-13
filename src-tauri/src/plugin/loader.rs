@@ -1,3 +1,4 @@
+use std::env::current_exe;
 use crate::plugin::manifest::PluginManifest;
 use std::fs;
 use std::io::Read;
@@ -9,11 +10,30 @@ pub struct PluginLoader;
 pub struct DiscoveredPlugin {
     pub zip_path: PathBuf,
     pub manifest: PluginManifest,
+    pub builtin: bool,
 }
 
 impl PluginLoader {
     pub fn discover_plugins() -> Result<Vec<DiscoveredPlugin>, String> {
-        let exe_dir = std::env::current_exe()
+        let mut plugins = Self::discover_builtin_plugins();
+        let mut zip_plugins = Self::discover_zip_plugins()?;
+        plugins.append(&mut zip_plugins);
+        Ok(plugins)
+    }
+
+    pub fn discover_builtin_plugins() -> Vec<DiscoveredPlugin> {
+        crate::plugin::get_builtin_plugin_manifests()
+            .into_iter()
+            .map(|manifest| DiscoveredPlugin {
+                zip_path: PathBuf::from("__builtin__"),
+                manifest,
+                builtin: true,
+            })
+            .collect()
+    }
+
+    pub fn discover_zip_plugins() -> Result<Vec<DiscoveredPlugin>, String> {
+        let exe_dir = current_exe()
             .map_err(|e| e.to_string())?
             .parent()
             .ok_or("Failed to get exe directory")?
@@ -35,6 +55,7 @@ impl PluginLoader {
                     Ok(manifest) => plugins.push(DiscoveredPlugin {
                         zip_path: path,
                         manifest,
+                        builtin: false,
                     }),
                     Err(e) => {
                         eprintln!("Warning: Failed to load plugin from {:?}: {}", path, e)

@@ -7,6 +7,8 @@ import WinCard from "../component/WinCard.vue";
 import {ExifInfo, Group, GroupType} from "../types/photo.ts";
 import {onMounted, onUnmounted, ref, watchEffect} from "vue";
 import {useDialog} from "../composables/dialog.ts";
+import {pluginManager} from "../composables/pluginManager.ts";
+import type {GroupActionDeclaration} from "../types/plugin.ts";
 
 const router = useRouter();
 const tauriImpl = useTauri();
@@ -62,6 +64,15 @@ function getGroupTypeColor(type: GroupType) {
     // Custom: 'var(--color-custom)',
   };
   return colors[type];
+}
+
+function getPluginGroupActions(groupType: GroupType): GroupActionDeclaration[] {
+  if (!pluginManager.isInitialized) return [];
+  return pluginManager.getGroupActions(groupType);
+}
+
+async function handlePluginGroupAction(action: GroupActionDeclaration, group: Group) {
+  await pluginManager.emitGroupAction(action.id, group);
 }
 
 function toggleGroupSelection(groupId: string) {
@@ -633,6 +644,15 @@ async function executeOrganize() {
               </span>
             </div>
             <div class="group-actions">
+              <template v-for="action in getPluginGroupActions(group.group_type)" :key="action.id">
+                <button
+                    class="icon-btn plugin-action-btn"
+                    @click.stop="handlePluginGroupAction(action, group)"
+                    :title="action.label"
+                >
+                  {{ action.icon || '⚡' }}
+                </button>
+              </template>
               <button v-if="group.id !== 'ungrouped'"
                       class="icon-btn"
                       @click.stop="startRenaming(group)"
@@ -915,6 +935,10 @@ async function executeOrganize() {
 
 .icon-btn:hover {
   background-color: var(--color-bg-tertiary);
+}
+
+.plugin-action-btn {
+  color: var(--color-accent);
 }
 
 .main-content {

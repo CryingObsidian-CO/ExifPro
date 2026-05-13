@@ -102,6 +102,10 @@ function updatePluginConfig(pluginId: string, key: string, value: any) {
 }
 
 function isPluginEnabled(pluginId: string) {
+  const plugin = store.plugins.find(p => p.manifest.id === pluginId);
+  if (plugin) {
+    return plugin.enabled;
+  }
   const config = store.config;
   if (!config) {
     return false;
@@ -521,6 +525,7 @@ function getSortedPlugins() {
               <div class="plugin-info">
                 <div class="plugin-header">
                   <span class="plugin-name">{{ plugin.manifest.name }}</span>
+                  <span v-if="plugin.builtin" class="plugin-builtin-badge">内置</span>
                   <span class="plugin-version">v{{ plugin.manifest.version }}</span>
                 </div>
                 <p v-if="plugin.manifest.description" class="plugin-description">
@@ -537,6 +542,7 @@ function getSortedPlugins() {
                   <span v-if="plugin.manifest.capabilities.merging"
                         class="capability-tag">合并</span>
                   <span v-if="plugin.manifest.capabilities.exif_enhancement" class="capability-tag">EXIF增强</span>
+                  <span v-if="plugin.manifest.capabilities.ui_extensions" class="capability-tag">UI扩展</span>
                   <span v-for="gt in (plugin.manifest.capabilities.custom_group_types || [])"
                         :key="gt" class="capability-tag custom">
                     {{ gt }}
@@ -797,6 +803,16 @@ function getSortedPlugins() {
 .plugin-version {
   font-size: 12px;
   color: var(--color-text-secondary);
+}
+
+.plugin-builtin-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  background-color: var(--color-accent-light);
+  color: var(--color-accent);
 }
 
 .plugin-description {

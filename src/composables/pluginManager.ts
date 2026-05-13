@@ -1,13 +1,15 @@
 import {useTauri} from './tauri';
 import type {
-  PluginInfo,
-  ExifProPluginHooks,
   ExifProHostAPI,
-  MergeResult,
+  ExifProPluginHooks,
+  GroupActionDeclaration,
   LoadedPlugin,
+  MergeResult,
+  PluginInfo,
 } from '../types/plugin';
-import type {ExifInfo, Group} from '../types/photo';
+import type {ExifInfo, Group, GroupType} from '../types/photo';
 import type {Config} from '../types/config';
+import {builtinPlugins} from './builtinPlugins';
 
 class PluginManagerImpl {
   private readonly tauri = useTauri();
@@ -26,38 +28,45 @@ class PluginManagerImpl {
     try {
       const pluginList = await this.tauri.listPlugins();
       for (const info of pluginList) {
-        if (info.enabled) {
-          try {
-            await this.loadPlugin(info);
-          } catch (e) {
-            console.error(`Failed to load plugin ${info.manifest.id}:`, e);
-            this.plugins.set(info.manifest.id, {
-              manifest: info.manifest,
-              hooks: {},
-              enabled: false,
-              config: {},
-              zipPath: info.zip_path,
-            });
-          }
-        } else {
+        if (!info.enabled) {
           this.plugins.set(info.manifest.id, {
             manifest: info.manifest,
             hooks: {},
             enabled: false,
             config: {},
             zipPath: info.zip_path,
+            builtin: info.builtin ?? false,
+          });
+          continue;
+        }
+
+        try {
+          await this.loadPlugin(info);
+        } catch (e) {
+          console.error(`Failed to load plugin ${info.manifest.id}:`, e);
+          this.plugins.set(info.manifest.id, {
+            manifest: info.manifest,
+            hooks: {},
+            enabled: false,
+            config: {},
+            zipPath: info.zip_path,
+            builtin: info.builtin ?? false,
           });
         }
       }
+
       this.initialized = true;
     } catch (e) {
       console.error('Failed to initialize plugin manager:', e);
     }
   }
 
-  private async loadPlugin(info: PluginInfo): Promise<void> {
-    const scriptContent = await this.tauri.readPluginFile(info.zip_path, info.manifest.entry_point);
+  private getBuiltinPluginHooks(pluginId: string): ExifProPluginHooks | null {
+    const entry = builtinPlugins[pluginId];
+    return entry ? entry.hooks : null;
+  }
 
+  private async loadPlugin(info: PluginInfo): Promise<void> {
     let pluginConfig: Record<string, any> = {};
     try {
       const raw = await this.tauri.getPluginConfig(info.manifest.id);
@@ -69,28 +78,55 @@ class PluginManagerImpl {
     }
 
     if (info.manifest.config_schema && Object.keys(pluginConfig).length === 0) {
-      for (const [key, schema] of Object.entries(info.manifest.config_schema)) {
-        if (schema.default !== undefined) {
-          pluginConfig[key] = schema.default;
+      if (info.builtin) {
+        const entry = builtinPlugins[info.manifest.id];
+        pluginConfig = entry?.getDefaultConfig ? entry.getDefaultConfig() : {};
+      } else {
+        for (const [key, schema] of Object.entries(info.manifest.config_schema)) {
+          if (schema.default !== undefined) {
+            pluginConfig[key] = schema.default;
+          }
         }
       }
     }
 
     const api = this.createHostAPI(info.manifest.id, pluginConfig);
-    const hooks = this.evaluatePluginScript(scriptContent, api);
 
-    this.plugins.set(info.manifest.id, {
+    let hooks: ExifProPluginHooks;
+    if (info.builtin) {
+      const builtinHooks = this.getBuiltinPluginHooks(info.manifest.id);
+      if (!builtinHooks) {
+        throw new Error(`Unknown builtin plugin: ${info.manifest.id}`);
+      }
+      hooks = builtinHooks;
+    } else {
+      const scriptContent = await this.tauri.readPluginFile(info.zip_path, info.manifest.entry_point);
+      hooks = this.evaluatePluginScript(scriptContent, api);
+    }
+
+    const loaded: LoadedPlugin = {
       manifest: info.manifest,
       hooks,
       enabled: true,
       config: pluginConfig,
       zipPath: info.zip_path,
-    });
+      builtin: info.builtin ?? false,
+    };
+
+    this.plugins.set(info.manifest.id, loaded);
 
     try {
       hooks.onLoad?.(api);
     } catch (e) {
       console.error(`Plugin ${info.manifest.id} onLoad error:`, e);
+    }
+
+    if (hooks.onRegisterUIExtensions && info.manifest.capabilities.ui_extensions) {
+      try {
+        loaded.uiExtensions = hooks.onRegisterUIExtensions();
+      } catch (e) {
+        console.error(`Plugin ${info.manifest.id} onRegisterUIExtensions error:`, e);
+      }
     }
   }
 
@@ -107,6 +143,7 @@ class PluginManagerImpl {
     try {
       const preprocessedScript = this.preprocessPluginCode(script);
 
+      // TODO 完善 api 提供的日志记录功能
       const customConsole = {
         log: (...args: any[]) => api.log(args.join(' ')),
         warn: (...args: any[]) => api.log('[WARN] ' + args.join(' ')),
@@ -190,6 +227,32 @@ class PluginManagerImpl {
     return undefined;
   }
 
+  async emitGroupAction(actionId: string, group: Group): Promise<void> {
+    for (const plugin of this.getEnabledPlugins()) {
+      if (plugin.hooks.onGroupAction && plugin.manifest.capabilities.ui_extensions) {
+        try {
+          await plugin.hooks.onGroupAction(actionId, group);
+        } catch (e) {
+          console.error(`Plugin ${plugin.manifest.id} onGroupAction error:`, e);
+        }
+      }
+    }
+  }
+
+  getGroupActions(groupType: GroupType): GroupActionDeclaration[] {
+    const actions: GroupActionDeclaration[] = [];
+    for (const plugin of this.getEnabledPlugins()) {
+      if (plugin.uiExtensions?.groupActions && plugin.manifest.capabilities.ui_extensions) {
+        for (const action of plugin.uiExtensions.groupActions) {
+          if (action.groupTypes.length === 0 || action.groupTypes.includes(groupType)) {
+            actions.push(action);
+          }
+        }
+      }
+    }
+    return actions;
+  }
+
   private getEnabledPlugins(): LoadedPlugin[] {
     return Array.from(this.plugins.values()).filter(p => p.enabled);
   }
@@ -199,6 +262,7 @@ class PluginManagerImpl {
       manifest: p.manifest,
       enabled: p.enabled,
       zip_path: p.zipPath,
+      builtin: p.builtin ?? false,
     }));
   }
 
@@ -211,44 +275,48 @@ class PluginManagerImpl {
   }
 
   async enablePlugin(pluginId: string): Promise<void> {
-    await this.tauri.enablePlugin(pluginId);
     const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      const info: PluginInfo = {
+    if (!plugin || plugin.enabled) return;
+
+    await this.tauri.enablePlugin(pluginId);
+
+    try {
+      await this.loadPlugin({
         manifest: plugin.manifest,
         enabled: true,
         zip_path: plugin.zipPath,
-      };
-      try {
-        await this.loadPlugin(info);
-      } catch (e) {
-        console.error(`Failed to enable plugin ${pluginId}:`, e);
-      }
+        builtin: plugin.builtin ?? false,
+      });
+    } catch (e) {
+      console.error(`Failed to enable plugin ${pluginId}:`, e);
     }
   }
 
   async disablePlugin(pluginId: string): Promise<void> {
-    await this.tauri.disablePlugin(pluginId);
     const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      if (plugin.hooks.onUnload) {
-        try {
-          plugin.hooks.onUnload();
-        } catch (e) {
-          console.error(`Plugin ${pluginId} onUnload error:`, e);
-        }
+    if (!plugin || !plugin.enabled) return;
+
+    if (plugin.hooks.onUnload) {
+      try {
+        plugin.hooks.onUnload();
+      } catch (e) {
+        console.error(`Plugin ${pluginId} onUnload error:`, e);
       }
-      plugin.enabled = false;
-      plugin.hooks = {};
     }
+
+    await this.tauri.disablePlugin(pluginId);
+
+    plugin.enabled = false;
+    plugin.hooks = {};
+    plugin.uiExtensions = undefined;
   }
 
   async setPluginConfig(pluginId: string, config: Record<string, any>): Promise<void> {
-    await this.tauri.setPluginConfig(pluginId, config);
     const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      plugin.config = config;
-    }
+    if (!plugin) return;
+
+    await this.tauri.setPluginConfig(pluginId, config);
+    plugin.config = config;
   }
 
   async reloadPlugins(): Promise<void> {
@@ -263,6 +331,7 @@ class PluginManagerImpl {
     await this.initialize();
   }
 
+  // TODO 解决 getPluginConfig 没法获取实时配置的问题
   private createHostAPI(pluginId: string, pluginConfig: Record<string, any>): ExifProHostAPI {
     return {
       getPluginConfig: () => pluginConfig,

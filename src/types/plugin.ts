@@ -1,4 +1,4 @@
-import type {ExifInfo, Group} from './photo';
+import type {ExifInfo, Group, GroupType} from './photo';
 import type {Config} from './config';
 
 export interface PluginManifest {
@@ -14,10 +14,12 @@ export interface PluginManifest {
   config_schema?: Record<string, ConfigSchemaItem>;
 }
 
+// TODO 重新优化插件能力的排列，使能力更符合逻辑顺序，并在 Manager 的相应判断中修改
 export interface PluginCapabilities {
   grouping: boolean;
   merging: boolean;
   exif_enhancement: boolean;
+  ui_extensions?: boolean;
   custom_group_types?: string[];
 }
 
@@ -34,6 +36,7 @@ export interface PluginInfo {
   manifest: PluginManifest;
   enabled: boolean;
   zip_path: string;
+  builtin?: boolean;
 }
 
 export interface MergeResult {
@@ -42,6 +45,18 @@ export interface MergeResult {
   message?: string;
 }
 
+export interface GroupActionDeclaration {
+  id: string;
+  label: string;
+  icon?: string;
+  groupTypes: GroupType[];
+}
+
+export interface UIExtensionDeclaration {
+  groupActions: GroupActionDeclaration[];
+}
+
+// TODO 完成钩子的调用
 export interface ExifProPluginHooks {
   onLoad?(api: ExifProHostAPI): void;
 
@@ -52,6 +67,10 @@ export interface ExifProPluginHooks {
   onGroupsCreated?(groups: Group[], ungroupedPhotos: ExifInfo[], config: Config): Group[];
 
   onGroupMerge?(group: Group, outputDir: string): MergeResult | undefined;
+
+  onRegisterUIExtensions?(): UIExtensionDeclaration;
+
+  onGroupAction?(actionId: string, group: Group): void | Promise<void>;
 }
 
 export interface ExifProHostAPI {
@@ -79,4 +98,6 @@ export interface LoadedPlugin {
   enabled: boolean;
   config: Record<string, any>;
   zipPath: string;
+  builtin?: boolean;
+  uiExtensions?: UIExtensionDeclaration;
 }
