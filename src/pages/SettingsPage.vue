@@ -560,7 +560,6 @@ function getSortedPlugins() {
                         :modelValue="Boolean(getPluginConfigValue(plugin.manifest.id, key, schema))"
                         @update:modelValue="(v: boolean) => updatePluginConfig(plugin.manifest.id, key, v)"
                     />
-                    <!--TODO 加入一个配置来配置步长-->
                     <WinInput
                         v-else
                         :type="schema.type === 'string' ? 'text' : 'number'"

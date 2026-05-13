@@ -1,7 +1,167 @@
-# Tauri + Vue + TypeScript
+<div style="text-align: center;">
+  <h1>📸 ExifPro</h1>
+  <p><strong>智能照片分组与整理工具</strong></p>
+  <p>基于 EXIF 信息的照片自动化分类、分组和整理工具</p>
+</div>
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+---
 
-## Recommended IDE Setup
+## ✨ 功能特性
 
-- [VS Code](https://code.visualstudio.com/) + [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+- 🧠 **智能分组** - 自动识别焦点堆栈（Focus Bracketing）、自动包围曝光（AEB）、连拍（Burst）等照片组
+- 🔌 **插件系统** - 支持通过插件扩展更多分组和处理功能
+- 📁 **批量处理** - 一次性整理整个目录的照片
+- 🎨 **优雅界面** - 简洁美观的用户界面，操作直观
+- 🔒 **安全可靠** - 支持复制模式，确保不破坏原文件
+
+---
+
+> 🤖 **AI 开发参与声明**
+> 本项目**前端样式、页面布局**相关内容由 AI 深度参与开发；
+> 
+> 其余前端逻辑、后端 Rust / 业务核心代码，AI 仅参与少量修改与代码审核。
+> 
+> **所有 AI 生成、AI 修改的代码均经过人工逐行审核与确认后才合入仓库**。
+> 
+> 若您介意项目有 AI 参与开发、修改代码，可以选择立即停止使用、下载、分发及参与本项目。
+
+---
+
+> ⚠️ **重要安全警告**
+>
+> 本项目当前**插件系统未实现严格安全沙箱隔离**，插件拥有较高本地执行权限。
+>
+> ❌ **请勿安装、运行来源不明、非第三方可信渠道、非官方内置的插件**
+>
+> ✅ **仅推荐使用：官方内置插件、项目原版维护插件、可完全信任来源的插件**
+>
+> 随意加载未知插件存在**恶意代码执行、隐私泄露、文件篡改、系统安全风险**
+>
+> **本项目不对任何非内置插件的安全性负责**
+---
+
+## 🚀 快速开始
+
+### 下载安装
+
+1. 访问 [Releases](https://github.com/CryingObsidian-CO/ExifPro/releases) 页面
+2. 下载适合您操作系统的版本：
+3. 运行安装程序或直接运行可执行文件
+
+### 使用步骤
+
+1. **选择照片目录** - 点击「浏览...」选择包含待整理照片的文件夹
+2. **设置输出目录** - 选择整理后的照片保存位置
+3. **配置选项** - 选择是否包含子目录、是否使用复制模式等
+4. **开始分析** - 点击「开始分析」，软件会自动扫描并分组照片
+5. **编辑分组** - 在编辑页面查看和调整分组结果
+6. **导出整理** - 确认后导出整理好的照片
+
+---
+
+## 📖 功能说明
+
+### 智能分组类型
+
+| 分组类型                 | 说明                 |
+|----------------------|--------------------|
+| **Focus Bracketing** | 焦点堆栈照片，用于景深合成      |
+| **AEB**              | 自动包围曝光照片，用于 HDR 合成 |
+| **Burst**            | 连拍照片，捕捉动态瞬间        |
+| **Single**           | 单张未分组照片            |
+
+### 插件系统
+
+ExifPro 支持插件扩展，您可以：
+
+- 安装第三方插件
+- 开发自定义插件
+- 通过插件添加新的分组规则
+- 通过插件添加照片合并/处理功能
+
+---
+
+## 🖼️ 支持图片格式
+
+- RAW 格式：CR3、NEF、ARW、DNG 等
+- 普通格式：JPG、PNG、TIFF
+- 完整保留 EXIF、元数据、拍摄参数
+
+---
+
+## ❓ 常见问题
+
+### 会修改原始照片文件吗？
+
+不会。默认采用**复制模式**，仅对副本进行整理，原始文件不受任何改动。
+
+### 第三方插件安全吗？
+
+非官方内置插件**无沙箱隔离**，存在安全风险，请仅使用可信来源插件，详见上方安全警告。
+
+### 可以子目录递归扫描吗？
+
+支持，可在配置中开启包含子目录选项。
+
+---
+
+## 🔧 参与开发
+
+如果您想参与 ExifPro 的开发，欢迎贡献代码！
+
+### 开发环境要求
+
+- Node.js 18+
+- Rust 1.70+
+- Tauri 2
+
+### 开发步骤
+
+1. Fork 并克隆仓库
+2. 安装依赖：`npm install`
+3. 启动开发服务器：`npm run tauri dev`
+4. 构建生产版本：`npm run tauri build`
+
+### 项目结构
+
+```
+exifpro/
+├── src/              # 前端 Vue 代码
+├── src-tauri/        # 后端 Rust 代码
+├── examples/         # 插件示例
+├── public/           # 前端静态资源
+├── LICENSE           # 开源许可证文件
+└── ...
+```
+
+---
+
+## 🤝 贡献规范
+
+- 欢迎提交 Issue 反馈问题、提出功能建议
+- 欢迎 Fork 后提交 PR 参与代码贡献
+- 所有代码提交遵循本项目 **GPLv3** 开源协议
+
+---
+
+## 📋 更新日志
+
+所有版本更新记录请查看 [Releases](https://github.com/CryingObsidian-CO/ExifPro/releases)
+
+---
+
+## 📄 许可证
+
+ExifPro 基于 **GNU General Public License v3.0 (GPLv3)** 开源，受版权法与国际相关条约保护。
+
+您可自由使用、修改、分发本项目，但需严格遵循 GPLv3 协议条款，详见仓库根目录 [LICENSE](LICENSE) 文件。
+
+免责声明：本软件按 “现状” 提供，无任何明示或暗示的担保，开发者不担保软件的适用性、可靠性及无故障运行，因使用软件产生的一切风险由使用者自行承担。
+
+---
+
+<div style="text-align: center;">
+    <p>Made with ❤️ by the ExifPro Team</p>
+    <p>基于GPLv3开源协议 | 严禁未经授权商用</p>
+</div>
+
