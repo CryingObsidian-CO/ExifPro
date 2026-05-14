@@ -5,12 +5,12 @@ on:
     branches:
       - dev
       - master
-      - 'release/**'
+      - 'releases/**'
   pull_request:
     branches:
       - dev
       - master
-      - 'release/**'
+      - 'releases/**'
 
 permissions:
   contents: write
@@ -78,16 +78,22 @@ jobs:
         run: npm run build
 
   build:
-    name: Build Artifacts
-    runs-on: ubuntu-latest
+    name: Build Artifacts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     needs: test
-    if: startsWith(github.ref, 'refs/heads/release/') || github.ref == 'refs/heads/master'
+    if: startsWith(github.ref, 'refs/heads/releases/') || github.ref == 'refs/heads/master'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
       - name: Install Tauri dependencies
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update && 
           sudo apt-get install -y \
@@ -95,7 +101,7 @@ jobs:
             libayatana-appindicator3-dev \
             libwebkit2gtk-4.1-dev \
             librsvg2-dev  \
-            patchelf  \
+            patchelf
 
       - name: Setup Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -121,9 +127,17 @@ jobs:
         with:
           tagName: exifpro-v__VERSION__
           releaseName: 'ExifPro v__VERSION__'
-          releaseBody: 'See the assets to download this version and install.'
-          releaseDraft: ${{ github.ref != 'refs/heads/master' }}
-          prerelease: ${{ startsWith(github.ref, 'refs/heads/release/') }}
+          releaseBody: |
+            ## 📦 下载版本
+            安装包：https://github.com/${{ github.repository }}/releases/tag/exifpro-v__VERSION__
+            
+            ## 🔍 校验码（MD5 / SHA256）
+            __CHECKSUMS__
+          releaseDraft: true
+          prerelease: ${{ startsWith(github.ref, 'refs/heads/releases/') }}
+          args: >
+            --bundles
+            ${{ matrix.os == 'ubuntu-latest' && 'deb,rpm' || 'msi' }}
 
   tag-version:
     name: Tag Version
