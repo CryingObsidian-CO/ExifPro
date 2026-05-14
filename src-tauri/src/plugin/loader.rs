@@ -1,5 +1,5 @@
-use std::env::current_exe;
 use crate::plugin::manifest::PluginManifest;
+use std::env::current_exe;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};

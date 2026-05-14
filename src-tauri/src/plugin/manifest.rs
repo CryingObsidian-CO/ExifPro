@@ -1,6 +1,6 @@
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use indexmap::IndexMap;
 
 pub const CURRENT_API_VERSION: u32 = 1;
 

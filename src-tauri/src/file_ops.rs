@@ -42,27 +42,8 @@ fn is_image_file(path: &Path) -> bool {
         .unwrap_or("")
         .to_lowercase();
     let allowed_exts = [
-        "jpg",
-        "jpeg",
-        "png",
-        "gif",
-        "bmp",
-        "tif",
-        "tiff",
-        "webp",
-        "heic",
-        "heif",
-        "arw",
-        "cr2",
-        "cr3",
-        "nef",
-        "dng",
-        "raf",
-        "rw2",
-        "orf",
-        "srw",
-        "pef",
-        "x3f",
+        "jpg", "jpeg", "png", "gif", "bmp", "tif", "tiff", "webp", "heic", "heif", "arw", "cr2",
+        "cr3", "nef", "dng", "raf", "rw2", "orf", "srw", "pef", "x3f",
     ];
     allowed_exts.contains(&ext.as_str())
 }
