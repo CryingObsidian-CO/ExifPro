@@ -106,7 +106,7 @@ fn extract_thumbnail(file_path: &Path, exif: &Exif) -> Option<String> {
     let offset = thumb_offset.value.get_uint(0)? as u64;
     let length = thumb_length.value.get_uint(0)? as u64;
 
-    if length <= 0 || offset <= 0 {
+    if length == 0 || offset == 0 {
         return None;
     }
 
