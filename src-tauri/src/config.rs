@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{env, fs};
+use tauri_plugin_log::log;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub aeb_settings: AebSettings,
@@ -111,28 +112,65 @@ impl Config {
         let config_path = get_config_path()?;
 
         if config_path.exists() {
+            log::debug!("config.load: start path={}", config_path.display());
             let config_content = fs::read_to_string(&config_path)
-                .map_err(|_| format!("Failed to read config file: {:?}", config_path))?;
+                .map_err(|e| {
+                    log::error!(
+                        "config.load: read_failed path={} err={}",
+                        config_path.display(),
+                        e
+                    );
+                    format!("Failed to read config file: {:?}", config_path)
+                })?;
             let config: Self = serde_json::from_str(&config_content)
-                .map_err(|_| format!("Failed to parse config file: {:?}", config_path))?;
-
+                .map_err(|e| {
+                    log::error!(
+                        "config.load: parse_failed path={} err={}",
+                        config_path.display(),
+                        e
+                    );
+                    format!("Failed to parse config file: {:?}", config_path)
+                })?;
+            log::info!("config.load: complete path={}", config_path.display());
             Ok(config)
         } else {
+            log::warn!(
+                "config.load: missing path={} default=true",
+                config_path.display()
+            );
             Ok(Self::default())
         }
     }
 
     pub fn save(&self) -> Result<(), String> {
         let config_path = get_config_path()?;
+        log::debug!("config.save: start path={}", config_path.display());
         if let Some(parent) = config_path.parent() {
             fs::create_dir_all(parent)
-                .map_err(|_| format!("Failed to create directory: {:?}", parent))?;
+                .map_err(|e| {
+                    log::error!(
+                        "config.save: mkdir_failed path={} err={}",
+                        parent.display(),
+                        e
+                    );
+                    format!("Failed to create directory: {:?}", parent)
+                })?;
         }
 
         let config_content = serde_json::to_string_pretty(self)
-            .map_err(|e| format!("Failed to serialize config: {:?}", e))?;
-        fs::write(config_path, config_content)
-            .map_err(|e| format!("Failed to write config file: {:?}", e))?;
+            .map_err(|e| {
+                log::error!("config.save: serialize_failed err={}", e);
+                format!("Failed to serialize config: {:?}", e)
+            })?;
+        fs::write(&config_path, config_content).map_err(|e| {
+            log::error!(
+                "config.save: write_failed path={} err={}",
+                config_path.display(),
+                e
+            );
+            format!("Failed to write config file: {:?}", e)
+        })?;
+        log::info!("config.save: complete path={}", config_path.display());
         Ok(())
     }
 }
@@ -142,5 +180,6 @@ fn get_config_path() -> Result<PathBuf, String> {
     let exe_dir = exe_path.parent().ok_or("Failed to get parent directory")?;
 
     let config_path = exe_dir.join("config.json");
+    log::debug!("config.path: resolved path={}", config_path.display());
     Ok(config_path)
 }

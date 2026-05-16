@@ -3,6 +3,7 @@ import {reactive, watch} from "vue";
 import {ExifInfo, Group} from "../types/photo.ts";
 import {Config} from "../types/config.ts";
 import {pluginManager} from "../composables/pluginManager.ts";
+import {formatError} from "../composables/logger";
 
 function getSystemTheme() {
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -42,6 +43,7 @@ export class Store {
     watch(() => this.state.theme, (newTheme) => {
           localStorage.setItem('theme', newTheme);
           applyTheme(newTheme);
+          console.info(`ui.store.theme: applied value=${newTheme}`);
         },
         {immediate: true});
 
@@ -252,14 +254,17 @@ export class Store {
     if (pluginManager.isInitialized) {
       return;
     }
+    console.info("ui.store.plugins: load start");
     try {
       await pluginManager.initialize();
+      console.info("ui.store.plugins: load complete");
     } catch (e) {
-      console.error('Failed to load plugins:', e);
+      console.error('ui.store.plugins: load failed err=' + formatError(e));
     }
   }
 
   async syncPluginsEnabled(enabledPluginIds: string[]) {
+    console.info(`ui.store.plugins: sync start target=${enabledPluginIds.length}`);
     const desired = new Set(enabledPluginIds);
     for (const plugin of this.plugins) {
       if (desired.has(plugin.manifest.id)) {
@@ -270,6 +275,7 @@ export class Store {
         await pluginManager.disablePlugin(plugin.manifest.id);
       }
     }
+    console.info("ui.store.plugins: sync complete");
   }
 
   getPlugin(pluginId: string) {
@@ -278,17 +284,21 @@ export class Store {
 
   async enablePlugin(pluginId: string) {
     try {
+      console.info(`ui.store.plugins: enable start id=${pluginId}`);
       await pluginManager.enablePlugin(pluginId);
+      console.info(`ui.store.plugins: enable complete id=${pluginId}`);
     } catch (e) {
-      console.error('Failed to enable plugin:', e);
+      console.error('ui.store.plugins: enable failed id=' + pluginId + ' err=' + formatError(e));
     }
   }
 
   async disablePlugin(pluginId: string) {
     try {
+      console.info(`ui.store.plugins: disable start id=${pluginId}`);
       await pluginManager.disablePlugin(pluginId);
+      console.info(`ui.store.plugins: disable complete id=${pluginId}`);
     } catch (e) {
-      console.error('Failed to disable plugin:', e);
+      console.error('ui.store.plugins: disable failed id=' + pluginId + ' err=' + formatError(e));
     }
   }
 }

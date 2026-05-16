@@ -5,6 +5,7 @@ import WinDialogHost from "./component/WinDialogHost.vue";
 import { onMounted } from 'vue';
 import { useTauri } from './composables/tauri';
 import { useDialog } from './composables/dialog';
+import {formatError} from "./composables/logger";
 
 const router = useRouter();
 const route = useRoute();
@@ -20,17 +21,21 @@ const isEditPage = () => route?.path === '/edit';
 
 onMounted(async () => {
   if (!store.config) {
+    console.info("ui.app.config: load start");
     try {
       store.config = await tauriImpl.loadConfig();
+      console.info("ui.app.config: load complete");
     } catch (error) {
-      console.error('加载配置失败，已重置默认配置:', error);
+      console.error(`ui.app.config: load failed err=${formatError(error)}`);
       store.config = await tauriImpl.resetConfig();
       await showAlert('配置文件读取失败，已恢复为默认配置。', { title: '配置已重置', tone: 'warning' });
     }
   }
 
   if (!store.pluginsInitialized) {
+    console.info("ui.app.plugins: load start");
     await store.loadPlugins();
+    console.info("ui.app.plugins: load complete");
   }
 });
 </script>
