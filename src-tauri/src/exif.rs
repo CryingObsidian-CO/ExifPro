@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
+use tauri_plugin_log::log;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExifInfo {
@@ -86,16 +87,46 @@ fn extract_file_preview(file_path: &Path, max_preview_bytes: u64) -> Option<Stri
     }
     let metadata = fs::metadata(file_path).ok()?;
     if metadata.len() > max_preview_bytes {
+        log::debug!(
+            "exif.preview: skip_too_large file={} size={} max={}",
+            file_path.display(),
+            metadata.len(),
+            max_preview_bytes
+        );
         return None;
     }
-    let mut file = File::open(file_path).ok()?;
+    log::debug!(
+        "exif.preview: start file={} size={}",
+        file_path.display(),
+        metadata.len()
+    );
+    let mut file = match File::open(file_path) {
+        Ok(f) => f,
+        Err(e) => {
+            log::warn!(
+                "exif.preview: open_failed file={} err={}",
+                file_path.display(),
+                e
+            );
+            return None;
+        }
+    };
     let mut buf = Vec::new();
-    file.read_to_end(&mut buf).ok()?;
+    if file.read_to_end(&mut buf).is_err() {
+        log::warn!("exif.preview: read_failed file={}", file_path.display());
+        return None;
+    }
     if buf.is_empty() {
         return None;
     }
     let mime = detect_mime_type(&buf);
     let encoded = BASE64.encode(&buf);
+    log::debug!(
+        "exif.preview: complete file={} mime={} size={}",
+        file_path.display(),
+        mime,
+        buf.len()
+    );
     Some(format!("data:{};base64,{}", mime, encoded))
 }
 
@@ -107,8 +138,21 @@ fn extract_thumbnail(file_path: &Path, exif: &Exif) -> Option<String> {
     let length = thumb_length.value.get_uint(0)? as u64;
 
     if length == 0 || offset == 0 {
+        log::warn!(
+            "exif.thumbnail: invalid_offset_length file={} offset={} length={}",
+            file_path.display(),
+            offset,
+            length
+        );
         return None;
     }
+
+    log::debug!(
+        "exif.thumbnail: start file={} offset={} length={}",
+        file_path.display(),
+        offset,
+        length
+    );
 
     let mut file = File::open(file_path).ok()?;
     file.seek(SeekFrom::Start(offset)).ok()?;
@@ -118,9 +162,21 @@ fn extract_thumbnail(file_path: &Path, exif: &Exif) -> Option<String> {
         Ok(()) => {
             let mime = detect_mime_type(&buf);
             let encoded = BASE64.encode(&buf);
+            log::debug!(
+                "exif.thumbnail: complete file={} size={}",
+                file_path.display(),
+                buf.len()
+            );
             Some(format!("data:{};base64,{}", mime, encoded))
         }
-        Err(_) => None,
+        Err(e) => {
+            log::warn!(
+                "exif.thumbnail: read_failed file={} err={}",
+                file_path.display(),
+                e
+            );
+            None
+        }
     }
 }
 
@@ -135,6 +191,7 @@ fn detect_mime_type(data: &[u8]) -> &'static str {
 }
 
 fn enhance_prase_focus_distance(exif: &Exif, camera_make: &str) -> Option<String> {
+    log::debug!("exif.focus_distance: enhance make={}", camera_make);
     match camera_make {
         "SONY" => {
             let makernote = get_field_value(&exif, Tag::MakerNote, In::PRIMARY)?;
@@ -164,6 +221,11 @@ fn to_clean_text(value: Option<String>) -> Option<String> {
 }
 
 pub fn parse_exif(file_path: &Path, max_preview_bytes: u64) -> Result<ExifInfo, Error> {
+    log::debug!(
+        "exif.parse: start file={} max_preview_bytes={}",
+        file_path.display(),
+        max_preview_bytes
+    );
     let mut exif_info = ExifInfo::new(file_path);
     let file = File::open(file_path)?;
     let mut buf_reader = BufReader::new(file);
@@ -204,5 +266,10 @@ pub fn parse_exif(file_path: &Path, max_preview_bytes: u64) -> Result<ExifInfo, 
     exif_info.thumbnail = extract_thumbnail(file_path, &exif)
         .or_else(|| extract_file_preview(file_path, max_preview_bytes));
 
+    if exif_info.thumbnail.is_none() {
+        log::debug!("exif.parse: no_preview file={}", file_path.display());
+    }
+
+    log::debug!("exif.parse: complete file={}", file_path.display());
     Ok(exif_info)
 }

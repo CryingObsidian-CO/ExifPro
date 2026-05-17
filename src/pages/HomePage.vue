@@ -7,6 +7,7 @@ import {computed} from "vue";
 import {useTauri} from "../composables/tauri.ts";
 import {useRouter} from "vue-router";
 import {useDialog} from "../composables/dialog.ts";
+import {formatError} from "../composables/logger";
 
 const router = useRouter();
 const tauriImpl = useTauri();
@@ -34,23 +35,33 @@ const getErrorMessage = (error: unknown) => {
 const selectSourceDir = async () => {
   const path = await tauriImpl.selectDirectory();
   if (path) {
+    console.info(`ui.home.select_source_dir: selected path=${path}`);
     store.selectedDirectory = path;
+  } else {
+    console.info("ui.home.select_source_dir: canceled");
   }
 };
 
 const selectOutputDir = async () => {
   const path = await tauriImpl.selectDirectory();
   if (path) {
+    console.info(`ui.home.select_output_dir: selected path=${path}`);
     store.outputDirectory = path;
+  } else {
+    console.info("ui.home.select_output_dir: canceled");
   }
 };
 
 const startAnalysis = async () => {
   if (!store.selectedDirectory) {
+    console.warn("ui.home.start_analysis: missing_directory");
     await showAlert('请选择有效的照片目录', {title: '目录无效', tone: 'warning'});
     return;
   }
 
+  console.info(
+    `ui.home.start_analysis: start dir=${store.selectedDirectory} recursive=${store.recursive}`
+  );
   store.isAnalyzing = true;
   try {
     const photos = await tauriImpl.scanDirectory(store.selectedDirectory, store.recursive);
@@ -58,13 +69,17 @@ const startAnalysis = async () => {
 
     if (store.config) {
       store.groups = await tauriImpl.groupPhotos(photos, store.config);
+      console.info(
+        `ui.home.start_analysis: complete photos=${photos.length} groups=${store.groups.length}`
+      );
       await router.push('/edit');
     } else {
+      console.warn("ui.home.start_analysis: missing_config");
       await showAlert('请先配置分组参数', {title: '缺少配置', tone: 'warning'});
     }
   } catch (error) {
     const message = getErrorMessage(error);
-    console.error('分析失败:', error);
+    console.error(`ui.home.start_analysis: failed err=${formatError(error)}`);
     await showAlert('分析失败: ' + message, {title: '分析失败', tone: 'error'});
   } finally {
     store.isAnalyzing = false;

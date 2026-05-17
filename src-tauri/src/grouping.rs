@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
+use tauri_plugin_log::log;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum GroupType {
@@ -47,6 +48,7 @@ fn is_unlimited(value: f64) -> bool {
 }
 
 pub async fn group_photos(photos: Vec<ExifInfo>, config: Config) -> Result<Vec<Group>, String> {
+    log::info!("grouping: start photos={}", photos.len());
     tauri::async_runtime::spawn_blocking(move || group_photos_sync(photos, &config))
         .await
         .map_err(|err| format!("Failed to join grouping task: {}", err))
@@ -61,6 +63,10 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
     let focus_min_count = config.focus_bracket_settings.min_count.max(2);
     let aeb_min_count = config.aeb_settings.min_count.max(2);
     let burst_min_count = config.burst_settings.min_count.max(2);
+
+    if focus_enabled {
+        log::debug!("grouping.focus_bracketing: enabled=true");
+    }
 
     let mut ungrouped_photos = Vec::new();
 
@@ -80,6 +86,12 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
                         name: generate_group_name(&GroupType::FocusBracketing, photo_group, config),
                         photos: photo_group.to_vec(),
                     };
+                    log::debug!(
+                        "grouping.focus_bracketing: group_found photos={} index_start={} index_end={}",
+                        group.photos.len(),
+                        i,
+                        i + j - 1
+                    );
                     groups.push(group);
                     for k in i..i + j {
                         used[k] = true;
@@ -104,6 +116,12 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
                     name: generate_group_name(&GroupType::AEB, aeb_group, config),
                     photos: aeb_group.to_vec(),
                 };
+                log::debug!(
+                    "grouping.aeb: group_found photos={} index_start={} index_end={}",
+                    group.photos.len(),
+                    i,
+                    i + j - 1
+                );
                 groups.push(group);
                 for k in i..i + j {
                     used[k] = true;
@@ -127,6 +145,12 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
                     name: generate_group_name(&GroupType::Burst, burst_group, config),
                     photos: burst_group.to_vec(),
                 };
+                log::debug!(
+                    "grouping.burst: group_found photos={} index_start={} index_end={}",
+                    group.photos.len(),
+                    i,
+                    i + j - 1
+                );
                 groups.push(group);
                 for k in i..i + j {
                     used[k] = true;
@@ -145,6 +169,10 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
         used[i] = true;
     }
 
+    log::debug!("grouping: ungrouped photos={}", ungrouped_photos.len());
+
+    let ungrouped_count = ungrouped_photos.len();
+
     let ungrouped_group = Group {
         id: "ungrouped".to_string(),
         group_type: GroupType::Single,
@@ -153,6 +181,17 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
     };
     groups.push(ungrouped_group);
 
+    let focus_count = groups.iter().filter(|g| matches!(g.group_type, GroupType::FocusBracketing)).count();
+    let aeb_count = groups.iter().filter(|g| matches!(g.group_type, GroupType::AEB)).count();
+    let burst_count = groups.iter().filter(|g| matches!(g.group_type, GroupType::Burst)).count();
+    log::info!(
+        "grouping: complete focus={} aeb={} burst={} ungrouped={} total_groups={}",
+        focus_count,
+        aeb_count,
+        burst_count,
+        ungrouped_count,
+        groups.len()
+    );
     groups
 }
 
@@ -177,7 +216,14 @@ fn parse_focus_distance(focus_distance: &str) -> Option<f64> {
         .replace("in", "")
         .trim()
         .to_string();
-    cleaned.parse::<f64>().ok()
+    let result = cleaned.parse::<f64>().ok();
+    if result.is_none() {
+        log::warn!(
+            "grouping.focus_distance: parse_failed value={}",
+            focus_distance
+        );
+    }
+    result
 }
 
 fn parse_capture_time(time_info: &ExifInfo) -> Option<DateTime<Utc>> {
@@ -195,6 +241,7 @@ fn parse_capture_time(time_info: &ExifInfo) -> Option<DateTime<Utc>> {
     } else if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y-%m-%d %H:%M:%S.%3f %z") {
         Some(dt.with_timezone(&Utc))
     } else {
+        log::warn!("grouping.capture_time: parse_failed value={}", time_str);
         None
     }
 }
@@ -263,11 +310,17 @@ fn is_monotonic(vec: &[Option<f64>]) -> bool {
 fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
     // 是否小于最小数量
     if groups.len() < config.focus_bracket_settings.min_count {
+        log::debug!(
+            "grouping.focus_bracketing: rejected reason=min_count actual={} required={}",
+            groups.len(),
+            config.focus_bracket_settings.min_count
+        );
         return false;
     }
 
     //是否存在自动曝光模式
     if groups.iter().any(|p| p.exposure_mode == Some(2)) {
+        log::debug!("grouping.focus_bracketing: rejected reason=auto_bracket_exposure_mode");
         return false;
     }
 
@@ -278,6 +331,11 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
     if !is_unlimited(config.focus_bracket_settings.max_span) {
         if let Some(time_span) = time_diff_seconds(last, first) {
             if time_span > config.focus_bracket_settings.max_span {
+                log::debug!(
+                    "grouping.focus_bracketing: rejected reason=time_span time_span={:.3} max_span={:.3}",
+                    time_span,
+                    config.focus_bracket_settings.max_span
+                );
                 return false;
             }
         }
@@ -293,11 +351,21 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
                 if !is_unlimited(config.focus_bracket_settings.min_consecutive_interval)
                     && interval < config.focus_bracket_settings.min_consecutive_interval
                 {
+                    log::debug!(
+                        "grouping.focus_bracketing: rejected reason=interval_too_short interval={:.3} min_consecutive={:.3}",
+                        interval,
+                        config.focus_bracket_settings.min_consecutive_interval
+                    );
                     return false;
                 }
                 if !is_unlimited(config.focus_bracket_settings.max_consecutive_interval)
                     && interval > config.focus_bracket_settings.max_consecutive_interval
                 {
+                    log::debug!(
+                        "grouping.focus_bracketing: rejected reason=interval_too_long interval={:.3} max_consecutive={:.3}",
+                        interval,
+                        config.focus_bracket_settings.max_consecutive_interval
+                    );
                     return false;
                 }
             }
@@ -318,6 +386,14 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
         .all(|w| w[0].focal_length == w[1].focal_length);
 
     if !same_shutter || !same_aperture || !same_iso || !same_ev || !same_focal {
+        log::debug!(
+            "grouping.focus_bracketing: rejected reason=params_differ shutter={} aperture={} iso={} ev={} focal={}",
+            same_shutter,
+            same_aperture,
+            same_iso,
+            same_ev,
+            same_focal
+        );
         return false;
     }
 
@@ -331,12 +407,23 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
         })
         .collect();
 
-    is_monotonic(&focus_distances)
+    if !is_monotonic(&focus_distances) {
+        log::debug!("grouping.focus_bracketing: rejected reason=focus_distance_not_monotonic");
+        return false;
+    }
+
+    log::debug!("grouping.focus_bracketing: accepted photos={}", groups.len());
+    true
 }
 
 fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
     // 是否小于最小数量
     if groups.len() < config.aeb_settings.min_count {
+        log::debug!(
+            "grouping.aeb: rejected reason=min_count actual={} required={}",
+            groups.len(),
+            config.aeb_settings.min_count
+        );
         return false;
     }
 
@@ -347,6 +434,11 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
     if !is_unlimited(config.aeb_settings.max_span) {
         if let Some(time_span) = time_diff_seconds(last, first) {
             if time_span > config.aeb_settings.max_span {
+                log::debug!(
+                    "grouping.aeb: rejected reason=time_span time_span={:.3} max_span={:.3}",
+                    time_span,
+                    config.aeb_settings.max_span
+                );
                 return false;
             }
         }
@@ -362,11 +454,21 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
                 if !is_unlimited(config.aeb_settings.min_consecutive_interval)
                     && interval < config.aeb_settings.min_consecutive_interval
                 {
+                    log::debug!(
+                        "grouping.aeb: rejected reason=interval_too_short interval={:.3} min_consecutive={:.3}",
+                        interval,
+                        config.aeb_settings.min_consecutive_interval
+                    );
                     return false;
                 }
                 if !is_unlimited(config.aeb_settings.max_consecutive_interval)
                     && interval > config.aeb_settings.max_consecutive_interval
                 {
+                    log::debug!(
+                        "grouping.aeb: rejected reason=interval_too_long interval={:.3} max_consecutive={:.3}",
+                        interval,
+                        config.aeb_settings.max_consecutive_interval
+                    );
                     return false;
                 }
             }
@@ -378,6 +480,7 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
         .windows(2)
         .all(|w| w[0].focal_length == w[1].focal_length);
     if !same_focal {
+        log::debug!("grouping.aeb: rejected reason=focal_length_differs");
         return false;
     }
 
@@ -386,7 +489,7 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
     if config.aeb_settings.auto_bracket_only {
         let all_auto_bracket = groups.iter().all(|p| p.exposure_mode == Some(2));
         if !all_auto_bracket {
-            println!("001?");
+            log::debug!("grouping.aeb: rejected reason=auto_bracket_required");
             return false;
         }
     }
@@ -401,9 +504,14 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
         })
         .collect();
     let Some(ev_values) = ev_values else {
+        log::debug!("grouping.aeb: rejected reason=missing_ev_values");
         return false;
     };
     if !is_symmetric_ev_bracket(&ev_values) {
+        log::debug!(
+            "grouping.aeb: rejected reason=ev_not_symmetric values={:?}",
+            ev_values
+        );
         return false;
     }
 
@@ -414,12 +522,23 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
             || w[0].iso != w[1].iso
     });
 
-    param_different
+    if !param_different {
+        log::debug!("grouping.aeb: rejected reason=exposure_params_identical");
+        return false;
+    }
+
+    log::debug!("grouping.aeb: accepted photos={}", groups.len());
+    true
 }
 
 fn is_burst(groups: &[ExifInfo], config: &Config) -> bool {
     // 是否小于最小数量
     if groups.len() < config.burst_settings.min_count {
+        log::debug!(
+            "grouping.burst: rejected reason=min_count actual={} required={}",
+            groups.len(),
+            config.burst_settings.min_count
+        );
         return false;
     }
 
@@ -433,11 +552,21 @@ fn is_burst(groups: &[ExifInfo], config: &Config) -> bool {
                 if !is_unlimited(config.burst_settings.min_consecutive_interval)
                     && interval < config.burst_settings.min_consecutive_interval
                 {
+                    log::debug!(
+                        "grouping.burst: rejected reason=interval_too_short interval={:.3} min_consecutive={:.3}",
+                        interval,
+                        config.burst_settings.min_consecutive_interval
+                    );
                     return false;
                 }
                 if !is_unlimited(config.burst_settings.max_consecutive_interval)
                     && interval > config.burst_settings.max_consecutive_interval
                 {
+                    log::debug!(
+                        "grouping.burst: rejected reason=interval_too_long interval={:.3} max_consecutive={:.3}",
+                        interval,
+                        config.burst_settings.max_consecutive_interval
+                    );
                     return false;
                 }
             }
@@ -453,5 +582,12 @@ fn is_burst(groups: &[ExifInfo], config: &Config) -> bool {
             && w[0].focal_length == w[1].focal_length
             && w[0].focus_distance == w[1].focus_distance
     });
-    same_params
+
+    if !same_params {
+        log::debug!("grouping.burst: rejected reason=params_differ");
+        return false;
+    }
+
+    log::debug!("grouping.burst: accepted photos={}", groups.len());
+    true
 }

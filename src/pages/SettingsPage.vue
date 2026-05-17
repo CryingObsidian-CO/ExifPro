@@ -10,6 +10,7 @@ import WinInput from "../component/WinInput.vue";
 import WinToggle from "../component/WinToggle.vue";
 import {onBeforeRouteLeave} from "vue-router";
 import {useDialog} from "../composables/dialog.ts";
+import {formatError} from "../composables/logger";
 
 const tauri = useTauri();
 const {showAlert, showConfirm} = useDialog();
@@ -117,46 +118,53 @@ function isPluginEnabled(pluginId: string) {
 async function saveSettings() {
   const config = store.config;
   if (config) {
+    console.info("ui.settings.save: start");
     try {
       normalizeConfig(config);
       await tauri.saveConfig(config);
       await store.syncPluginsEnabled(config.enabled_plugins);
       await reloadConfig();
       dirty.value = false;
+      console.info("ui.settings.save: complete");
       await showAlert('设置已保存', {title: '保存成功', tone: 'success'});
     } catch (error) {
-      console.error('保存设置失败:', error);
+      console.error(`ui.settings.save: failed err=${formatError(error)}`);
       await showAlert('保存设置失败，请稍后重试。', {title: '保存失败', tone: 'error'});
     }
   }
 }
 
 async function resetSettings() {
+  console.info("ui.settings.reset: start");
   try {
     const config = await tauri.resetConfig();
     normalizeConfig(config);
     store.config = config;
     await store.syncPluginsEnabled(config.enabled_plugins);
     dirty.value = false;
+    console.info("ui.settings.reset: complete");
     await showAlert('已重置为默认设置', {title: '重置成功', tone: 'success'});
   } catch (error) {
-    console.error('重置设置失败:', error);
+    console.error(`ui.settings.reset: failed err=${formatError(error)}`);
     await showAlert('重置设置失败，请稍后重试。', {title: '重置失败', tone: 'error'});
   }
 }
 
 async function setTheme(theme: Theme) {
+  console.info(`ui.settings.theme: set value=${theme}`);
   store.theme = theme;
 }
 
 async function reloadConfig() {
+  console.info("ui.settings.reload_config: start");
   try {
     const config = await tauri.loadConfig();
     normalizeConfig(config);
     store.config = config;
     syncPluginConfigDefaults();
+    console.info("ui.settings.reload_config: complete");
   } catch (error) {
-    console.error('加载配置失败，已重置默认配置:', error);
+    console.error(`ui.settings.reload_config: failed err=${formatError(error)}`);
     const config = await tauri.resetConfig();
     normalizeConfig(config);
     store.config = config;
@@ -184,7 +192,7 @@ onBeforeRouteLeave(async (_to, _from) => {
         await store.syncPluginsEnabled(config.enabled_plugins);
         await reloadConfig();
       } catch (error) {
-        console.error('保存设置失败:', error);
+        console.error(`ui.settings.leave: save_failed err=${formatError(error)}`);
         await showAlert('保存失败，已取消离开页面。', {title: '保存失败', tone: 'error'});
         return false;
       }
@@ -204,8 +212,10 @@ onMounted(async () => {
 });
 
 async function loadPlugins() {
+  console.info("ui.settings.load_plugins: start");
   await store.loadPlugins();
   syncPluginConfigDefaults();
+  console.info("ui.settings.load_plugins: complete");
 }
 
 async function togglePlugin(pluginId: string, enabled: boolean) {
@@ -213,6 +223,7 @@ async function togglePlugin(pluginId: string, enabled: boolean) {
   if (!config) {
     return;
   }
+  console.info(`ui.settings.toggle_plugin: start id=${pluginId} enabled=${enabled}`);
   normalizeConfig(config);
   if (enabled) {
     if (!config.enabled_plugins.includes(pluginId)) {
@@ -548,7 +559,8 @@ function getSortedPlugins() {
                     {{ gt }}
                   </span>
                 </div>
-                <div v-if="isPluginEnabled(plugin.manifest.id) && plugin.manifest.config_schema" class="plugin-config">
+                <div v-if="isPluginEnabled(plugin.manifest.id) && plugin.manifest.config_schema"
+                     class="plugin-config">
                   <div v-for="(schema, key) in plugin.manifest.config_schema"
                        :key="key"
                        class="plugin-config-item">

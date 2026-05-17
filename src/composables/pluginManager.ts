@@ -10,6 +10,7 @@ import type {
 import type {ExifInfo, Group, GroupType} from '../types/photo';
 import type {Config} from '../types/config';
 import {builtinPlugins} from './builtinPlugins';
+import {formatError} from "./logger";
 
 class PluginManagerImpl {
   private readonly tauri = useTauri();
@@ -25,8 +26,10 @@ class PluginManagerImpl {
     if (this.initialized) {
       return;
     }
+    console.info("ui.plugins: initialize start");
     try {
       const pluginList = await this.tauri.listPlugins();
+      console.info(`ui.plugins: discovered count=${pluginList.length}`);
       for (const info of pluginList) {
         if (!info.enabled) {
           this.plugins.set(info.manifest.id, {
@@ -43,7 +46,7 @@ class PluginManagerImpl {
         try {
           await this.loadPlugin(info);
         } catch (e) {
-          console.error(`Failed to load plugin ${info.manifest.id}:`, e);
+          console.error(`ui.plugins: load failed id=${info.manifest.id} err=${formatError(e)}`);
           this.plugins.set(info.manifest.id, {
             manifest: info.manifest,
             hooks: {},
@@ -56,8 +59,9 @@ class PluginManagerImpl {
       }
 
       this.initialized = true;
+      console.info("ui.plugins: initialize complete");
     } catch (e) {
-      console.error('Failed to initialize plugin manager:', e);
+      console.error('ui.plugins: initialize failed err=' + formatError(e));
     }
   }
 
@@ -67,6 +71,7 @@ class PluginManagerImpl {
   }
 
   private async loadPlugin(info: PluginInfo): Promise<void> {
+    console.info(`ui.plugins: load start id=${info.manifest.id} builtin=${Boolean(info.builtin)}`);
     let pluginConfig: Record<string, any> = {};
     try {
       const raw = await this.tauri.getPluginConfig(info.manifest.id);
@@ -128,6 +133,8 @@ class PluginManagerImpl {
         console.error(`Plugin ${info.manifest.id} onRegisterUIExtensions error:`, e);
       }
     }
+
+    console.info(`ui.plugins: load complete id=${info.manifest.id}`);
   }
 
   private preprocessPluginCode(code: string): string {
@@ -278,6 +285,7 @@ class PluginManagerImpl {
     const plugin = this.plugins.get(pluginId);
     if (!plugin || plugin.enabled) return;
 
+    console.info(`ui.plugins: enable start id=${pluginId}`);
     await this.tauri.enablePlugin(pluginId);
 
     try {
@@ -287,8 +295,9 @@ class PluginManagerImpl {
         zip_path: plugin.zipPath,
         builtin: plugin.builtin ?? false,
       });
+      console.info(`ui.plugins: enable complete id=${pluginId}`);
     } catch (e) {
-      console.error(`Failed to enable plugin ${pluginId}:`, e);
+      console.error(`ui.plugins: enable failed id=${pluginId} err=${formatError(e)}`);
     }
   }
 
@@ -296,6 +305,7 @@ class PluginManagerImpl {
     const plugin = this.plugins.get(pluginId);
     if (!plugin || !plugin.enabled) return;
 
+    console.info(`ui.plugins: disable start id=${pluginId}`);
     if (plugin.hooks.onUnload) {
       try {
         plugin.hooks.onUnload();
@@ -309,6 +319,7 @@ class PluginManagerImpl {
     plugin.enabled = false;
     plugin.hooks = {};
     plugin.uiExtensions = undefined;
+    console.info(`ui.plugins: disable complete id=${pluginId}`);
   }
 
   async setPluginConfig(pluginId: string, config: Record<string, any>): Promise<void> {
@@ -320,6 +331,7 @@ class PluginManagerImpl {
   }
 
   async reloadPlugins(): Promise<void> {
+    console.info("ui.plugins: reload start");
     for (const plugin of this.plugins.values()) {
       try {
         plugin.hooks.onUnload?.();
@@ -329,6 +341,7 @@ class PluginManagerImpl {
     }
     this.plugins.clear();
     await this.initialize();
+    console.info("ui.plugins: reload complete");
   }
 
   // TODO 解决 getPluginConfig 没法获取实时配置的问题

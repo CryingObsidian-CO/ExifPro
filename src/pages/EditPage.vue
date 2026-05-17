@@ -9,6 +9,7 @@ import {onMounted, onUnmounted, ref, watchEffect} from "vue";
 import {useDialog} from "../composables/dialog.ts";
 import {pluginManager} from "../composables/pluginManager.ts";
 import type {GroupActionDeclaration} from "../types/plugin.ts";
+import {formatError} from "../composables/logger";
 
 const router = useRouter();
 const tauriImpl = useTauri();
@@ -72,7 +73,14 @@ function getPluginGroupActions(groupType: GroupType): GroupActionDeclaration[] {
 }
 
 async function handlePluginGroupAction(action: GroupActionDeclaration, group: Group) {
-  await pluginManager.emitGroupAction(action.id, group);
+  console.info(`ui.edit.plugin_action: start id=${action.id} group=${group.id}`);
+  try {
+    await pluginManager.emitGroupAction(action.id, group);
+    console.info(`ui.edit.plugin_action: complete id=${action.id} group=${group.id}`);
+  } catch (error) {
+    console.error(`ui.edit.plugin_action: failed id=${action.id} group=${group.id} err=${formatError(error)}`);
+    throw error;
+  }
 }
 
 function toggleGroupSelection(groupId: string) {
@@ -408,6 +416,7 @@ onUnmounted(() => {
 });
 
 function startRenaming(group: Group) {
+  console.info(`ui.edit.rename: start group=${group.id}`);
   renamingGroupId.value = group.id;
   newGroupName.value = group.name;
 }
@@ -430,6 +439,7 @@ async function handleBlur() {
 }
 
 function cancelRenaming() {
+  console.info("ui.edit.rename: cancel");
   renamingGroupId.value = null;
   newGroupName.value = '';
   const active = document.activeElement;
@@ -440,11 +450,13 @@ function cancelRenaming() {
 
 function finishRenaming() {
   if (renamingGroupId.value === 'ungrouped') {
+    console.warn("ui.edit.rename: rejected reason=ungrouped");
     showAlert('不能重命名未分组', {title: '操作无效', tone: 'warning'});
     return;
   }
 
   if (renamingGroupId.value && newGroupName.value.trim()) {
+    console.info(`ui.edit.rename: complete group=${renamingGroupId.value} name=${newGroupName.value.trim()}`);
     store.updateGroup(renamingGroupId.value, {name: newGroupName.value.trim()});
   }
 
@@ -454,6 +466,7 @@ function finishRenaming() {
 
 async function disbandGroup(groupId: string) {
   if (groupId === 'ungrouped') {
+    console.warn("ui.edit.disband_group: rejected reason=ungrouped");
     await showAlert('不能解散未分组', {title: '操作无效', tone: 'warning'});
     return;
   }
@@ -467,65 +480,84 @@ async function disbandGroup(groupId: string) {
     confirmText: '确认解散',
     cancelText: '取消',
   })) {
+    console.info(`ui.edit.disband_group: confirmed group=${group.id} name=${group.name}`);
     store.addToUngroupedPhotos(group.photos);
     store.deleteGroup(groupId);
     selectedGroupIds.value = selectedGroupIds.value.filter((id) => id !== groupId);
+  } else {
+    console.info(`ui.edit.disband_group: canceled group=${group.id}`);
   }
 }
 
 async function createGroupFromSelected() {
   if (selectedPhotos.value.length === 0) {
+    console.warn("ui.edit.create_group: rejected reason=no_selection");
     await showAlert('请选择照片', {title: '未选择照片', tone: 'warning'});
     return;
   }
   const name = prompt('请输入分组名称:', '新分组');
   if (name) {
+    console.info(`ui.edit.create_group: confirmed name=${name} photos=${selectedPhotos.value.length}`);
     const newGroup = store.createGroup(name);
     store.movePhotoToGroup(selectedPhotos.value, newGroup.id);
     clearPhotoSelection();
+  } else {
+    console.info("ui.edit.create_group: canceled");
   }
 }
 
 async function moveSelectedToGroup() {
   if (selectedPhotos.value.length === 0) {
+    console.warn("ui.edit.move_photos: rejected reason=no_selection");
     await showAlert('请先选择照片', {title: '未选择照片', tone: 'warning'});
     return;
   }
 
   // TODO 提供选择框
   const targetGroupId = prompt('请输入目标分组 ID:');
-  if (!targetGroupId) return;
+  if (!targetGroupId) {
+    console.info("ui.edit.move_photos: canceled");
+    return;
+  }
 
   const targetGroup = store.findGroup(targetGroupId);
   if (!targetGroup) {
+    console.warn(`ui.edit.move_photos: rejected reason=group_not_found id=${targetGroupId}`);
     await showAlert('未找到目标分组', {title: '分组不存在', tone: 'error'});
     return;
   }
 
+  console.info(`ui.edit.move_photos: start photos=${selectedPhotos.value.length} target=${targetGroupId}`);
   store.movePhotoToGroup(selectedPhotos.value, targetGroupId);
   clearPhotoSelection();
 }
 
 async function mergeSelectedGroups() {
   if (selectedGroupIds.value.length < 2) {
+    console.warn("ui.edit.merge_groups: rejected reason=insufficient_selection");
     await showAlert('请选择至少两个分组', {title: '选择不足', tone: 'warning'});
     return;
   }
   const name = prompt('请输入新分组名称:', '合并分组');
   if (name) {
+    console.info(`ui.edit.merge_groups: confirmed name=${name} groups=${selectedGroupIds.value.length}`);
     let mergedGroup = store.mergeGroups(selectedGroupIds.value, name);
     selectedGroupIds.value = [mergedGroup.id];
+  } else {
+    console.info("ui.edit.merge_groups: canceled");
   }
 }
 
 async function executeOrganize() {
   if (!store.outputDirectory) {
+    console.warn("ui.edit.organize: rejected reason=missing_output_dir");
     await showAlert('请先选择输出目录', {title: '缺少输出目录', tone: 'warning'});
     await router.push('/');
     return;
   }
 
   if (store.groupsNumber === 0) {
+    console.warn("ui.edit.organize: rejected reason=no_groups");
     await showAlert('没有可整理的分组', {title: '无可用分组', tone: 'warning'});
     return;
   }
@@ -544,9 +576,13 @@ async function executeOrganize() {
           }
       )
   ) {
+    console.info("ui.edit.organize: canceled");
     return;
   }
 
+  console.info(
+    `ui.edit.organize: start groups=${store.groupsNumber} output_dir=${store.outputDirectory}`
+  );
   store.isOrganizing = true;
   try {
     await tauriImpl.organizeFiles(
@@ -554,8 +590,10 @@ async function executeOrganize() {
         store.outputDirectory,
         store.copyMode,
         store.overwrite);
+    console.info("ui.edit.organize: complete");
     await showAlert('整理完成', {title: '整理完成', tone: 'success'});
   } catch (error) {
+    console.error(`ui.edit.organize: failed err=${formatError(error)}`);
     await showAlert('整理失败: ' + (error as Error).message, {title: '整理失败', tone: 'error'});
   } finally {
     store.isOrganizing = false;
