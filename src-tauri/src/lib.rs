@@ -309,6 +309,7 @@ pub fn run() {
     };
 
     tauri::Builder::default()
+        // NOTE 这个插件会在大小达到限制后立刻切分文件，很可能导致同义词运行的日志被切分在两个不同的文件中
         .plugin(
             tauri_plugin_log::Builder::new()
                 .clear_targets()
@@ -318,14 +319,7 @@ pub fn run() {
                 }))
                 .level(log::LevelFilter::Info)
                 .max_file_size(5_000_000 /* bytes */)
-                .format(|out, message, record| {
-                    out.finish(format_args!(
-                        "[{} {}] {}",
-                        record.level(),
-                        record.target(),
-                        message
-                    ))
-                })
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
                 .build(),
         )
         .setup(|_app| {
