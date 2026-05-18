@@ -15,7 +15,6 @@ export interface ExifInfo {
   focus_distance?: string;
   camera_make?: string;
   camera_model?: string;
-  thumbnail?: string;
 }
 
 export interface Group {

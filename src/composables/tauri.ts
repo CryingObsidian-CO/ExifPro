@@ -169,6 +169,15 @@ export function useTauri() {
     );
   }
 
+  async function getThumbnail(filePath: string, level: 'small' | 'large') {
+    return await invokeWithLog<string | null>(
+        "get_thumbnail",
+        'get_thumbnail_command',
+        {filePath, level},
+        `path=${filePath} level=${level}`
+    );
+  }
+
   return {
     selectDirectory,
     groupPhotos,
@@ -184,6 +193,7 @@ export function useTauri() {
     disablePlugin,
     getPluginConfig,
     setPluginConfig,
-    pluginFileOp
+    pluginFileOp,
+    getThumbnail,
   }
 }
