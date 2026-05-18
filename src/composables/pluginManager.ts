@@ -3,6 +3,7 @@ import type {
   ExifProHostAPI,
   ExifProPluginHooks,
   GroupActionDeclaration,
+  ImageActionDeclaration,
   LoadedPlugin,
   MergeResult,
   PluginInfo,
@@ -246,12 +247,39 @@ class PluginManagerImpl {
     }
   }
 
+  async emitImageAction(actionId: string, photo: ExifInfo): Promise<void> {
+    for (const plugin of this.getEnabledPlugins()) {
+      if (plugin.hooks.onImageAction && plugin.manifest.capabilities.ui_extensions) {
+        try {
+          await plugin.hooks.onImageAction(actionId, photo);
+        } catch (e) {
+          console.error(`Plugin ${plugin.manifest.id} onImageAction error:`, e);
+        }
+      }
+    }
+  }
+
+
   getGroupActions(groupType: GroupType): GroupActionDeclaration[] {
     const actions: GroupActionDeclaration[] = [];
     for (const plugin of this.getEnabledPlugins()) {
       if (plugin.uiExtensions?.groupActions && plugin.manifest.capabilities.ui_extensions) {
         for (const action of plugin.uiExtensions.groupActions) {
           if (action.groupTypes.length === 0 || action.groupTypes.includes(groupType)) {
+            actions.push(action);
+          }
+        }
+      }
+    }
+    return actions;
+  }
+
+  getImageActions(groupType: GroupType): ImageActionDeclaration[] {
+    const actions: ImageActionDeclaration[] = [];
+    for (const plugin of this.getEnabledPlugins()) {
+      if (plugin.uiExtensions?.imageActions && plugin.manifest.capabilities.ui_extensions) {
+        for (const action of plugin.uiExtensions.imageActions) {
+          if (!action.groupTypes || action.groupTypes.length === 0 || action.groupTypes.includes(groupType)) {
             actions.push(action);
           }
         }

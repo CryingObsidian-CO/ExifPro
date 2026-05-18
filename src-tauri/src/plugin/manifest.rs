@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri_plugin_log::log;
 
-pub const CURRENT_API_VERSION: u32 = 1;
+pub const CURRENT_API_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginManifest {

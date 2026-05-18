@@ -52,8 +52,16 @@ export interface GroupActionDeclaration {
   groupTypes: GroupType[];
 }
 
+export interface ImageActionDeclaration {
+  id: string;
+  label: string;
+  icon?: string;
+  groupTypes?: GroupType[];
+}
+
 export interface UIExtensionDeclaration {
-  groupActions: GroupActionDeclaration[];
+  groupActions?: GroupActionDeclaration[];
+  imageActions?: ImageActionDeclaration[];
 }
 
 // TODO 完成钩子的调用
@@ -71,6 +79,8 @@ export interface ExifProPluginHooks {
   onRegisterUIExtensions?(): UIExtensionDeclaration;
 
   onGroupAction?(actionId: string, group: Group): void | Promise<void>;
+
+  onImageAction?(actionId: string, photo: ExifInfo): void | Promise<void>;
 }
 
 export interface ExifProHostAPI {
