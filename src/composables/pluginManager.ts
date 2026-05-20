@@ -404,12 +404,12 @@ class PluginManagerImpl {
         return group;
       },
 
-      moveToGroup: (groupId: string, photos: ExifInfo[]): void => {
-        store.movePhotoToGroup(photos, groupId);
+      moveToGroup: (groupId: string, photos: ExifInfo[]): boolean => {
+        return store.movePhotoToGroup(photos, groupId);
       },
 
-      mergeGroups: (groupIds: string[], name: string) => {
-        store.mergeGroups(groupIds, name);
+      mergeGroups: (groupIds: string[], name: string): Group | null => {
+        return store.mergeGroups(groupIds, name);
       },
 
       // TODO 从 selectedGroupIds 中移除 groupId
@@ -417,7 +417,9 @@ class PluginManagerImpl {
         const group = store.findGroup(groupId);
         if (!group) return [];
 
-        store.disbandGroup(groupId);
+        if (!store.disbandGroup(groupId)) {
+          return [];
+        }
         return group.photos;
       },
 

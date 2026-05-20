@@ -16,44 +16,47 @@ export interface ExifInfo {
   thumbnail?: string;
 }
 
+export type GroupType = 'FocusBracketing' | 'AEB' | 'Burst' | 'Single' | string;
+
 export interface Group {
   id: string;
-  group_type: string;
+  group_type: GroupType;
   name: string;
   photos: ExifInfo[];
-}
-
-export interface MergeResult {
-  success: boolean;
-  outputFiles: string[];
-  message?: string;
 }
 
 export interface GroupActionDeclaration {
   id: string;
   label: string;
   icon?: string;
-  groupTypes: string[];
+  groupTypes: GroupType[];
+}
+
+export interface ImageActionDeclaration {
+  id: string;
+  label: string;
+  icon?: string;
+  groupTypes?: GroupType[];
 }
 
 export interface UIExtensionDeclaration {
-  groupActions: GroupActionDeclaration[];
-}
-
-export interface ScriptResult {
-  exit_code: number;
-  stdout: string;
-  stderr: string;
+  groupActions?: GroupActionDeclaration[];
+  imageActions?: ImageActionDeclaration[];
 }
 
 export interface ExifProHostAPI {
+
   log(message: string): void;
 
-  getPluginConfig<T = Record<string, any>>(): T;
+  getPluginConfig(): Record<string, any>;
 
-  createGroup(photos: ExifInfo[], groupType: string, name: string): Group;
+  getGroups(): Group[];
 
-  mergeGroups(groupIds: string[]): Group | null;
+  createGroup(photos: ExifInfo[], groupType: GroupType, name: string): Group | null;
+
+  moveToGroup(groupId: string, photos: ExifInfo[]): boolean;
+
+  mergeGroups(groupIds: string[], name: string): Group | null;
 
   disbandGroup(groupId: string): ExifInfo[];
 
@@ -62,30 +65,36 @@ export interface ExifProHostAPI {
   writeFile(path: string, data: Uint8Array): Promise<void>;
 
   createDirectory(path: string): Promise<void>;
-
-  executePhotoshopScript(scriptPath: string, photoPaths: string[], outputDir: string, extraArgs?: Record<string, string>): Promise<ScriptResult>;
 }
 
 export interface ExifProPluginHooks {
-  onLoad?(api: ExifProHostAPI): void;
+  onLoad?(): void;
 
   onUnload?(): void;
-
-  onExifEnhance?(exif: ExifInfo): ExifInfo;
-
-  onGroupsCreated?(groups: Group[], ungrouped: ExifInfo[], config: any): Group[];
-
-  onGroupMerge?(group: Group, outputDir: string): MergeResult | undefined;
 
   onRegisterUIExtensions?(): UIExtensionDeclaration;
 
   onGroupAction?(actionId: string, group: Group): void | Promise<void>;
+
+  onImageAction?(actionId: string, photo: ExifInfo): void | Promise<void>;
+
+  onParseExif?(exif: ExifInfo[]): ExifInfo[];
+
+  onGroupCreated?(group: Group): Group;
+
+  onMoveToGroup?(group: Group, photos: ExifInfo[]): void;
+
+  onGroupMerged?(originalGroups: Group[], mergedGroup: Group): void;
+
+  onGroupUpdated?(group: Group, updates: Partial<Group>): void;
+
+  onGroupDisband?(group: Group): void;
 }
 
 declare global {
   const exports: {
     default: ExifProPluginHooks;
   };
-  const ExifProAPI: ExifProHostAPI;
+  const exifProHostAPI: ExifProHostAPI;
 }
 export {};

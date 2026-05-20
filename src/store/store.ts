@@ -178,23 +178,26 @@ export class Store {
     return newGroup;
   }
 
-  updateGroup(groupId: string, updates: Partial<Group>) {
+  updateGroup(groupId: string, updates: Partial<Group>): boolean {
     if (groupId === 'ungrouped') {
-      return;
+      return false;
     }
     const index = this.state.groups.findIndex((g) => g.id === groupId);
     if (index !== -1) {
       const {id: _, ...safeUpdates} = updates;
       this.state.groups[index] = {...this.state.groups[index], ...safeUpdates};
       pluginManager.emitGroupUpdated(this.state.groups[index], safeUpdates);
+      return true;
     }
+    return false;
   }
 
-  deleteGroup(groupId: string) {
+  deleteGroup(groupId: string): boolean {
     if (groupId === 'ungrouped') {
-      return;
+      return false;
     }
     this.state.groups = this.state.groups.filter((g) => g.id !== groupId);
+    return true;
   }
 
   private deleteGroups(groupIds: string[]) {
@@ -212,14 +215,15 @@ export class Store {
     return this.state.groups.filter((g) => groupIds.includes(g.id));
   }
 
-  movePhotoToGroup(photos: ExifInfo[], groupId: string) {
+  movePhotoToGroup(photos: ExifInfo[], groupId: string): boolean {
     const group = this.findGroup(groupId);
     if (!group) {
-      return;
+      return false;
     }
     group.photos.push(...photos);
     this.deletePhotosInAllGroups(photos, [groupId]);
     pluginManager.emitMoveToGroup(group, photos);
+    return true;
   }
 
   mergeGroups(groupIds: string[], name: string) {
@@ -252,26 +256,30 @@ export class Store {
     });
   }
 
-  disbandGroup(groupId: string) {
+  disbandGroup(groupId: string): boolean {
     const group = this.findGroup(groupId);
     if (!group) {
-      return;
+      return false;
     }
-    store.addToUngroupedPhotos(group.photos);
+    if (!this.addToUngroupedPhotos(group.photos)) {
+      return false;
+    }
     this.deleteGroup(groupId);
     pluginManager.emitGroupDisband(group);
+    return true;
   }
 
-  addToUngroupedPhotos(photos: ExifInfo[]) {
+  addToUngroupedPhotos(photos: ExifInfo[]): boolean {
     let ungroupedPhotos = this.findGroup('ungrouped');
     if (!ungroupedPhotos) {
       const newUngroupedPhotos = this.createGroup('未分组', 'ungrouped');
       if (!ungroupedPhotos) {
-        return;
+        return false;
       }
       ungroupedPhotos = newUngroupedPhotos as Group;
     }
     ungroupedPhotos.photos.push(...photos);
+    return true;
   }
 
   async loadPlugins() {

@@ -57,6 +57,7 @@ export interface UIExtensionDeclaration {
   imageActions?: ImageActionDeclaration[];
 }
 
+// NOTE 修改时更新 plugin-api.d.ts 中的 ExifProPluginHooks 接口
 export interface ExifProPluginHooks {
   onLoad?(): void;
 
@@ -81,6 +82,8 @@ export interface ExifProPluginHooks {
   onGroupDisband?(group: Group): void;
 }
 
+
+// NOTE 修改时更新 plugin-api.d.ts 中的 ExifProHostAPI 接口
 export interface ExifProHostAPI {
 
   log(message: string): void;
@@ -91,9 +94,9 @@ export interface ExifProHostAPI {
 
   createGroup(photos: ExifInfo[], groupType: GroupType, name: string): Group | null;
 
-  moveToGroup(groupId: string, photos: ExifInfo[]): void;
+  moveToGroup(groupId: string, photos: ExifInfo[]): boolean;
 
-  mergeGroups(groupIds: string[], name: string): void;
+  mergeGroups(groupIds: string[], name: string): Group | null;
 
   disbandGroup(groupId: string): ExifInfo[];
 

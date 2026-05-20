@@ -7,9 +7,10 @@
   "api_version": 2,
   "entry_point": "index.ts",
   "capabilities": {
+    "exif_enhancement": true,
     "grouping": true,
     "merging": true,
-    "exif_enhancement": true,
+    "ui_extensions": true,
     "custom_capabilities": [
       "Test"
     ]

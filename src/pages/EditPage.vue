@@ -497,8 +497,12 @@ async function disbandGroup(groupId: string) {
     cancelText: '取消',
   })) {
     console.info(`ui.edit.disband_group: confirmed group=${group.id} name=${group.name}`);
-    store.disbandGroup(groupId);
+    if (!store.disbandGroup(groupId)) {
+      await showAlert('解散分组失败，请重试', {title: '操作失败', tone: 'error'});
+      return;
+    }
     selectedGroupIds.value = selectedGroupIds.value.filter((id) => id !== groupId);
+    clearPhotoSelection();
   } else {
     console.info(`ui.edit.disband_group: canceled group=${group.id}`);
   }
