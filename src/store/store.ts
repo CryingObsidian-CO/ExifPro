@@ -1,9 +1,10 @@
 import {AppState, Theme} from "../types";
 import {reactive, watch} from "vue";
-import {ExifInfo, Group} from "../types/photo.ts";
+import {ExifInfo, Group, GroupType} from "../types/photo.ts";
 import {Config} from "../types/config.ts";
 import {pluginManager} from "../composables/pluginManager.ts";
 import {formatError} from "../composables/logger";
+import {useTauri} from "../composables/tauri.ts";
 
 function getSystemTheme() {
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -160,18 +161,21 @@ export class Store {
     return this.state.groups.length;
   }
 
-  createGroup(name: string, id: string = `group_${name}`) {
-    const newGroup: Group = {
+  // DEBUG id重复！！！检查是否重复创建
+  createGroup(name: string, id: string = `group_${name.trim()}`, groupType: GroupType = 'Single') {
+    let newGroup: Group = {
       id,
-      group_type: 'Single',
+      group_type: groupType,
       name,
       photos: [],
     };
 
+    newGroup = pluginManager.emitGroupCreated(newGroup);
     this.state.groups.push(newGroup);
     return newGroup;
   }
 
+  // DEBUG 不允许修改 id
   updateGroup(groupId: string, updates: Partial<Group>) {
     if (groupId === 'ungrouped') {
       return;
@@ -180,6 +184,8 @@ export class Store {
     if (index !== -1) {
       this.state.groups[index] = {...this.state.groups[index], ...updates};
     }
+
+    pluginManager.emitGroupUpdated(this.state.groups[index], updates);
   }
 
   deleteGroup(groupId: string) {
@@ -196,11 +202,11 @@ export class Store {
     });
   }
 
-  findGroup(groupId: string) {
+  findGroup(groupId: string): Group | undefined {
     return this.state.groups.find((g) => g.id === groupId);
   }
 
-  private findGroups(groupIds: string[]) {
+  private findGroups(groupIds: string[]): Group[] {
     return this.state.groups.filter((g) => groupIds.includes(g.id));
   }
 
@@ -211,6 +217,7 @@ export class Store {
     }
     group.photos.push(...photos);
     this.deletePhotosInAllGroups(photos, [groupId]);
+    pluginManager.emitMoveToGroup(group, photos);
   }
 
   mergeGroups(groupIds: string[], name: string) {
@@ -227,6 +234,8 @@ export class Store {
     this.state.groups.push(mergedGroup);
     this.deleteGroups(groupIds);
 
+    pluginManager.emitGroupMerge(groupsToMerge, mergedGroup);
+
     return mergedGroup;
   }
 
@@ -240,6 +249,16 @@ export class Store {
         this.deleteGroup(group.id);
       }
     });
+  }
+
+  disbandGroup(groupId: string) {
+    const group = this.findGroup(groupId);
+    if (!group) {
+      return;
+    }
+    store.addToUngroupedPhotos(group.photos);
+    this.deleteGroup(groupId);
+    pluginManager.emitGroupDisband(group);
   }
 
   addToUngroupedPhotos(photos: ExifInfo[]) {
@@ -270,6 +289,8 @@ export class Store {
       if (desired.has(plugin.manifest.id)) {
         if (!plugin.enabled) {
           await pluginManager.enablePlugin(plugin.manifest.id);
+        } else {
+          await useTauri().getPluginConfig(plugin.manifest.id);
         }
       } else if (plugin.enabled) {
         await pluginManager.disablePlugin(plugin.manifest.id);
@@ -280,26 +301,6 @@ export class Store {
 
   getPlugin(pluginId: string) {
     return this.plugins.find((p) => p.manifest.id === pluginId);
-  }
-
-  async enablePlugin(pluginId: string) {
-    try {
-      console.info(`ui.store.plugins: enable start id=${pluginId}`);
-      await pluginManager.enablePlugin(pluginId);
-      console.info(`ui.store.plugins: enable complete id=${pluginId}`);
-    } catch (e) {
-      console.error('ui.store.plugins: enable failed id=' + pluginId + ' err=' + formatError(e));
-    }
-  }
-
-  async disablePlugin(pluginId: string) {
-    try {
-      console.info(`ui.store.plugins: disable start id=${pluginId}`);
-      await pluginManager.disablePlugin(pluginId);
-      console.info(`ui.store.plugins: disable complete id=${pluginId}`);
-    } catch (e) {
-      console.error('ui.store.plugins: disable failed id=' + pluginId + ' err=' + formatError(e));
-    }
   }
 }
 

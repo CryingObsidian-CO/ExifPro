@@ -497,8 +497,7 @@ async function disbandGroup(groupId: string) {
     cancelText: '取消',
   })) {
     console.info(`ui.edit.disband_group: confirmed group=${group.id} name=${group.name}`);
-    store.addToUngroupedPhotos(group.photos);
-    store.deleteGroup(groupId);
+    store.disbandGroup(groupId);
     selectedGroupIds.value = selectedGroupIds.value.filter((id) => id !== groupId);
   } else {
     console.info(`ui.edit.disband_group: canceled group=${group.id}`);

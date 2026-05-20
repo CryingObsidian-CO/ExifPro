@@ -1,5 +1,4 @@
 import type {ExifInfo, Group, GroupType} from './photo';
-import type {Config} from './config';
 
 export interface PluginManifest {
   id: string;
@@ -16,11 +15,12 @@ export interface PluginManifest {
 
 // TODO 重新优化插件能力的排列，使能力更符合逻辑顺序，并在 Manager 的相应判断中修改
 export interface PluginCapabilities {
-  grouping: boolean;
-  merging: boolean;
-  exif_enhancement: boolean;
+  exif_enhancement?: boolean;
+  grouping?: boolean;
+  merging?: boolean;
   ui_extensions?: boolean;
-  custom_group_types?: string[];
+  // Display-only tags for showing plugin-provided capabilities.
+  custom_capabilities?: string[];
 }
 
 export interface ConfigSchemaItem {
@@ -37,12 +37,6 @@ export interface PluginInfo {
   enabled: boolean;
   zip_path: string;
   builtin?: boolean;
-}
-
-export interface MergeResult {
-  success: boolean;
-  outputFiles: string[];
-  message?: string;
 }
 
 export interface GroupActionDeclaration {
@@ -66,21 +60,27 @@ export interface UIExtensionDeclaration {
 
 // TODO 完成钩子的调用
 export interface ExifProPluginHooks {
-  onLoad?(api: ExifProHostAPI): void;
+  onLoad?(): void;
 
   onUnload?(): void;
-
-  onExifEnhance?(exif: ExifInfo): ExifInfo;
-
-  onGroupsCreated?(groups: Group[], ungroupedPhotos: ExifInfo[], config: Config): Group[];
-
-  onGroupMerge?(group: Group, outputDir: string): MergeResult | undefined;
 
   onRegisterUIExtensions?(): UIExtensionDeclaration;
 
   onGroupAction?(actionId: string, group: Group): void | Promise<void>;
 
   onImageAction?(actionId: string, photo: ExifInfo): void | Promise<void>;
+
+  onParseExif?(exif: ExifInfo[]): ExifInfo[];
+
+  onGroupCreated?(group: Group): Group;
+
+  onMoveToGroup?(group: Group, photos: ExifInfo[]): void;
+
+  onGroupMerged?(originalGroups: Group[], mergedGroup: Group): void;
+
+  onGroupUpdated?(group: Group, updates: Partial<Group>): void;
+
+  onGroupDisband?(group: Group): void;
 }
 
 export interface ExifProHostAPI {
@@ -89,14 +89,19 @@ export interface ExifProHostAPI {
 
   getPluginConfig(): Record<string, any>;
 
-  createGroup(photos: ExifInfo[], groupType: string, name: string): Group;
+  getGroups(): Group[];
 
-  mergeGroups(groupIds: string[]): Group | null;
+  createGroup(photos: ExifInfo[], groupType: GroupType, name: string): void;
+
+  moveToGroup(groupId: string, photos: ExifInfo[]): void;
+
+  mergeGroups(groupIds: string[], name: string): void;
 
   disbandGroup(groupId: string): ExifInfo[];
 
   readFile(path: string): Promise<Uint8Array>;
 
+  // TODO 直接对文件的操作存在安全问题 writeFile 和 createDirectory 的可写路径应该都加以限制
   writeFile(path: string, data: Uint8Array): Promise<void>;
 
   createDirectory(path: string): Promise<void>;

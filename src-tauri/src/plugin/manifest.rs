@@ -24,15 +24,15 @@ pub struct PluginManifest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginCapabilities {
     #[serde(default)]
+    pub exif_enhancement: bool,
+    #[serde(default)]
     pub grouping: bool,
     #[serde(default)]
     pub merging: bool,
     #[serde(default)]
-    pub exif_enhancement: bool,
-    #[serde(default)]
     pub ui_extensions: bool,
     #[serde(default)]
-    pub custom_group_types: Vec<String>,
+    pub custom_capabilities: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -5,6 +5,7 @@ import {store} from "../store/store.ts";
 import {useTauri} from "../composables/tauri.ts";
 import {Theme} from "../types";
 import type {Config} from "../types/config.ts";
+import type {PluginCapabilities} from "../types/plugin";
 import {onMounted, ref} from "vue";
 import WinInput from "../component/WinInput.vue";
 import WinToggle from "../component/WinToggle.vue";
@@ -115,7 +116,7 @@ function isPluginEnabled(pluginId: string) {
   return config.enabled_plugins.includes(pluginId);
 }
 
-async function saveSettings() {
+async function saveSettings(): Promise<boolean> {
   const config = store.config;
   if (config) {
     console.info("ui.settings.save: start");
@@ -127,11 +128,14 @@ async function saveSettings() {
       dirty.value = false;
       console.info("ui.settings.save: complete");
       await showAlert('设置已保存', {title: '保存成功', tone: 'success'});
+      return true;
     } catch (error) {
       console.error(`ui.settings.save: failed err=${formatError(error)}`);
       await showAlert('保存设置失败，请稍后重试。', {title: '保存失败', tone: 'error'});
+      return false;
     }
   }
+  return true;
 }
 
 async function resetSettings() {
@@ -184,20 +188,9 @@ onBeforeRouteLeave(async (_to, _from) => {
     closeOnOverlay: false,
   });
   if (save) {
-    const config = store.config;
-    if (config) {
-      try {
-        normalizeConfig(config);
-        await tauri.saveConfig(config);
-        await store.syncPluginsEnabled(config.enabled_plugins);
-        await reloadConfig();
-      } catch (error) {
-        console.error(`ui.settings.leave: save_failed err=${formatError(error)}`);
-        await showAlert('保存失败，已取消离开页面。', {title: '保存失败', tone: 'error'});
-        return false;
-      }
+    if (!await saveSettings()) {
+      return false;
     }
-    dirty.value = false;
   } else {
     await reloadConfig();
     dirty.value = false;
@@ -245,6 +238,11 @@ function getSortedPlugins() {
     return a.manifest.id.localeCompare(b.manifest.id);
   });
 }
+
+function getCustomCapabilityTags(capabilities: PluginCapabilities) {
+  return capabilities.custom_capabilities ?? [];
+}
+
 </script>
 
 <template>
@@ -548,13 +546,13 @@ function getSortedPlugins() {
                   <span class="plugin-id">{{ plugin.manifest.id }}</span>
                 </div>
                 <div class="plugin-capabilities">
+                  <span v-if="plugin.manifest.capabilities.exif_enhancement" class="capability-tag">EXIF增强</span>
                   <span v-if="plugin.manifest.capabilities.grouping"
                         class="capability-tag">分组</span>
                   <span v-if="plugin.manifest.capabilities.merging"
                         class="capability-tag">合并</span>
-                  <span v-if="plugin.manifest.capabilities.exif_enhancement" class="capability-tag">EXIF增强</span>
                   <span v-if="plugin.manifest.capabilities.ui_extensions" class="capability-tag">UI扩展</span>
-                  <span v-for="gt in (plugin.manifest.capabilities.custom_group_types || [])"
+                  <span v-for="gt in getCustomCapabilityTags(plugin.manifest.capabilities)"
                         :key="gt" class="capability-tag custom">
                     {{ gt }}
                   </span>

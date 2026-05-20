@@ -4,6 +4,7 @@ import {invoke} from "@tauri-apps/api/core";
 import {Config} from "../types/config.ts";
 import {PluginInfo} from "../types/plugin.ts";
 import {formatError} from "./logger";
+import {pluginManager} from "./pluginManager.ts";
 
 const tauriLog = {
   start(action: string, details?: string) {
@@ -40,12 +41,15 @@ export function useTauri() {
   }
 
   async function scanDirectory(path: string, recursive: boolean) {
-    return await invokeWithLog<ExifInfo[]>(
+    let photos = await invokeWithLog<ExifInfo[]>(
         "scan_directory",
         'scan_directory_command',
         {path, recursive},
         `path=${path} recursive=${recursive}`
     );
+
+    photos = pluginManager.emitParseExif(photos);
+    return photos;
   }
 
   async function groupPhotos(photos: ExifInfo[], config: Config | null) {
