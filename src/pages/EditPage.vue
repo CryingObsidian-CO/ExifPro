@@ -514,6 +514,10 @@ async function createGroupFromSelected() {
   if (name) {
     console.info(`ui.edit.create_group: confirmed name=${name} photos=${selectedPhotos.value.length}`);
     const newGroup = store.createGroup(name);
+    if (!newGroup) {
+      await showAlert('创建分组失败，请重试', {title: '操作失败', tone: 'error'});
+      return;
+    }
     store.movePhotoToGroup(selectedPhotos.value, newGroup.id);
     clearPhotoSelection();
   } else {
@@ -557,6 +561,10 @@ async function mergeSelectedGroups() {
   if (name) {
     console.info(`ui.edit.merge_groups: confirmed name=${name} groups=${selectedGroupIds.value.length}`);
     let mergedGroup = store.mergeGroups(selectedGroupIds.value, name);
+    if (!mergedGroup) {
+      await showAlert('合并分组失败，请重试', {title: '操作失败', tone: 'error'});
+      return;
+    }
     selectedGroupIds.value = [mergedGroup.id];
   } else {
     console.info("ui.edit.merge_groups: canceled");

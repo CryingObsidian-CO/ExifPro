@@ -1,22 +1,25 @@
 import {useTauri} from './tauri';
-import type {
+import {
   ExifProHostAPI,
   ExifProPluginHooks,
   GroupActionDeclaration,
   ImageActionDeclaration,
   LoadedPlugin,
+  PluginAPIContext,
+  PluginCapabilities,
   PluginInfo,
   PluginManifest,
-  PluginCapabilities,
 } from '../types/plugin';
 import type {ExifInfo, Group, GroupType} from '../types/photo';
 import {builtinPlugins} from './builtinPlugins';
 import {formatError} from "./logger";
 import {store} from "../store/store.ts";
 
+// TODO 更好的单例控制，避免多个实例
 class PluginManagerImpl {
   private readonly tauri = useTauri();
   private plugins: Map<string, LoadedPlugin> = new Map();
+  private apiContexts: Map<string, PluginAPIContext> = new Map();
   private initialized: boolean = false;
 
   get isInitialized(): boolean {
@@ -101,7 +104,9 @@ class PluginManagerImpl {
       }
     }
 
-    const api = this.createHostAPI(info.manifest.id, pluginConfig);
+    const apiContext = new PluginAPIContext(info.manifest.id, pluginConfig);
+    this.apiContexts.set(info.manifest.id, apiContext);
+    const api = this.createHostAPI(apiContext);
 
     let hooks: ExifProPluginHooks;
     if (info.builtin) {
@@ -156,7 +161,6 @@ class PluginManagerImpl {
     try {
       const preprocessedScript = this.preprocessPluginCode(script);
 
-      // TODO 完善 api 提供的日志记录功能
       const customConsole = {
         log: (...args: any[]) => api.log(args.join(' ')),
         warn: (...args: any[]) => api.log('[WARN] ' + args.join(' ')),
@@ -378,16 +382,26 @@ class PluginManagerImpl {
     console.info(`ui.plugins: disable complete id=${pluginId}`);
   }
 
-  private createHostAPI(pluginId: string, pluginConfig: Record<string, any>): ExifProHostAPI {
+  async updatePluginConfig(pluginId: string): Promise<void> {
+    const apiContext = this.apiContexts.get(pluginId);
+    if (!apiContext) {
+      throw new Error(`Plugin ${pluginId} not found`)
+    }
+    apiContext.updateConfig(await this.tauri.getPluginConfig(pluginId));
+  }
+
+  private createHostAPI(context: PluginAPIContext): ExifProHostAPI {
     return {
-      getPluginConfig: () => pluginConfig,
-      log: (msg: string) => console.log(`[Plugin:${pluginId}] ${msg}`),
+      getPluginConfig: () => context.getConfig(),
+      log: (msg: string) => console.log(`[Plugin:${context.id}] ${msg}`),
 
       getGroups: () => store.groups,
 
       createGroup: (photos: ExifInfo[], groupType: GroupType, name: string) => {
-        const group = store.createGroup(name, `plugin_${pluginId.trim()}_${name.trim()}`, groupType);
+        const group = store.createGroup(name, `plugin_${context.id.trim()}_${name.trim()}`, groupType);
+        if (!group) return null;
         store.movePhotoToGroup(photos, group.id);
+        return group;
       },
 
       moveToGroup: (groupId: string, photos: ExifInfo[]): void => {
@@ -408,7 +422,7 @@ class PluginManagerImpl {
       },
 
       readFile: async (path: string): Promise<Uint8Array> => {
-        const plugin = this.plugins.get(pluginId);
+        const plugin = this.plugins.get(context.id);
         if (!plugin) throw new Error('Plugin not found');
         return await this.tauri.readPluginBinary(plugin.zipPath, path);
       },

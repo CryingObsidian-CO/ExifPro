@@ -4,13 +4,13 @@
   "name": "测试插件",
   "description": "测试插件描述",
   "author": "ExifPro Team",
-  "api_version": 1,
+  "api_version": 2,
   "entry_point": "index.ts",
   "capabilities": {
     "grouping": true,
     "merging": true,
     "exif_enhancement": true,
-    "custom_group_types": [
+    "custom_capabilities": [
       "Test"
     ]
   },

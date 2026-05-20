@@ -19,7 +19,6 @@ export interface PluginCapabilities {
   grouping?: boolean;
   merging?: boolean;
   ui_extensions?: boolean;
-  // Display-only tags for showing plugin-provided capabilities.
   custom_capabilities?: string[];
 }
 
@@ -58,7 +57,6 @@ export interface UIExtensionDeclaration {
   imageActions?: ImageActionDeclaration[];
 }
 
-// TODO 完成钩子的调用
 export interface ExifProPluginHooks {
   onLoad?(): void;
 
@@ -91,7 +89,7 @@ export interface ExifProHostAPI {
 
   getGroups(): Group[];
 
-  createGroup(photos: ExifInfo[], groupType: GroupType, name: string): void;
+  createGroup(photos: ExifInfo[], groupType: GroupType, name: string): Group | null;
 
   moveToGroup(groupId: string, photos: ExifInfo[]): void;
 
@@ -115,4 +113,22 @@ export interface LoadedPlugin {
   zipPath: string;
   builtin?: boolean;
   uiExtensions?: UIExtensionDeclaration;
+}
+
+export class PluginAPIContext {
+  readonly id: string;
+  private config: Record<string, any>;
+
+  constructor(id: string, config: Record<string, any>) {
+    this.id = id;
+    this.config = config;
+  }
+
+  getConfig(): Record<string, any> {
+    return this.config;
+  }
+
+  updateConfig(config: Record<string, any>): void {
+    this.config = config;
+  }
 }

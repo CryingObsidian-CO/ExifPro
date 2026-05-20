@@ -4,7 +4,6 @@ import {ExifInfo, Group, GroupType} from "../types/photo.ts";
 import {Config} from "../types/config.ts";
 import {pluginManager} from "../composables/pluginManager.ts";
 import {formatError} from "../composables/logger";
-import {useTauri} from "../composables/tauri.ts";
 
 function getSystemTheme() {
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -161,8 +160,12 @@ export class Store {
     return this.state.groups.length;
   }
 
-  // DEBUG id重复！！！检查是否重复创建
   createGroup(name: string, id: string = `group_${name.trim()}`, groupType: GroupType = 'Single') {
+
+    if (this.findGroup(id)) {
+      return null;
+    }
+
     let newGroup: Group = {
       id,
       group_type: groupType,
@@ -175,17 +178,16 @@ export class Store {
     return newGroup;
   }
 
-  // DEBUG 不允许修改 id
   updateGroup(groupId: string, updates: Partial<Group>) {
     if (groupId === 'ungrouped') {
       return;
     }
     const index = this.state.groups.findIndex((g) => g.id === groupId);
     if (index !== -1) {
-      this.state.groups[index] = {...this.state.groups[index], ...updates};
+      const {id: _, ...safeUpdates} = updates;
+      this.state.groups[index] = {...this.state.groups[index], ...safeUpdates};
+      pluginManager.emitGroupUpdated(this.state.groups[index], safeUpdates);
     }
-
-    pluginManager.emitGroupUpdated(this.state.groups[index], updates);
   }
 
   deleteGroup(groupId: string) {
@@ -224,12 +226,11 @@ export class Store {
     const groupsToMerge = this.findGroups(groupIds);
     const allPhotos = groupsToMerge.flatMap((g) => g.photos);
 
-    const mergedGroup: Group = {
-      id: `group_${name.trim()}`,
-      group_type: 'Single',
-      name,
-      photos: allPhotos,
-    };
+    const mergedGroup = this.createGroup(name, `group_${name.trim()}`);
+    if (!mergedGroup) {
+      return null;
+    }
+    mergedGroup.photos = allPhotos;
 
     this.state.groups.push(mergedGroup);
     this.deleteGroups(groupIds);
@@ -264,7 +265,11 @@ export class Store {
   addToUngroupedPhotos(photos: ExifInfo[]) {
     let ungroupedPhotos = this.findGroup('ungrouped');
     if (!ungroupedPhotos) {
-      ungroupedPhotos = this.createGroup('未分组', 'ungrouped');
+      const newUngroupedPhotos = this.createGroup('未分组', 'ungrouped');
+      if (!ungroupedPhotos) {
+        return;
+      }
+      ungroupedPhotos = newUngroupedPhotos as Group;
     }
     ungroupedPhotos.photos.push(...photos);
   }
@@ -290,7 +295,7 @@ export class Store {
         if (!plugin.enabled) {
           await pluginManager.enablePlugin(plugin.manifest.id);
         } else {
-          await useTauri().getPluginConfig(plugin.manifest.id);
+          await pluginManager.updatePluginConfig(plugin.manifest.id);
         }
       } else if (plugin.enabled) {
         await pluginManager.disablePlugin(plugin.manifest.id);
