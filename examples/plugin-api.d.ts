@@ -60,7 +60,11 @@ export interface ExifProHostAPI {
 
   disbandGroup(groupId: string): ExifInfo[];
 
-  readFile(path: string): Promise<Uint8Array>;
+  readFile(fileName: string): Promise<string>;
+
+  readFileBinary(fileName: string): Promise<Uint8Array>;
+
+  readExternalFile(path: string): Promise<Uint8Array>;
 
   writeFile(path: string, data: Uint8Array): Promise<void>;
 

@@ -11,6 +11,9 @@
     "grouping": true,
     "merging": true,
     "ui_extensions": true,
+    "file_read": true,
+    "file_write": true,
+    "directory_create": true,
     "custom_capabilities": [
       "Test"
     ]

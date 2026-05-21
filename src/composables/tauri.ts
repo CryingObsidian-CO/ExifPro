@@ -110,24 +110,6 @@ export function useTauri() {
     );
   }
 
-  async function readPluginFile(zipPath: string, fileName: string) {
-    return await invokeWithLog<string>(
-        "read_plugin_file",
-        'read_plugin_file_command',
-        {zipPath, fileName},
-        `zip=${zipPath} file=${fileName}`
-    );
-  }
-
-  async function readPluginBinary(zipPath: string, fileName: string) {
-    return await invokeWithLog<Uint8Array>(
-        "read_plugin_binary",
-        'read_plugin_binary_command',
-        {zipPath, fileName},
-        `zip=${zipPath} file=${fileName}`
-    );
-  }
-
   async function enablePlugin(pluginId: string) {
     return await invokeWithLog<void>(
         "enable_plugin",
@@ -164,13 +146,39 @@ export function useTauri() {
     );
   }
 
-  async function pluginFileOp(operation: 'mkdir' | 'write', path: string, data?: number[]) {
-    return await invokeWithLog<void>(
+  async function readPluginFile(zipPath: string, fileName: string) {
+    return await invokeWithLog<string>(
+        "read_plugin_file",
+        'read_plugin_file_command',
+        {zipPath, fileName},
+        `zip=${zipPath} file=${fileName}`
+    );
+  }
+
+  async function readPluginBinary(zipPath: string, fileName: string): Promise<Uint8Array> {
+    const result = await invokeWithLog<number[]>(
+        "read_plugin_binary",
+        'read_plugin_binary_command',
+        {zipPath, fileName},
+        `zip=${zipPath} file=${fileName}`
+    );
+    return new Uint8Array(result);
+  }
+
+  async function pluginFileOp(pluginId: string,
+                              operation: 'read' | 'mkdir' | 'write',
+                              path: string,
+                              data?: Uint8Array): Promise<Uint8Array> {
+
+    let safeData = Array.from(data || []);
+
+    const result = await invokeWithLog<Promise<number[]>>(
         "plugin_file_op",
         'plugin_file_op_command',
-        {operation, path, data},
-        `operation=${operation} path=${path}`
+        {pluginId, operation, path, safeData},
+        `plugin=${pluginId} operation=${operation} path=${path}`
     );
+    return new Uint8Array(result);
   }
 
   return {
@@ -182,12 +190,12 @@ export function useTauri() {
     loadConfig,
     resetConfig,
     listPlugins,
-    readPluginFile,
-    readPluginBinary,
     enablePlugin,
     disablePlugin,
     getPluginConfig,
     setPluginConfig,
+    readPluginFile,
+    readPluginBinary,
     pluginFileOp
   }
 }

@@ -5,7 +5,7 @@ import {store} from "../store/store.ts";
 import {useTauri} from "../composables/tauri.ts";
 import {Theme} from "../types";
 import type {Config} from "../types/config.ts";
-import type {PluginCapabilities} from "../types/plugin";
+import {CAPABILITY_INFO, CapabilityType, PluginCapabilities} from "../types/plugin";
 import {onMounted, ref} from "vue";
 import WinInput from "../component/WinInput.vue";
 import WinToggle from "../component/WinToggle.vue";
@@ -239,8 +239,38 @@ function getSortedPlugins() {
   });
 }
 
-function getCustomCapabilityTags(capabilities: PluginCapabilities) {
-  return capabilities.custom_capabilities ?? [];
+function getCapabilityLabel(type: CapabilityType): string {
+  return CAPABILITY_INFO[type].label;
+}
+
+function getCapabilityRiskLevel(type: CapabilityType): 'low' | 'medium' | 'high' {
+  return CAPABILITY_INFO[type].riskLevel;
+}
+
+function getCapabilityColor(type: CapabilityType): string {
+  const risk = getCapabilityRiskLevel(type);
+
+  switch (risk) {
+    case "low":
+      return 'var(--color-accent-light)';
+    case "medium":
+      return 'var(--color-warning-light)';
+    case "high":
+      return 'var(--color-error-light)';
+  }
+}
+
+function getStandardCapabilities(capabilities: PluginCapabilities): CapabilityType[] {
+  const result: CapabilityType[] = [];
+  const capabilityTypes = Object.keys(CAPABILITY_INFO) as CapabilityType[];
+
+  for (const type of capabilityTypes) {
+    if (capabilities[type] === true) {
+      result.push(type);
+    }
+  }
+
+  return result;
 }
 
 </script>
@@ -546,16 +576,15 @@ function getCustomCapabilityTags(capabilities: PluginCapabilities) {
                   <span class="plugin-id">{{ plugin.manifest.id }}</span>
                 </div>
                 <div class="plugin-capabilities">
-                  <span v-if="plugin.manifest.capabilities.exif_enhancement" class="capability-tag">EXIF增强</span>
-                  <span v-if="plugin.manifest.capabilities.grouping"
-                        class="capability-tag">分组</span>
-                  <span v-if="plugin.manifest.capabilities.merging"
-                        class="capability-tag">合并</span>
-                  <span v-if="plugin.manifest.capabilities.ui_extensions" class="capability-tag">UI扩展</span>
-                  <span v-for="gt in getCustomCapabilityTags(plugin.manifest.capabilities)"
-                        :key="gt" class="capability-tag custom">
-                    {{ gt }}
-                  </span>
+                  <span
+                      v-for="cap in getStandardCapabilities(plugin.manifest.capabilities)"
+                      :key="cap"
+                      class="capability-tag"
+                      :style="{ backgroundColor: getCapabilityColor(cap) }"
+                      :title="`风险等级: ${getCapabilityRiskLevel(cap)}`"
+                  >
+{{ getCapabilityLabel(cap) }}
+</span>
                 </div>
                 <div v-if="isPluginEnabled(plugin.manifest.id) && plugin.manifest.config_schema"
                      class="plugin-config">

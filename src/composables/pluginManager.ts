@@ -423,18 +423,28 @@ class PluginManagerImpl {
         return group.photos;
       },
 
-      readFile: async (path: string): Promise<Uint8Array> => {
+      readFile: async (fileName: string): Promise<string> => {
         const plugin = this.plugins.get(context.id);
         if (!plugin) throw new Error('Plugin not found');
-        return await this.tauri.readPluginBinary(plugin.zipPath, path);
+        return await this.tauri.readPluginFile(plugin.zipPath, fileName);
+      },
+
+      readFileBinary: async (fileName: string): Promise<Uint8Array> => {
+        const plugin = this.plugins.get(context.id);
+        if (!plugin) throw new Error('Plugin not found');
+        return await this.tauri.readPluginBinary(plugin.zipPath, fileName);
+      },
+
+      readExternalFile: async (path: string): Promise<Uint8Array> => {
+        return await this.tauri.pluginFileOp(context.id, 'read', path);
       },
 
       writeFile: async (path: string, data: Uint8Array): Promise<void> => {
-        await this.tauri.pluginFileOp('write', path, Array.from(data));
+        await this.tauri.pluginFileOp(context.id, 'write', path, data);
       },
 
       createDirectory: async (path: string): Promise<void> => {
-        await this.tauri.pluginFileOp('mkdir', path);
+        await this.tauri.pluginFileOp(context.id, 'mkdir', path);
       },
     };
   }

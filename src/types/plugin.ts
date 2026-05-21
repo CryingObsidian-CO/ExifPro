@@ -13,14 +13,77 @@ export interface PluginManifest {
   config_schema?: Record<string, ConfigSchemaItem>;
 }
 
-// TODO 重新优化插件能力的排列，使能力更符合逻辑顺序，并在 Manager 的相应判断中修改
 export interface PluginCapabilities {
   exif_enhancement?: boolean;
   grouping?: boolean;
   merging?: boolean;
   ui_extensions?: boolean;
+  file_read?: boolean;
+  file_write?: boolean;
+  directory_create?: boolean;
   custom_capabilities?: string[];
 }
+
+export type CapabilityType =
+    | 'exif_enhancement'
+    | 'grouping'
+    | 'merging'
+    | 'ui_extensions'
+    | 'file_read'
+    | 'file_write'
+    | 'directory_create';
+
+export interface CapabilityInfo {
+  type: CapabilityType;
+  label: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  description: string;
+}
+
+export const CAPABILITY_INFO: Record<CapabilityType, CapabilityInfo> = {
+  exif_enhancement: {
+    type: 'exif_enhancement',
+    label: 'EXIF增强',
+    riskLevel: 'low',
+    description: '读取和处理EXIF数据',
+  },
+  grouping: {
+    type: 'grouping',
+    label: '分组',
+    riskLevel: 'low',
+    description: '识别和创建照片分组',
+  },
+  merging: {
+    type: 'merging',
+    label: '合并',
+    riskLevel: 'low',
+    description: '合并多个照片组',
+  },
+  ui_extensions: {
+    type: 'ui_extensions',
+    label: 'UI扩展',
+    riskLevel: 'low',
+    description: '扩展用户界面功能',
+  },
+  file_read: {
+    type: 'file_read',
+    label: '文件读取',
+    riskLevel: 'medium',
+    description: '读取本地文件内容',
+  },
+  file_write: {
+    type: 'file_write',
+    label: '文件写入',
+    riskLevel: 'medium',
+    description: '写入本地文件（高风险操作）',
+  },
+  directory_create: {
+    type: 'directory_create',
+    label: '创建目录',
+    riskLevel: 'medium',
+    description: '创建本地目录（高风险操作）',
+  },
+};
 
 export interface ConfigSchemaItem {
   type: 'integer' | 'number' | 'string' | 'boolean';
@@ -85,7 +148,6 @@ export interface ExifProPluginHooks {
 
 // NOTE 修改时更新 plugin-api.d.ts 中的 ExifProHostAPI 接口
 export interface ExifProHostAPI {
-
   log(message: string): void;
 
   getPluginConfig(): Record<string, any>;
@@ -100,9 +162,13 @@ export interface ExifProHostAPI {
 
   disbandGroup(groupId: string): ExifInfo[];
 
-  readFile(path: string): Promise<Uint8Array>;
-
   // TODO 直接对文件的操作存在安全问题 writeFile 和 createDirectory 的可写路径应该都加以限制
+  readFile(fileName: string): Promise<string>;
+
+  readFileBinary(fileName: string): Promise<Uint8Array>;
+
+  readExternalFile(path: string): Promise<Uint8Array>;
+
   writeFile(path: string, data: Uint8Array): Promise<void>;
 
   createDirectory(path: string): Promise<void>;

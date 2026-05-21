@@ -246,20 +246,29 @@ async fn set_plugin_config_command(
 
 #[tauri::command]
 async fn plugin_file_op_command(
+    plugin_id: String,
     operation: String,
     path: String,
     data: Option<Vec<u8>>,
-) -> Result<(), String> {
+) -> Result<Vec<u8>, String> {
     log::info!(
-        "command.plugin_file_op: operation={} path={}",
+        "command.plugin_file_op: plugin={} operation={} path={}",
+        plugin_id,
         operation,
         path
     );
+
+    PluginLoader::check_plugin_file_capability(&plugin_id, &operation)?;
     match operation.as_str() {
-        "mkdir" => create_dirs_if_not_exist(Path::new(&path)).map_err(|e| e.to_string()),
+        "read" => std::fs::read(Path::new(&path)).map_err(|e| e.to_string()),
+        "mkdir" => {
+            create_dirs_if_not_exist(Path::new(&path)).map_err(|e| e.to_string())?;
+            Ok(Vec::new())
+        }
         "write" => {
             let data = data.ok_or("No data provided for write operation")?;
-            std::fs::write(Path::new(&path), data).map_err(|e| e.to_string())
+            std::fs::write(Path::new(&path), data).map_err(|e| e.to_string());
+            Ok(Vec::new())
         }
         _ => Err(format!("Unknown file operation: {}", operation)),
     }

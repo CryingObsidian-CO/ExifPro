@@ -32,6 +32,12 @@ pub struct PluginCapabilities {
     #[serde(default)]
     pub ui_extensions: bool,
     #[serde(default)]
+    pub file_read: bool,
+    #[serde(default)]
+    pub file_write: bool,
+    #[serde(default)]
+    pub directory_create: bool,
+    #[serde(default)]
     pub custom_capabilities: Vec<String>,
 }
 
@@ -105,5 +111,19 @@ impl PluginManifest {
             self.version
         );
         Ok(())
+    }
+}
+
+impl PluginCapabilities {
+    pub fn has_file_read(&self) -> bool {
+        self.file_read
+    }
+
+    pub fn has_file_write(&self) -> bool {
+        self.file_write
+    }
+
+    pub fn has_directory_create(&self) -> bool {
+        self.directory_create
     }
 }

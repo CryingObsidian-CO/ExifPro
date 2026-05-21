@@ -197,4 +197,61 @@ impl PluginLoader {
         );
         Ok(buf)
     }
+
+    pub fn check_plugin_file_capability(plugin_id: &str, operation: &str) -> Result<(), String> {
+        let plugins = PluginLoader::discover_plugins()
+            .map_err(|e| format!("Failed to discover plugins: {}", e))?;
+
+        let plugin = plugins
+            .into_iter()
+            .find(|p| p.manifest.id == plugin_id)
+            .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+        let capabilities = &plugin.manifest.capabilities;
+
+        match operation {
+            "read" => {
+                if !capabilities.has_file_read() {
+                    log::error!(
+                        "command.plugin_file_op: capability_denied plugin={} operation={}",
+                        plugin_id,
+                        operation
+                    );
+                    return Err(format!(
+                        "Plugin {} does not have file_read capability",
+                        plugin_id
+                    ));
+                }
+            }
+            "write" => {
+                if !capabilities.has_file_write() {
+                    log::error!(
+                        "command.plugin_file_op: capability_denied plugin={} operation={}",
+                        plugin_id,
+                        operation
+                    );
+                    return Err(format!(
+                        "Plugin {} does not have file_write capability",
+                        plugin_id
+                    ));
+                }
+            }
+            "mkdir" => {
+                if !capabilities.has_directory_create() {
+                    log::error!(
+                        "command.plugin_file_op: capability_denied plugin={} operation={}",
+                        plugin_id,
+                        operation
+                    );
+                    return Err(format!(
+                        "Plugin {} does not have directory_create capability",
+                        plugin_id
+                    ));
+                }
+            }
+            _ => {}
+        }
+
+        Ok(())
+    }
 }
