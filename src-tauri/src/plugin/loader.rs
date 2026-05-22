@@ -2,7 +2,7 @@ use crate::plugin::manifest::PluginManifest;
 use std::env::current_exe;
 use std::fs;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use tauri_plugin_log::log;
 use zip::ZipArchive;
 
@@ -185,6 +185,7 @@ impl PluginLoader {
             e.to_string()
         })?;
 
+        Self::validate_zip_entry_path(file_name)?;
         let mut entry = archive
             .by_name(file_name)
             .map_err(|e| format!("File '{}' not found in zip: {}", file_name, e))?;
@@ -252,6 +253,23 @@ impl PluginLoader {
             _ => {}
         }
 
+        Ok(())
+    }
+
+    fn validate_zip_entry_path(file_name: &str) -> Result<(), String> {
+        if file_name.trim().is_empty() {
+            return Err("Zip entry path must not be empty".to_string());
+        }
+        let path = Path::new(file_name);
+        if path.is_absolute() {
+            return Err("Absolute zip entry paths are not allowed".to_string());
+        }
+        for component in path.components() {
+            match component {
+                Component::Normal(_) => {}
+                _ => return Err("Invalid zip entry path".to_string()),
+            }
+        }
         Ok(())
     }
 }
