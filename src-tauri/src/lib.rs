@@ -102,10 +102,7 @@ async fn scan_directory_command(path: String, recursive: bool) -> Result<Vec<Exi
     Ok(exif_infos)
 }
 #[tauri::command]
-async fn get_thumbnail_command(
-    file_path: String,
-    level: String,
-) -> Result<Option<String>, String> {
+async fn get_thumbnail_command(file_path: String, level: String) -> Result<Option<String>, String> {
     log::info!(
         "command.get_thumbnail: start path={} level={}",
         file_path,
@@ -397,8 +394,8 @@ pub fn run() {
                     path: PathBuf::from(exe_dir.join("logs")),
                     file_name: None,
                 }))
-                .level(log::LevelFilter::Trace)
-                .max_file_size(5_000_000_000 /* bytes */)
+                .level(log::LevelFilter::Info)
+                .max_file_size(5_000_000 /* bytes */)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
                 .build(),
         )
