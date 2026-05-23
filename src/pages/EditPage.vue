@@ -673,6 +673,13 @@ async function mergeSelectedGroups() {
     await showAlert('请选择至少两个分组', {title: '选择不足', tone: 'warning'});
     return;
   }
+
+  if (selectedGroupIds.value.includes('ungrouped')) {
+    console.warn("ui.edit.merge_groups: rejected reason=includes_ungrouped");
+    await showAlert('不能合并未分组', {title: '操作无效', tone: 'warning'});
+    return;
+  }
+  
   const name = prompt('请输入新分组名称:', '合并分组');
   if (name) {
     console.info(`ui.edit.merge_groups: confirmed name=${name} groups=${selectedGroupIds.value.length}`);

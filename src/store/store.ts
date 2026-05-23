@@ -227,6 +227,10 @@ export class Store {
   }
 
   mergeGroups(groupIds: string[], name: string) {
+    if (groupIds.includes('ungrouped')) {
+      console.warn("ui.store.merge_groups: rejected reason=includes_ungrouped");
+      return null;
+    }
     const groupsToMerge = this.findGroups(groupIds);
     if (groupIds.length < 2 || groupsToMerge.length !== groupIds.length) {
       return null;
