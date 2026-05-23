@@ -273,6 +273,10 @@ function getStandardCapabilities(capabilities: PluginCapabilities): CapabilityTy
   return result;
 }
 
+function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
+  return capabilities.custom_capabilities?.filter((cap) => cap && cap.trim().length > 0) ?? [];
+}
+
 </script>
 
 <template>
@@ -597,6 +601,13 @@ function getStandardCapabilities(capabilities: PluginCapabilities): CapabilityTy
                       :title="`风险等级: ${getCapabilityRiskLevel(cap)}`"
                   >
 {{ getCapabilityLabel(cap) }}
+</span>
+                  <span
+                      v-for="cap in getCustomCapabilities(plugin.manifest.capabilities)"
+                      :key="`custom-${cap}`"
+                      class="capability-tag custom"
+                  >
+{{ cap }}
 </span>
                 </div>
                 <div v-if="isPluginEnabled(plugin.manifest.id) && plugin.manifest.config_schema"
