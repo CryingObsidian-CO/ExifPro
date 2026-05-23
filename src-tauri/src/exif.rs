@@ -227,6 +227,19 @@ fn to_clean_text(value: Option<String>) -> Option<String> {
     }
 }
 
+fn normalize_sub_time(value: Option<String>, digits: usize) -> Option<String> {
+    let cleaned = to_clean_text(value)?;
+    let digits_only: String = cleaned.chars().filter(|c| c.is_ascii_digit()).collect();
+    if digits_only.is_empty() {
+        return None;
+    }
+    if digits_only.len() >= digits {
+        Some(digits_only[..digits].to_string())
+    } else {
+        Some(format!("{:0<width$}", digits_only, width = digits))
+    }
+}
+
 pub fn parse_exif(file_path: &Path) -> Result<ExifInfo, Error> {
     log::debug!("exif.parse: start file={}", file_path.display());
     let mut exif_info = ExifInfo::new(file_path);
@@ -246,8 +259,11 @@ pub fn parse_exif(file_path: &Path) -> Result<ExifInfo, Error> {
 
     exif_info.capture_time = get_field_value(&exif, Tag::DateTimeOriginal, In::PRIMARY);
     exif_info.sub_time = Some(
-        to_clean_text(get_field_value(&exif, Tag::SubSecTimeOriginal, In::PRIMARY))
-            .map_or("000".to_string(), |s| format!("{:0>3}", s)),
+        normalize_sub_time(
+            get_field_value(&exif, Tag::SubSecTimeOriginal, In::PRIMARY),
+            6,
+        )
+        .unwrap_or_else(|| "000000".to_string()),
     );
     exif_info.offset_time_original =
         to_clean_text(get_field_value(&exif, Tag::OffsetTimeOriginal, In::PRIMARY));

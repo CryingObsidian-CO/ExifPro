@@ -11,6 +11,8 @@ pub struct Config {
     pub naming_rules: NamingRules,
     pub preview_max_mb: u64,
     #[serde(default)]
+    pub sub_second_digits: u8,
+    #[serde(default)]
     pub plugin_settings: HashMap<String, serde_json::Value>,
     #[serde(default)]
     pub enabled_plugins: Vec<String>,
@@ -56,6 +58,7 @@ impl Default for Config {
             burst_settings: BurstSettings::default(),
             naming_rules: NamingRules::default(),
             preview_max_mb: 8,
+            sub_second_digits: 3,
             plugin_settings: HashMap::new(),
             enabled_plugins: Vec::new(),
         }
@@ -113,24 +116,22 @@ impl Config {
 
         if config_path.exists() {
             log::debug!("config.load: start path={}", config_path.display());
-            let config_content = fs::read_to_string(&config_path)
-                .map_err(|e| {
-                    log::error!(
-                        "config.load: read_failed path={} err={}",
-                        config_path.display(),
-                        e
-                    );
-                    format!("Failed to read config file: {:?}", config_path)
-                })?;
-            let config: Self = serde_json::from_str(&config_content)
-                .map_err(|e| {
-                    log::error!(
-                        "config.load: parse_failed path={} err={}",
-                        config_path.display(),
-                        e
-                    );
-                    format!("Failed to parse config file: {:?}", config_path)
-                })?;
+            let config_content = fs::read_to_string(&config_path).map_err(|e| {
+                log::error!(
+                    "config.load: read_failed path={} err={}",
+                    config_path.display(),
+                    e
+                );
+                format!("Failed to read config file: {:?}", config_path)
+            })?;
+            let config: Self = serde_json::from_str(&config_content).map_err(|e| {
+                log::error!(
+                    "config.load: parse_failed path={} err={}",
+                    config_path.display(),
+                    e
+                );
+                format!("Failed to parse config file: {:?}", config_path)
+            })?;
             log::info!("config.load: complete path={}", config_path.display());
             Ok(config)
         } else {
@@ -146,22 +147,20 @@ impl Config {
         let config_path = get_config_path()?;
         log::debug!("config.save: start path={}", config_path.display());
         if let Some(parent) = config_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| {
-                    log::error!(
-                        "config.save: mkdir_failed path={} err={}",
-                        parent.display(),
-                        e
-                    );
-                    format!("Failed to create directory: {:?}", parent)
-                })?;
+            fs::create_dir_all(parent).map_err(|e| {
+                log::error!(
+                    "config.save: mkdir_failed path={} err={}",
+                    parent.display(),
+                    e
+                );
+                format!("Failed to create directory: {:?}", parent)
+            })?;
         }
 
-        let config_content = serde_json::to_string_pretty(self)
-            .map_err(|e| {
-                log::error!("config.save: serialize_failed err={}", e);
-                format!("Failed to serialize config: {:?}", e)
-            })?;
+        let config_content = serde_json::to_string_pretty(self).map_err(|e| {
+            log::error!("config.save: serialize_failed err={}", e);
+            format!("Failed to serialize config: {:?}", e)
+        })?;
         fs::write(&config_path, config_content).map_err(|e| {
             log::error!(
                 "config.save: write_failed path={} err={}",

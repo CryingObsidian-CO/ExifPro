@@ -181,9 +181,18 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
     };
     groups.push(ungrouped_group);
 
-    let focus_count = groups.iter().filter(|g| matches!(g.group_type, GroupType::FocusBracketing)).count();
-    let aeb_count = groups.iter().filter(|g| matches!(g.group_type, GroupType::AEB)).count();
-    let burst_count = groups.iter().filter(|g| matches!(g.group_type, GroupType::Burst)).count();
+    let focus_count = groups
+        .iter()
+        .filter(|g| matches!(g.group_type, GroupType::FocusBracketing))
+        .count();
+    let aeb_count = groups
+        .iter()
+        .filter(|g| matches!(g.group_type, GroupType::AEB))
+        .count();
+    let burst_count = groups
+        .iter()
+        .filter(|g| matches!(g.group_type, GroupType::Burst))
+        .count();
     log::info!(
         "grouping: complete focus={} aeb={} burst={} ungrouped={} total_groups={}",
         focus_count,
@@ -228,7 +237,7 @@ fn parse_focus_distance(focus_distance: &str) -> Option<f64> {
 
 fn parse_capture_time(time_info: &ExifInfo) -> Option<DateTime<Utc>> {
     let capture = time_info.capture_time.as_deref().unwrap_or("");
-    let sub = time_info.sub_time.as_deref().unwrap_or("999");
+    let sub = time_info.sub_time.as_deref().unwrap_or("999999");
     let offset = time_info
         .offset_time_original
         .as_deref()
@@ -236,9 +245,9 @@ fn parse_capture_time(time_info: &ExifInfo) -> Option<DateTime<Utc>> {
     let time_str = format!("{}.{} {}", capture, sub, offset);
 
     // TODO 处理时区转换
-    if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y:%m:%d %H:%M:%S.%3f %z") {
+    if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y:%m:%d %H:%M:%S.%6f %z") {
         Some(dt.with_timezone(&Utc))
-    } else if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y-%m-%d %H:%M:%S.%3f %z") {
+    } else if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y-%m-%d %H:%M:%S.%6f %z") {
         Some(dt.with_timezone(&Utc))
     } else {
         log::warn!("grouping.capture_time: parse_failed value={}", time_str);
@@ -412,7 +421,10 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
         return false;
     }
 
-    log::debug!("grouping.focus_bracketing: accepted photos={}", groups.len());
+    log::debug!(
+        "grouping.focus_bracketing: accepted photos={}",
+        groups.len()
+    );
     true
 }
 

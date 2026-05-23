@@ -33,6 +33,7 @@ const handleInput = (e: Event) => {
     // 整数正则：允许空、负数、0，不允许小数点
     const integerReg = /^-?\d*$/;
     if (!integerReg.test(nextValue)) {
+      input.value = value.value as string;
       return;
     }
   }

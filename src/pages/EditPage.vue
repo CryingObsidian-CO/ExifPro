@@ -272,6 +272,12 @@ function formatExposureMode(value?: number) {
   return labels[value] ?? `未知(${value})`;
 }
 
+function getSubSecondDigits() {
+  const raw = store.config?.sub_second_digits;
+  const value = Number.isFinite(raw) ? raw as number : 3;
+  return Math.min(9, Math.max(0, value));
+}
+
 function formatCaptureTime(photo: ExifInfo) {
   const captureTime = toCleanText(photo.capture_time);
   const subSecond = toCleanText(photo.sub_time).replace(/^\.+/, '');
@@ -280,7 +286,11 @@ function formatCaptureTime(photo: ExifInfo) {
     return '—';
   }
 
-  const withSubSecond = subSecond ? `${captureTime}.${subSecond}` : captureTime;
+  const digits = getSubSecondDigits();
+  const normalizedSubSecond = digits > 0 && subSecond
+      ? subSecond.padEnd(digits, '0').slice(0, digits)
+      : '';
+  const withSubSecond = normalizedSubSecond ? `${captureTime}.${normalizedSubSecond}` : captureTime;
   return offsetTime ? `${withSubSecond} ${offsetTime}` : withSubSecond;
 }
 
@@ -491,6 +501,18 @@ function handleMainContentPointerCancel(event: PointerEvent) {
   finishDragSelection(event.pointerId);
 }
 
+watch(() => store.groups.length, () => {
+  const groupIds = new Set(store.groups.map((group) => group.id));
+  const filtered = selectedGroupIds.value.filter((id) => groupIds.has(id));
+  if (filtered.length !== selectedGroupIds.value.length) {
+    selectedGroupIds.value = filtered;
+  }
+  if (renamingGroupId.value && !groupIds.has(renamingGroupId.value)) {
+    renamingGroupId.value = null;
+    newGroupName.value = '';
+  }
+});
+
 watchEffect(() => {
   const {keys} = getPhotoCatalog();
   const validKeys = new Set(keys);
@@ -592,7 +614,6 @@ async function disbandGroup(groupId: string) {
       await showAlert('解散分组失败，请重试', {title: '操作失败', tone: 'error'});
       return;
     }
-    selectedGroupIds.value = selectedGroupIds.value.filter((id) => id !== groupId);
     clearPhotoSelection();
   } else {
     console.info(`ui.edit.disband_group: canceled group=${group.id}`);
@@ -652,6 +673,13 @@ async function mergeSelectedGroups() {
     await showAlert('请选择至少两个分组', {title: '选择不足', tone: 'warning'});
     return;
   }
+
+  if (selectedGroupIds.value.includes('ungrouped')) {
+    console.warn("ui.edit.merge_groups: rejected reason=includes_ungrouped");
+    await showAlert('不能合并未分组', {title: '操作无效', tone: 'warning'});
+    return;
+  }
+  
   const name = prompt('请输入新分组名称:', '合并分组');
   if (name) {
     console.info(`ui.edit.merge_groups: confirmed name=${name} groups=${selectedGroupIds.value.length}`);
@@ -660,7 +688,6 @@ async function mergeSelectedGroups() {
       await showAlert('合并分组失败，请重试', {title: '操作失败', tone: 'error'});
       return;
     }
-    selectedGroupIds.value = [mergedGroup.id];
   } else {
     console.info("ui.edit.merge_groups: canceled");
   }
