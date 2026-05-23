@@ -175,7 +175,7 @@ export function useTauri() {
     const result = await invokeWithLog<Promise<number[]>>(
         "plugin_file_op",
         'plugin_file_op_command',
-        {pluginId, operation, path, safeData},
+        {pluginId, operation, path, data: safeData},
         `plugin=${pluginId} operation=${operation} path=${path}`
     );
     return new Uint8Array(result);

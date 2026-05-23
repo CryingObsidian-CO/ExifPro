@@ -371,6 +371,7 @@ pub fn run() {
     };
 
     tauri::Builder::default()
+        // DEBUG 日志在记录的时候不能保证严格有序，尤其是短时间同时写入日志的情况
         // NOTE 这个插件会在大小达到限制后立刻切分文件，很可能导致同义词运行的日志被切分在两个不同的文件中
         .plugin(
             tauri_plugin_log::Builder::new()

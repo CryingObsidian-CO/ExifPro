@@ -14,6 +14,7 @@ import type {ExifInfo, Group, GroupType} from '../types/photo';
 import {builtinPlugins} from './builtinPlugins';
 import {formatError} from "./logger";
 import {store} from "../store/store.ts";
+import ts from "typescript";
 
 // TODO 更好的单例控制，避免多个实例
 class PluginManagerImpl {
@@ -117,7 +118,7 @@ class PluginManagerImpl {
       hooks = builtinHooks;
     } else {
       const scriptContent = await this.tauri.readPluginFile(info.zip_path, info.manifest.entry_point);
-      hooks = this.evaluatePluginScript(scriptContent, api);
+      hooks = await this.evaluatePluginScript(scriptContent, api, info.manifest.entry_point.endsWith('.ts'));
     }
 
     const loaded: LoadedPlugin = {
@@ -148,18 +149,39 @@ class PluginManagerImpl {
     console.info(`ui.plugins: load complete id=${info.manifest.id}`);
   }
 
-  private preprocessPluginCode(code: string): string {
-    return code
+  private async preprocessPluginCode(code: string, isTypeScript: boolean): Promise<string> {
+    code = code
     // 1. 移除 import "../plugin-api"; 语句（运行时不需要）
     .replace(/^\s*import\s*["']..\/plugin-api["'];\s*$/gm, '')
     // 清理多余空行（可选）
     .replace(/\n\s*\n/g, '\n');
+
+    if (isTypeScript) {
+      console.info("ui.plugin: found .ts file");
+      try {
+        const result = ts.transpileModule(code, {
+          compilerOptions: {
+            module: ts.ModuleKind.Preserve,
+            target: ts.ScriptTarget.ES2020,
+            removeComments: true,
+            strict: false,
+            moduleResolution: ts.ModuleResolutionKind.Bundler,
+          },
+          reportDiagnostics: false,
+        });
+        console.info("ui.plugin: TS type removed successfully");
+        return result.outputText;
+      } catch (e) {
+        console.error("ui.plugin: TS type removed failed:", e);
+      }
+    }
+    return code;
   }
 
   // DEBUG 安全问题很重要，这里直接执行了用户提供的脚本，需要谨慎处理
-  private evaluatePluginScript(script: string, api: ExifProHostAPI): ExifProPluginHooks {
+  private async evaluatePluginScript(script: string, api: ExifProHostAPI, isTypeScript: boolean): Promise<ExifProPluginHooks> {
     try {
-      const preprocessedScript = this.preprocessPluginCode(script);
+      const preprocessedScript = await this.preprocessPluginCode(script, isTypeScript);
 
       const customConsole = {
         log: (...args: any[]) => api.log(args.join(' ')),
@@ -189,7 +211,7 @@ class PluginManagerImpl {
       const values = Object.values(blockedGlobals);
 
       // 将这些全局变量作为函数的形参传入，以便覆盖当前作用域内的同名对象
-      const moduleFactory = new Function('exports', 'ExifProAPI', ...keys, preprocessedScript);
+      const moduleFactory = new Function('exports', 'exifProHostAPI', ...keys, preprocessedScript);
       const exports: any = {};
 
       moduleFactory(exports, api, ...values);

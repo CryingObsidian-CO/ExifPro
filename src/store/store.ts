@@ -228,6 +228,10 @@ export class Store {
 
   mergeGroups(groupIds: string[], name: string) {
     const groupsToMerge = this.findGroups(groupIds);
+    if (groupIds.length < 2 || groupsToMerge.length !== groupIds.length) {
+      return null;
+    }
+
     const allPhotos = groupsToMerge.flatMap((g) => g.photos);
 
     const mergedGroup = this.createGroup(name, `group_${name.trim()}`);
@@ -236,7 +240,6 @@ export class Store {
     }
     mergedGroup.photos = allPhotos;
 
-    this.state.groups.push(mergedGroup);
     this.deleteGroups(groupIds);
 
     pluginManager.emitGroupMerge(groupsToMerge, mergedGroup);
@@ -270,15 +273,15 @@ export class Store {
   }
 
   addToUngroupedPhotos(photos: ExifInfo[]): boolean {
-    let ungroupedPhotos = this.findGroup('ungrouped');
-    if (!ungroupedPhotos) {
-      const newUngroupedPhotos = this.createGroup('未分组', 'ungrouped');
-      if (!ungroupedPhotos) {
+    let ungroupedGroup = this.findGroup('ungrouped');
+    if (!ungroupedGroup) {
+      const newUngroupedGroup = this.createGroup('未分组', 'ungrouped');
+      if (!newUngroupedGroup) {
         return false;
       }
-      ungroupedPhotos = newUngroupedPhotos as Group;
+      ungroupedGroup = newUngroupedGroup as Group;
     }
-    ungroupedPhotos.photos.push(...photos);
+    ungroupedGroup.photos.push(...photos);
     return true;
   }
 

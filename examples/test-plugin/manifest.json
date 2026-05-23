@@ -1,0 +1,49 @@
+{
+  "id": "com.test.test",
+  "version": "1.0.0",
+  "name": "插件功能测试工具",
+  "description": "一个全面测试ExifPro插件系统所有功能的测试插件",
+  "author": "ExifPro Team",
+  "api_version": 2,
+  "entry_point": "index.ts",
+  "capabilities": {
+    "exif_enhancement": true,
+    "grouping": true,
+    "merging": true,
+    "ui_extensions": true,
+    "file_read": true,
+    "file_write": true,
+    "directory_create": true,
+    "custom_capabilities": [
+      "test_all_features"
+    ]
+  },
+  "config_schema": {
+    "test_count": {
+      "type": "integer",
+      "default": 5,
+      "min": 1,
+      "max": 20,
+      "step": 1,
+      "description": "测试次数"
+    },
+    "test_mode": {
+      "type": "string",
+      "default": "basic",
+      "description": "测试模式 (basic/advanced)"
+    },
+    "verbose_log": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否启用详细日志"
+    },
+    "test_threshold": {
+      "type": "number",
+      "default": 0.5,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.1,
+      "description": "测试阈值"
+    }
+  }
+}

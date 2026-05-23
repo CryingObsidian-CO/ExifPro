@@ -3,27 +3,41 @@ use std::env::current_exe;
 use std::fs;
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
+use std::sync::OnceLock;
 use tauri_plugin_log::log;
 use zip::ZipArchive;
 
 pub struct PluginLoader;
 
+#[derive(Clone)]
 pub struct DiscoveredPlugin {
     pub zip_path: PathBuf,
     pub manifest: PluginManifest,
     pub builtin: bool,
 }
 
+static PLUGIN_CACHE: OnceLock<Vec<DiscoveredPlugin>> = OnceLock::new();
+
 impl PluginLoader {
-    pub fn discover_plugins() -> Result<Vec<DiscoveredPlugin>, String> {
-        log::info!("plugin.discover: start");
+    fn cached_discover() -> Result<&'static Vec<DiscoveredPlugin>, String> {
+        if let Some(plugins) = PLUGIN_CACHE.get() {
+            return Ok(plugins);
+        }
+
+        log::info!("plugin.discover: start (cache miss)");
         let mut plugins = Self::discover_builtin_plugins();
         log::debug!("plugin.discover: builtin_count={}", plugins.len());
         let mut zip_plugins = Self::discover_zip_plugins()?;
         log::debug!("plugin.discover: zip_count={}", zip_plugins.len());
         plugins.append(&mut zip_plugins);
-        log::info!("plugin.discover: complete total={}", plugins.len());
-        Ok(plugins)
+        log::info!("plugin.discover: complete total={} (cached)", plugins.len());
+
+        let _ = PLUGIN_CACHE.set(plugins);
+        Ok(PLUGIN_CACHE.get().unwrap())
+    }
+
+    pub fn discover_plugins() -> Result<Vec<DiscoveredPlugin>, String> {
+        Self::cached_discover().map(|v| v.clone())
     }
 
     pub fn discover_builtin_plugins() -> Vec<DiscoveredPlugin> {
@@ -200,8 +214,8 @@ impl PluginLoader {
     }
 
     pub fn check_plugin_file_capability(plugin_id: &str, operation: &str) -> Result<(), String> {
-        let plugins = PluginLoader::discover_plugins()
-            .map_err(|e| format!("Failed to discover plugins: {}", e))?;
+        let plugins =
+            Self::cached_discover().map_err(|e| format!("Failed to discover plugins: {}", e))?;
 
         let plugin = plugins
             .into_iter()
