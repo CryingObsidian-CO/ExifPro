@@ -162,7 +162,6 @@ export interface ExifProHostAPI {
 
   disbandGroup(groupId: string): ExifInfo[];
 
-  // TODO 直接对文件的操作存在安全问题 writeFile 和 createDirectory 的可写路径应该都加以限制
   readFile(fileName: string): Promise<string>;
 
   readFileBinary(fileName: string): Promise<Uint8Array>;

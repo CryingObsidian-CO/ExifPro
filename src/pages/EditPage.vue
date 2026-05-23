@@ -501,6 +501,18 @@ function handleMainContentPointerCancel(event: PointerEvent) {
   finishDragSelection(event.pointerId);
 }
 
+watch(() => store.groups.length, () => {
+  const groupIds = new Set(store.groups.map((group) => group.id));
+  const filtered = selectedGroupIds.value.filter((id) => groupIds.has(id));
+  if (filtered.length !== selectedGroupIds.value.length) {
+    selectedGroupIds.value = filtered;
+  }
+  if (renamingGroupId.value && !groupIds.has(renamingGroupId.value)) {
+    renamingGroupId.value = null;
+    newGroupName.value = '';
+  }
+});
+
 watchEffect(() => {
   const {keys} = getPhotoCatalog();
   const validKeys = new Set(keys);
@@ -602,7 +614,6 @@ async function disbandGroup(groupId: string) {
       await showAlert('解散分组失败，请重试', {title: '操作失败', tone: 'error'});
       return;
     }
-    selectedGroupIds.value = selectedGroupIds.value.filter((id) => id !== groupId);
     clearPhotoSelection();
   } else {
     console.info(`ui.edit.disband_group: canceled group=${group.id}`);
@@ -670,7 +681,6 @@ async function mergeSelectedGroups() {
       await showAlert('合并分组失败，请重试', {title: '操作失败', tone: 'error'});
       return;
     }
-    selectedGroupIds.value = [mergedGroup.id];
   } else {
     console.info("ui.edit.merge_groups: canceled");
   }
