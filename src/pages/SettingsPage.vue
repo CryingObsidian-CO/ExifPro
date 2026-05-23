@@ -329,6 +329,19 @@ function getStandardCapabilities(capabilities: PluginCapabilities): CapabilityTy
                       @update:modelValue="(v) => updateField(store.config, 'preview_max_mb', Number(v))"
             />
           </div>
+          <div class="setting-item">
+            <label class="setting-label has-tooltip"
+                   data-tooltip="拍摄时间中子秒部分的显示位数。设为 0 则隐藏子秒。"
+            >子秒显示位数</label>
+            <WinInput type="number"
+                      :step="1"
+                      :min="0"
+                      :max="9"
+                      :integerOnly="true"
+                      :modelValue="store.config?.sub_second_digits ?? 3"
+                      @update:modelValue="(v) => updateField(store.config, 'sub_second_digits', Number(v))"
+            />
+          </div>
         </div>
       </WinCard>
 

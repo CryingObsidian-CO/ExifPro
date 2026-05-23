@@ -33,6 +33,7 @@ export interface Config {
   burst_settings: BurstSettings;
   naming_rules: NamingRules;
   preview_max_mb: number;
+  sub_second_digits: number;
   plugin_settings: Record<string, Record<string, any>>;
   enabled_plugins: string[];
 }

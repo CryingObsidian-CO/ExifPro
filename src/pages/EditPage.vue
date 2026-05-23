@@ -272,6 +272,12 @@ function formatExposureMode(value?: number) {
   return labels[value] ?? `未知(${value})`;
 }
 
+function getSubSecondDigits() {
+  const raw = store.config?.sub_second_digits;
+  const value = Number.isFinite(raw) ? raw as number : 3;
+  return Math.min(9, Math.max(0, value));
+}
+
 function formatCaptureTime(photo: ExifInfo) {
   const captureTime = toCleanText(photo.capture_time);
   const subSecond = toCleanText(photo.sub_time).replace(/^\.+/, '');
@@ -280,7 +286,11 @@ function formatCaptureTime(photo: ExifInfo) {
     return '—';
   }
 
-  const withSubSecond = subSecond ? `${captureTime}.${subSecond}` : captureTime;
+  const digits = getSubSecondDigits();
+  const normalizedSubSecond = digits > 0 && subSecond
+      ? subSecond.padEnd(digits, '0').slice(0, digits)
+      : '';
+  const withSubSecond = normalizedSubSecond ? `${captureTime}.${normalizedSubSecond}` : captureTime;
   return offsetTime ? `${withSubSecond} ${offsetTime}` : withSubSecond;
 }
 
