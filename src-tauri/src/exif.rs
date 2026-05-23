@@ -2,7 +2,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use exif::{Error, Exif, In, Tag};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
-use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::io::{BufReader, Read};
 use std::path::Path;
 use tauri_plugin_log::log;
 
@@ -32,8 +32,6 @@ pub struct ExifInfo {
     pub camera_make: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub camera_model: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub thumbnail: Option<String>,
 }
 
 impl ExifInfo {
@@ -59,7 +57,6 @@ impl ExifInfo {
             focus_distance: None,
             camera_make: None,
             camera_model: None,
-            thumbnail: None,
         }
     }
 }
@@ -130,12 +127,12 @@ fn extract_file_preview(file_path: &Path, max_preview_bytes: u64) -> Option<Stri
     Some(format!("data:{};base64,{}", mime, encoded))
 }
 
-fn extract_thumbnail(file_path: &Path, exif: &Exif) -> Option<String> {
-    let thumb_offset = exif.get_field(Tag::JPEGInterchangeFormat, In::PRIMARY)?;
-    let thumb_length = exif.get_field(Tag::JPEGInterchangeFormatLength, In::PRIMARY)?;
+fn extract_thumbnail(file_path: &Path, exif: &Exif, ifd: In) -> Option<String> {
+    let thumb_offset = exif.get_field(Tag::JPEGInterchangeFormat, ifd)?;
+    let thumb_length = exif.get_field(Tag::JPEGInterchangeFormatLength, ifd)?;
 
-    let offset = thumb_offset.value.get_uint(0)? as u64;
-    let length = thumb_length.value.get_uint(0)? as u64;
+    let offset = thumb_offset.value.get_uint(0)? as usize;
+    let length = thumb_length.value.get_uint(0)? as usize;
 
     if length == 0 || offset == 0 {
         log::warn!(
@@ -147,44 +144,54 @@ fn extract_thumbnail(file_path: &Path, exif: &Exif) -> Option<String> {
         return None;
     }
 
+    let exif_buf = exif.buf();
+    let end = offset.saturating_add(length);
+    if end > exif_buf.len() {
+        log::warn!(
+            "exif.thumbnail: out_of_range file={} ifd={:?} offset={} length={} buf_len={}",
+            file_path.display(),
+            ifd,
+            offset,
+            length,
+            exif_buf.len()
+        );
+        return None;
+    }
+
     log::debug!(
-        "exif.thumbnail: start file={} offset={} length={}",
+        "exif.thumbnail: start file={} ifd={:?} offset={} length={} buf_len={}",
         file_path.display(),
+        ifd,
         offset,
-        length
+        length,
+        exif_buf.len()
     );
 
-    let mut file = File::open(file_path).ok()?;
-    file.seek(SeekFrom::Start(offset)).ok()?;
-
-    let mut buf = vec![0u8; length as usize];
-    match file.read_exact(&mut buf) {
-        Ok(()) => {
-            let mime = detect_mime_type(&buf);
-            let encoded = BASE64.encode(&buf);
-            log::debug!(
-                "exif.thumbnail: complete file={} size={}",
-                file_path.display(),
-                buf.len()
-            );
-            Some(format!("data:{};base64,{}", mime, encoded))
-        }
-        Err(e) => {
-            log::warn!(
-                "exif.thumbnail: read_failed file={} err={}",
-                file_path.display(),
-                e
-            );
-            None
-        }
-    }
+    let buf = &exif_buf[offset..end];
+    let mime = detect_mime_type(buf);
+    let encoded = BASE64.encode(buf);
+    log::debug!(
+        "exif.thumbnail: complete file={} ifd={:?} size={}",
+        file_path.display(),
+        ifd,
+        buf.len()
+    );
+    Some(format!("data:{};base64,{}", mime, encoded))
 }
 
 fn detect_mime_type(data: &[u8]) -> &'static str {
-    if data.len() >= 4 && &data[0..4] == b"\xff\xd8\xff" {
+    if data.len() >= 4 && &data[0..4] == b"\xff\xd8\xff\xdb" {
         "image/jpeg"
     } else if data.len() >= 8 && &data[0..8] == b"\x89PNG\r\n\x1a\n" {
         "image/png"
+    } else if data.len() >= 3 && &data[0..3] == b"GIF" {
+        "image/gif"
+    } else if data.len() >= 4
+        && &data[0..4] == b"RIFF"
+        && data.len() >= 12
+        && &data[8..12] == b"WEBP"
+    {
+        "image/webp"
     } else {
         "image/jpeg"
     }
@@ -220,12 +227,8 @@ fn to_clean_text(value: Option<String>) -> Option<String> {
     }
 }
 
-pub fn parse_exif(file_path: &Path, max_preview_bytes: u64) -> Result<ExifInfo, Error> {
-    log::debug!(
-        "exif.parse: start file={} max_preview_bytes={}",
-        file_path.display(),
-        max_preview_bytes
-    );
+pub fn parse_exif(file_path: &Path) -> Result<ExifInfo, Error> {
+    log::debug!("exif.parse: start file={}", file_path.display());
     let mut exif_info = ExifInfo::new(file_path);
     let file = File::open(file_path)?;
     let mut buf_reader = BufReader::new(file);
@@ -242,8 +245,10 @@ pub fn parse_exif(file_path: &Path, max_preview_bytes: u64) -> Result<ExifInfo, 
     */
 
     exif_info.capture_time = get_field_value(&exif, Tag::DateTimeOriginal, In::PRIMARY);
-    exif_info.sub_time =
-        to_clean_text(get_field_value(&exif, Tag::SubSecTimeOriginal, In::PRIMARY));
+    exif_info.sub_time = Some(
+        to_clean_text(get_field_value(&exif, Tag::SubSecTimeOriginal, In::PRIMARY))
+            .map_or("000".to_string(), |s| format!("{:0>3}", s)),
+    );
     exif_info.offset_time_original =
         to_clean_text(get_field_value(&exif, Tag::OffsetTimeOriginal, In::PRIMARY));
     exif_info.shutter_speed = get_field_value(&exif, Tag::ExposureTime, In::PRIMARY);
@@ -263,13 +268,32 @@ pub fn parse_exif(file_path: &Path, max_preview_bytes: u64) -> Result<ExifInfo, 
             enhance_prase_focus_distance(&exif, exif_info.camera_make.as_ref().unwrap());
     }
 
-    exif_info.thumbnail = extract_thumbnail(file_path, &exif)
-        .or_else(|| extract_file_preview(file_path, max_preview_bytes));
-
-    if exif_info.thumbnail.is_none() {
-        log::debug!("exif.parse: no_preview file={}", file_path.display());
-    }
-
     log::debug!("exif.parse: complete file={}", file_path.display());
     Ok(exif_info)
+}
+
+pub fn get_thumbnail_data(file_path: &Path, level: &str, max_preview_bytes: u64) -> Option<String> {
+    let file = File::open(file_path).ok()?;
+    let mut buf_reader = BufReader::new(file);
+
+    let (primary_thumb, small_thumb) = exif::Reader::new()
+        .read_from_container(&mut buf_reader)
+        .ok()
+        .map(|exif_data| {
+            let primary = extract_thumbnail(file_path, &exif_data, In::PRIMARY);
+            let small = extract_thumbnail(file_path, &exif_data, In::THUMBNAIL);
+            (primary, small)
+        })
+        .unwrap_or((None, None));
+
+    match level {
+        "small" => small_thumb
+            .or(primary_thumb)
+            .or_else(|| extract_file_preview(file_path, max_preview_bytes)),
+        "large" => primary_thumb.or_else(|| extract_file_preview(file_path, u64::MAX)),
+        _ => {
+            log::warn!("exif.thumbnail: unknown_level level={}", level);
+            None
+        }
+    }
 }

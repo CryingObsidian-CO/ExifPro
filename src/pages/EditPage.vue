@@ -5,7 +5,7 @@ import {useRouter} from "vue-router";
 import {useTauri} from "../composables/tauri.ts";
 import WinCard from "../component/WinCard.vue";
 import {ExifInfo, Group, GroupType} from "../types/photo.ts";
-import {onMounted, onUnmounted, ref, watchEffect} from "vue";
+import {computed, nextTick, onMounted, onUnmounted, reactive, ref, watch, watchEffect} from "vue";
 import {useDialog} from "../composables/dialog.ts";
 import {pluginManager} from "../composables/pluginManager.ts";
 import type {GroupActionDeclaration, ImageActionDeclaration} from "../types/plugin.ts";
@@ -43,6 +43,69 @@ type DragSelectState = {
 };
 
 const dragSelectState = ref<DragSelectState | null>(null);
+
+const thumbnailCache = reactive<Record<string, string | null>>({});
+const loadingSet = reactive<Set<string>>(new Set());
+const detailLoadingSet = reactive<Set<string>>(new Set());
+const detailThumbnail = ref<string | null>(null);
+let thumbnailObserver: IntersectionObserver | null = null;
+
+const isDetailLoading = computed(() => {
+  const key = detailPhoto.value?.file_path;
+  return key ? detailLoadingSet.has(key) : false;
+});
+
+function setupThumbnailObserver() {
+  thumbnailObserver?.disconnect();
+  for (const key in thumbnailCache) {
+    delete thumbnailCache[key];
+  }
+
+  const container = mainContentRef.value;
+  if (!container) return;
+
+  thumbnailObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const key = (entry.target as HTMLElement).dataset.photoKey;
+          if (!key) continue;
+
+          if (entry.isIntersecting) {
+            if (!(key in thumbnailCache) && !loadingSet.has(key)) {
+              loadThumbnail(key, 'small');
+            }
+          } else {
+            if (key in thumbnailCache && thumbnailCache[key] !== null) {
+              delete thumbnailCache[key];
+            }
+          }
+        }
+      },
+      {
+        root: container,
+        rootMargin: '300px',
+        threshold: 0,
+      }
+  );
+
+  const grid = photosGridRef.value || container;
+  const elements = grid.querySelectorAll<HTMLElement>('.photo-thumb[data-photo-key]');
+  for (const el of elements) {
+    thumbnailObserver.observe(el);
+  }
+}
+
+async function loadThumbnail(filePath: string, level: 'small' | 'large') {
+  if (loadingSet.has(filePath)) return;
+  loadingSet.add(filePath);
+  try {
+    thumbnailCache[filePath] = await tauriImpl.getThumbnail(filePath, level);
+  } catch {
+    thumbnailCache[filePath] = null;
+  } finally {
+    loadingSet.delete(filePath);
+  }
+}
 
 function getGroupTypeLabel(type: GroupType) {
   const labels: Partial<Record<GroupType, string>> = {
@@ -223,10 +286,30 @@ function formatCaptureTime(photo: ExifInfo) {
 
 function openPhotoDetail(photo: ExifInfo) {
   detailPhoto.value = photo;
+  detailThumbnail.value = null;
+  loadDetailThumbnail(photo.file_path);
+}
+
+async function loadDetailThumbnail(filePath: string) {
+  if (detailLoadingSet.has(filePath)) return;
+  detailLoadingSet.add(filePath);
+  try {
+    const data = await tauriImpl.getThumbnail(filePath, 'large');
+    if (detailPhoto.value?.file_path === filePath) {
+      detailThumbnail.value = data;
+    }
+  } catch {
+    if (detailPhoto.value?.file_path === filePath) {
+      detailThumbnail.value = null;
+    }
+  } finally {
+    detailLoadingSet.delete(filePath);
+  }
 }
 
 function closePhotoDetail() {
   detailPhoto.value = null;
+  detailThumbnail.value = null;
 }
 
 function handleWindowKeydown(event: KeyboardEvent) {
@@ -425,11 +508,19 @@ watchEffect(() => {
 
 onMounted(() => {
   window.addEventListener('keydown', handleWindowKeydown);
+  nextTick(() => setupThumbnailObserver());
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleWindowKeydown);
+  thumbnailObserver?.disconnect();
 });
+
+watch(
+    () => store.groups,
+    () => nextTick(() => setupThumbnailObserver()),
+    {deep: true}
+);
 
 function startRenaming(group: Group) {
   console.info(`ui.edit.rename: start group=${group.id}`);
@@ -766,11 +857,10 @@ async function executeOrganize() {
                   @dragstart.prevent
               >
                 <div class="thumb-image">
-                  <img v-if="photo.thumbnail"
-                       :src="photo.thumbnail"
+                  <img v-if="thumbnailCache[photo.file_path]"
+                       :src="thumbnailCache[photo.file_path]|| ''"
                        :alt="photo.file_name"
                        class="thumb-img"
-                       loading="lazy"
                   />
                   <span v-else class="placeholder">🖼️</span>
                 </div>
@@ -813,11 +903,12 @@ async function executeOrganize() {
 
           <div class="photo-detail-body">
             <div class="photo-detail-preview">
-              <img v-if="detailPhoto?.thumbnail"
-                   :src="detailPhoto.thumbnail"
+              <img v-if="detailThumbnail"
+                   :src="detailThumbnail"
                    :alt="detailPhoto.file_name"
                    class="photo-detail-image"
               />
+              <div v-else-if="isDetailLoading" class="photo-detail-placeholder">加载中...</div>
               <div v-else class="photo-detail-placeholder">无预览图</div>
             </div>
 

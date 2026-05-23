@@ -5,7 +5,7 @@ pub mod grouping;
 pub mod plugin;
 
 use crate::config::Config;
-use crate::exif::{parse_exif, ExifInfo};
+use crate::exif::{get_thumbnail_data, parse_exif, ExifInfo};
 use crate::file_ops::{create_dirs_if_not_exist, safe_copy, safe_move, scan_directory};
 use crate::grouping::{group_photos, Group};
 use crate::plugin::loader::PluginLoader;
@@ -77,10 +77,6 @@ async fn scan_directory_command(path: String, recursive: bool) -> Result<Vec<Exi
         .await
         .map_err(|e| format!("Failed to scan directory: {}", e))?;
 
-    // NOTE 如果后续还有别的配置项再改为传入 config
-    let config = Config::load().unwrap_or_default();
-    let max_preview_bytes = config.preview_max_mb.saturating_mul(1024 * 1024);
-
     let total = image_paths.len();
     let mut exif_infos = Vec::new();
     for image_path in image_paths {
@@ -88,7 +84,7 @@ async fn scan_directory_command(path: String, recursive: bool) -> Result<Vec<Exi
             "command.scan_directory: parse_start path={}",
             image_path.display()
         );
-        match parse_exif(&image_path, max_preview_bytes) {
+        match parse_exif(&image_path) {
             Ok(info) => exif_infos.push(info),
             Err(e) => log::error!(
                 "command.scan_directory: parse_failed path={} err={}",
@@ -104,6 +100,27 @@ async fn scan_directory_command(path: String, recursive: bool) -> Result<Vec<Exi
         total
     );
     Ok(exif_infos)
+}
+#[tauri::command]
+async fn get_thumbnail_command(
+    file_path: String,
+    level: String,
+) -> Result<Option<String>, String> {
+    log::info!(
+        "command.get_thumbnail: start path={} level={}",
+        file_path,
+        level
+    );
+    let path = Path::new(&file_path);
+    let config = Config::load().unwrap_or_default();
+    let max_preview_bytes = config.preview_max_mb.saturating_mul(1024 * 1024);
+    let result = get_thumbnail_data(path, &level, max_preview_bytes);
+    log::info!(
+        "command.get_thumbnail: complete path={} has_thumbnail={}",
+        file_path,
+        result.is_some()
+    );
+    Ok(result)
 }
 #[tauri::command]
 async fn group_photos_command(
@@ -380,8 +397,8 @@ pub fn run() {
                     path: PathBuf::from(exe_dir.join("logs")),
                     file_name: None,
                 }))
-                .level(log::LevelFilter::Info)
-                .max_file_size(5_000_000 /* bytes */)
+                .level(log::LevelFilter::Trace)
+                .max_file_size(5_000_000_000 /* bytes */)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
                 .build(),
         )
@@ -403,6 +420,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             scan_directory_command,
+            get_thumbnail_command,
             group_photos_command,
             save_config_command,
             load_config_command,

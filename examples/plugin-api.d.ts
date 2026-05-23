@@ -13,7 +13,6 @@ export interface ExifInfo {
   focus_distance?: string;
   camera_make?: string;
   camera_model?: string;
-  thumbnail?: string;
 }
 
 export type GroupType = 'FocusBracketing' | 'AEB' | 'Burst' | 'Single' | string;
