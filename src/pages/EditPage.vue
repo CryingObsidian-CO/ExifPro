@@ -8,7 +8,7 @@ import {ExifInfo, Group, GroupType} from "../types/photo.ts";
 import {computed, nextTick, onMounted, onUnmounted, reactive, ref, watch, watchEffect} from "vue";
 import {useDialog} from "../composables/dialog.ts";
 import {pluginManager} from "../composables/pluginManager.ts";
-import type {GroupActionDeclaration} from "../types/plugin.ts";
+import type {GroupActionDeclaration, ImageActionDeclaration} from "../types/plugin.ts";
 import {formatError} from "../composables/logger";
 
 const router = useRouter();
@@ -135,13 +135,29 @@ function getPluginGroupActions(groupType: GroupType): GroupActionDeclaration[] {
   return pluginManager.getGroupActions(groupType);
 }
 
+function getPluginImageActions(groupType: GroupType): ImageActionDeclaration[] {
+  if (!pluginManager.isInitialized) return [];
+  return pluginManager.getImageActions(groupType);
+}
+
 async function handlePluginGroupAction(action: GroupActionDeclaration, group: Group) {
-  console.info(`ui.edit.plugin_action: start id=${action.id} group=${group.id}`);
+  console.info(`ui.edit.plugin_group_action: start id=${action.id} group=${group.id}`);
   try {
     await pluginManager.emitGroupAction(action.id, group);
-    console.info(`ui.edit.plugin_action: complete id=${action.id} group=${group.id}`);
+    console.info(`ui.edit.plugin_group_action: complete id=${action.id} group=${group.id}`);
   } catch (error) {
-    console.error(`ui.edit.plugin_action: failed id=${action.id} group=${group.id} err=${formatError(error)}`);
+    console.error(`ui.edit.plugin_group_action: failed id=${action.id} group=${group.id} err=${formatError(error)}`);
+    throw error;
+  }
+}
+
+async function handlePluginImageAction(action: ImageActionDeclaration, photo: ExifInfo) {
+  console.info(`ui.edit.plugin_image_action: start id=${action.id} photo=${photo.file_path}`);
+  try {
+    await pluginManager.emitImageAction(action.id, photo);
+    console.info(`ui.edit.plugin_image_action: complete id=${action.id} photo=${photo.file_path}`);
+  } catch (error) {
+    console.error(`ui.edit.plugin_image_action: failed id=${action.id} photo=${photo.file_path} err=${formatError(error)}`);
     throw error;
   }
 }
@@ -572,9 +588,12 @@ async function disbandGroup(groupId: string) {
     cancelText: '取消',
   })) {
     console.info(`ui.edit.disband_group: confirmed group=${group.id} name=${group.name}`);
-    store.addToUngroupedPhotos(group.photos);
-    store.deleteGroup(groupId);
+    if (!store.disbandGroup(groupId)) {
+      await showAlert('解散分组失败，请重试', {title: '操作失败', tone: 'error'});
+      return;
+    }
     selectedGroupIds.value = selectedGroupIds.value.filter((id) => id !== groupId);
+    clearPhotoSelection();
   } else {
     console.info(`ui.edit.disband_group: canceled group=${group.id}`);
   }
@@ -590,6 +609,10 @@ async function createGroupFromSelected() {
   if (name) {
     console.info(`ui.edit.create_group: confirmed name=${name} photos=${selectedPhotos.value.length}`);
     const newGroup = store.createGroup(name);
+    if (!newGroup) {
+      await showAlert('创建分组失败，请重试', {title: '操作失败', tone: 'error'});
+      return;
+    }
     store.movePhotoToGroup(selectedPhotos.value, newGroup.id);
     clearPhotoSelection();
   } else {
@@ -633,6 +656,10 @@ async function mergeSelectedGroups() {
   if (name) {
     console.info(`ui.edit.merge_groups: confirmed name=${name} groups=${selectedGroupIds.value.length}`);
     let mergedGroup = store.mergeGroups(selectedGroupIds.value, name);
+    if (!mergedGroup) {
+      await showAlert('合并分组失败，请重试', {title: '操作失败', tone: 'error'});
+      return;
+    }
     selectedGroupIds.value = [mergedGroup.id];
   } else {
     console.info("ui.edit.merge_groups: canceled");
@@ -839,6 +866,18 @@ async function executeOrganize() {
                 </div>
                 <div class="thumb-info">
                   <span class="thumb-name">{{ photo.file_name }}</span>
+                </div>
+                <div v-if="getPluginImageActions(group.group_type).length" class="photo-actions">
+                  <template v-for="action in getPluginImageActions(group.group_type)"
+                            :key="action.id">
+                    <button
+                        class="icon-btn plugin-action-btn"
+                        @click.stop="handlePluginImageAction(action, photo)"
+                        :title="action.label"
+                    >
+                      {{ action.icon || '⚡' }}
+                    </button>
+                  </template>
                 </div>
               </div>
             </div>
@@ -1263,5 +1302,17 @@ async function executeOrganize() {
   text-overflow: ellipsis;
   white-space: nowrap;
   display: block;
+}
+
+.photo-actions {
+  display: flex;
+  gap: 2px;
+  padding: 0 8px 6px;
+  justify-content: flex-start;
+}
+
+.photo-actions .icon-btn {
+  padding: 3px 7px;
+  font-size: 12px;
 }
 </style>

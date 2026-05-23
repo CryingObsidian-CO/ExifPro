@@ -12,9 +12,58 @@ use crate::plugin::loader::PluginLoader;
 use crate::plugin::manifest::PluginInfo;
 use serde::{Deserialize, Serialize};
 use std::env::current_exe;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri_plugin_log::{log, Target, TargetKind};
+
+fn ensure_valid_plugin_id(plugin_id: &str) -> Result<(), String> {
+    let mut components = Path::new(plugin_id).components();
+    let first = components
+        .next()
+        .ok_or_else(|| "Plugin id must not be empty".to_string())?;
+    if components.next().is_some() {
+        return Err("Plugin id must not contain path separators".to_string());
+    }
+    match first {
+        Component::Normal(_) => Ok(()),
+        _ => Err("Plugin id contains invalid path components".to_string()),
+    }
+}
+
+fn plugin_data_root(plugin_id: &str) -> Result<PathBuf, String> {
+    ensure_valid_plugin_id(plugin_id)?;
+    let exe_dir = current_exe()
+        .map_err(|e| e.to_string())?
+        .parent()
+        .ok_or_else(|| "Failed to get exe directory".to_string())?
+        .to_path_buf();
+    let root = exe_dir.join("plugin_data").join(plugin_id);
+    create_dirs_if_not_exist(&root).map_err(|e| e.to_string())?;
+    Ok(root)
+}
+
+fn resolve_plugin_path(plugin_id: &str, path: &str) -> Result<PathBuf, String> {
+    if path.trim().is_empty() {
+        return Err("Path must not be empty".to_string());
+    }
+    let rel_path = Path::new(path);
+    if rel_path.is_absolute() {
+        return Err("Absolute paths are not allowed".to_string());
+    }
+    let mut safe_rel = PathBuf::new();
+    for component in rel_path.components() {
+        match component {
+            Component::Normal(part) => safe_rel.push(part),
+            _ => {
+                return Err("Path traversal is not allowed".to_string());
+            }
+        }
+    }
+    if safe_rel.as_os_str().is_empty() {
+        return Err("Path must not be empty".to_string());
+    }
+    Ok(plugin_data_root(plugin_id)?.join(safe_rel))
+}
 
 #[tauri::command]
 async fn scan_directory_command(path: String, recursive: bool) -> Result<Vec<ExifInfo>, String> {
@@ -53,10 +102,7 @@ async fn scan_directory_command(path: String, recursive: bool) -> Result<Vec<Exi
     Ok(exif_infos)
 }
 #[tauri::command]
-async fn get_thumbnail_command(
-    file_path: String,
-    level: String,
-) -> Result<Option<String>, String> {
+async fn get_thumbnail_command(file_path: String, level: String) -> Result<Option<String>, String> {
     log::info!(
         "command.get_thumbnail: start path={} level={}",
         file_path,
@@ -263,20 +309,33 @@ async fn set_plugin_config_command(
 
 #[tauri::command]
 async fn plugin_file_op_command(
+    plugin_id: String,
     operation: String,
     path: String,
     data: Option<Vec<u8>>,
-) -> Result<(), String> {
+) -> Result<Vec<u8>, String> {
     log::info!(
-        "command.plugin_file_op: operation={} path={}",
+        "command.plugin_file_op: plugin={} operation={} path={}",
+        plugin_id,
         operation,
         path
     );
+
+    PluginLoader::check_plugin_file_capability(&plugin_id, &operation)?;
+    let resolved_path = resolve_plugin_path(&plugin_id, &path)?;
     match operation.as_str() {
-        "mkdir" => create_dirs_if_not_exist(Path::new(&path)).map_err(|e| e.to_string()),
+        "read" => std::fs::read(&resolved_path).map_err(|e| e.to_string()),
+        "mkdir" => {
+            create_dirs_if_not_exist(&resolved_path).map_err(|e| e.to_string())?;
+            Ok(Vec::new())
+        }
         "write" => {
             let data = data.ok_or("No data provided for write operation")?;
-            std::fs::write(Path::new(&path), data).map_err(|e| e.to_string())
+            if let Some(parent) = resolved_path.parent() {
+                create_dirs_if_not_exist(parent).map_err(|e| e.to_string())?;
+            }
+            std::fs::write(&resolved_path, data).map_err(|e| e.to_string())?;
+            Ok(Vec::new())
         }
         _ => Err(format!("Unknown file operation: {}", operation)),
     }
@@ -326,6 +385,7 @@ pub fn run() {
     };
 
     tauri::Builder::default()
+        // DEBUG 日志在记录的时候不能保证严格有序，尤其是短时间同时写入日志的情况
         // NOTE 这个插件会在大小达到限制后立刻切分文件，很可能导致同义词运行的日志被切分在两个不同的文件中
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -334,8 +394,8 @@ pub fn run() {
                     path: PathBuf::from(exe_dir.join("logs")),
                     file_name: None,
                 }))
-                .level(log::LevelFilter::Trace)
-                .max_file_size(5_000_000_000 /* bytes */)
+                .level(log::LevelFilter::Info)
+                .max_file_size(5_000_000 /* bytes */)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
                 .build(),
         )

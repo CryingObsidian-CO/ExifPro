@@ -1,5 +1,4 @@
 import type {ExifInfo, Group, GroupType} from './photo';
-import type {Config} from './config';
 
 export interface PluginManifest {
   id: string;
@@ -14,14 +13,77 @@ export interface PluginManifest {
   config_schema?: Record<string, ConfigSchemaItem>;
 }
 
-// TODO 重新优化插件能力的排列，使能力更符合逻辑顺序，并在 Manager 的相应判断中修改
 export interface PluginCapabilities {
-  grouping: boolean;
-  merging: boolean;
-  exif_enhancement: boolean;
+  exif_enhancement?: boolean;
+  grouping?: boolean;
+  merging?: boolean;
   ui_extensions?: boolean;
-  custom_group_types?: string[];
+  file_read?: boolean;
+  file_write?: boolean;
+  directory_create?: boolean;
+  custom_capabilities?: string[];
 }
+
+export type CapabilityType =
+    | 'exif_enhancement'
+    | 'grouping'
+    | 'merging'
+    | 'ui_extensions'
+    | 'file_read'
+    | 'file_write'
+    | 'directory_create';
+
+export interface CapabilityInfo {
+  type: CapabilityType;
+  label: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  description: string;
+}
+
+export const CAPABILITY_INFO: Record<CapabilityType, CapabilityInfo> = {
+  exif_enhancement: {
+    type: 'exif_enhancement',
+    label: 'EXIF增强',
+    riskLevel: 'low',
+    description: '读取和处理EXIF数据',
+  },
+  grouping: {
+    type: 'grouping',
+    label: '分组',
+    riskLevel: 'low',
+    description: '识别和创建照片分组',
+  },
+  merging: {
+    type: 'merging',
+    label: '合并',
+    riskLevel: 'low',
+    description: '合并多个照片组',
+  },
+  ui_extensions: {
+    type: 'ui_extensions',
+    label: 'UI扩展',
+    riskLevel: 'low',
+    description: '扩展用户界面功能',
+  },
+  file_read: {
+    type: 'file_read',
+    label: '文件读取',
+    riskLevel: 'medium',
+    description: '读取本地文件内容',
+  },
+  file_write: {
+    type: 'file_write',
+    label: '文件写入',
+    riskLevel: 'medium',
+    description: '写入本地文件（高风险操作）',
+  },
+  directory_create: {
+    type: 'directory_create',
+    label: '创建目录',
+    riskLevel: 'medium',
+    description: '创建本地目录（高风险操作）',
+  },
+};
 
 export interface ConfigSchemaItem {
   type: 'integer' | 'number' | 'string' | 'boolean';
@@ -39,12 +101,6 @@ export interface PluginInfo {
   builtin?: boolean;
 }
 
-export interface MergeResult {
-  success: boolean;
-  outputFiles: string[];
-  message?: string;
-}
-
 export interface GroupActionDeclaration {
   id: string;
   label: string;
@@ -52,40 +108,66 @@ export interface GroupActionDeclaration {
   groupTypes: GroupType[];
 }
 
-export interface UIExtensionDeclaration {
-  groupActions: GroupActionDeclaration[];
+export interface ImageActionDeclaration {
+  id: string;
+  label: string;
+  icon?: string;
+  groupTypes?: GroupType[];
 }
 
-// TODO 完成钩子的调用
+export interface UIExtensionDeclaration {
+  groupActions?: GroupActionDeclaration[];
+  imageActions?: ImageActionDeclaration[];
+}
+
+// NOTE 修改时更新 plugin-api.d.ts 中的 ExifProPluginHooks 接口
 export interface ExifProPluginHooks {
-  onLoad?(api: ExifProHostAPI): void;
+  onLoad?(): void;
 
   onUnload?(): void;
-
-  onExifEnhance?(exif: ExifInfo): ExifInfo;
-
-  onGroupsCreated?(groups: Group[], ungroupedPhotos: ExifInfo[], config: Config): Group[];
-
-  onGroupMerge?(group: Group, outputDir: string): MergeResult | undefined;
 
   onRegisterUIExtensions?(): UIExtensionDeclaration;
 
   onGroupAction?(actionId: string, group: Group): void | Promise<void>;
+
+  onImageAction?(actionId: string, photo: ExifInfo): void | Promise<void>;
+
+  onParseExif?(exif: ExifInfo[]): ExifInfo[];
+
+  onGroupCreated?(group: Group): Group;
+
+  onMoveToGroup?(group: Group, photos: ExifInfo[]): void;
+
+  onGroupMerged?(originalGroups: Group[], mergedGroup: Group): void;
+
+  onGroupUpdated?(group: Group, updates: Partial<Group>): void;
+
+  onGroupDisband?(group: Group): void;
 }
 
-export interface ExifProHostAPI {
 
+// NOTE 修改时更新 plugin-api.d.ts 中的 ExifProHostAPI 接口
+export interface ExifProHostAPI {
   log(message: string): void;
 
   getPluginConfig(): Record<string, any>;
 
-  createGroup(photos: ExifInfo[], groupType: string, name: string): Group;
+  getGroups(): Group[];
 
-  mergeGroups(groupIds: string[]): Group | null;
+  createGroup(photos: ExifInfo[], groupType: GroupType, name: string): Group | null;
+
+  moveToGroup(groupId: string, photos: ExifInfo[]): boolean;
+
+  mergeGroups(groupIds: string[], name: string): Group | null;
 
   disbandGroup(groupId: string): ExifInfo[];
 
-  readFile(path: string): Promise<Uint8Array>;
+  // TODO 直接对文件的操作存在安全问题 writeFile 和 createDirectory 的可写路径应该都加以限制
+  readFile(fileName: string): Promise<string>;
+
+  readFileBinary(fileName: string): Promise<Uint8Array>;
+
+  readExternalFile(path: string): Promise<Uint8Array>;
 
   writeFile(path: string, data: Uint8Array): Promise<void>;
 
@@ -100,4 +182,22 @@ export interface LoadedPlugin {
   zipPath: string;
   builtin?: boolean;
   uiExtensions?: UIExtensionDeclaration;
+}
+
+export class PluginAPIContext {
+  readonly id: string;
+  private config: Record<string, any>;
+
+  constructor(id: string, config: Record<string, any>) {
+    this.id = id;
+    this.config = config;
+  }
+
+  getConfig(): Record<string, any> {
+    return this.config;
+  }
+
+  updateConfig(config: Record<string, any>): void {
+    this.config = config;
+  }
 }

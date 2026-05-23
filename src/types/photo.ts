@@ -1,5 +1,8 @@
+// NOTE 修改时更新 plugin-api.d.ts 中的 GroupType 类型
 export type GroupType = 'FocusBracketing' | 'AEB' | 'Burst' | 'Single' | string;
 
+
+// NOTE 修改时更新 plugin-api.d.ts 中的 ExifInfo 接口
 export interface ExifInfo {
   file_path: string;
   file_name: string;

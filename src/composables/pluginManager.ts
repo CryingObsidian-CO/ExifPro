@@ -1,21 +1,26 @@
 import {useTauri} from './tauri';
-import type {
+import {
   ExifProHostAPI,
   ExifProPluginHooks,
   GroupActionDeclaration,
+  ImageActionDeclaration,
   LoadedPlugin,
-  MergeResult,
+  PluginAPIContext,
+  PluginCapabilities,
   PluginInfo,
+  PluginManifest,
 } from '../types/plugin';
 import type {ExifInfo, Group, GroupType} from '../types/photo';
-import type {Config} from '../types/config';
 import {builtinPlugins} from './builtinPlugins';
 import {formatError} from "./logger";
+import {store} from "../store/store.ts";
+import ts from "typescript";
 
+// TODO 更好的单例控制，避免多个实例
 class PluginManagerImpl {
   private readonly tauri = useTauri();
   private plugins: Map<string, LoadedPlugin> = new Map();
-  private currentGroups: Group[] = [];
+  private apiContexts: Map<string, PluginAPIContext> = new Map();
   private initialized: boolean = false;
 
   get isInitialized(): boolean {
@@ -70,6 +75,11 @@ class PluginManagerImpl {
     return entry ? entry.hooks : null;
   }
 
+  private hasCapability(manifest: PluginManifest, key: keyof Pick<PluginCapabilities,
+      'exif_enhancement' | 'grouping' | 'merging' | 'ui_extensions'>): boolean {
+    return Boolean(manifest.capabilities?.[key]);
+  }
+
   private async loadPlugin(info: PluginInfo): Promise<void> {
     console.info(`ui.plugins: load start id=${info.manifest.id} builtin=${Boolean(info.builtin)}`);
     let pluginConfig: Record<string, any> = {};
@@ -95,7 +105,9 @@ class PluginManagerImpl {
       }
     }
 
-    const api = this.createHostAPI(info.manifest.id, pluginConfig);
+    const apiContext = new PluginAPIContext(info.manifest.id, pluginConfig);
+    this.apiContexts.set(info.manifest.id, apiContext);
+    const api = this.createHostAPI(apiContext);
 
     let hooks: ExifProPluginHooks;
     if (info.builtin) {
@@ -106,7 +118,7 @@ class PluginManagerImpl {
       hooks = builtinHooks;
     } else {
       const scriptContent = await this.tauri.readPluginFile(info.zip_path, info.manifest.entry_point);
-      hooks = this.evaluatePluginScript(scriptContent, api);
+      hooks = await this.evaluatePluginScript(scriptContent, api, info.manifest.entry_point.endsWith('.ts'));
     }
 
     const loaded: LoadedPlugin = {
@@ -121,12 +133,12 @@ class PluginManagerImpl {
     this.plugins.set(info.manifest.id, loaded);
 
     try {
-      hooks.onLoad?.(api);
+      hooks.onLoad?.();
     } catch (e) {
       console.error(`Plugin ${info.manifest.id} onLoad error:`, e);
     }
 
-    if (hooks.onRegisterUIExtensions && info.manifest.capabilities.ui_extensions) {
+    if (hooks.onRegisterUIExtensions && this.hasCapability(info.manifest, 'ui_extensions')) {
       try {
         loaded.uiExtensions = hooks.onRegisterUIExtensions();
       } catch (e) {
@@ -137,20 +149,40 @@ class PluginManagerImpl {
     console.info(`ui.plugins: load complete id=${info.manifest.id}`);
   }
 
-  private preprocessPluginCode(code: string): string {
-    return code
+  private async preprocessPluginCode(code: string, isTypeScript: boolean): Promise<string> {
+    code = code
     // 1. 移除 import "../plugin-api"; 语句（运行时不需要）
     .replace(/^\s*import\s*["']..\/plugin-api["'];\s*$/gm, '')
     // 清理多余空行（可选）
     .replace(/\n\s*\n/g, '\n');
+
+    if (isTypeScript) {
+      console.info("ui.plugin: found .ts file");
+      try {
+        const result = ts.transpileModule(code, {
+          compilerOptions: {
+            module: ts.ModuleKind.Preserve,
+            target: ts.ScriptTarget.ES2020,
+            removeComments: true,
+            strict: false,
+            moduleResolution: ts.ModuleResolutionKind.Bundler,
+          },
+          reportDiagnostics: false,
+        });
+        console.info("ui.plugin: TS type removed successfully");
+        return result.outputText;
+      } catch (e) {
+        console.error("ui.plugin: TS type removed failed:", e);
+      }
+    }
+    return code;
   }
 
   // DEBUG 安全问题很重要，这里直接执行了用户提供的脚本，需要谨慎处理
-  private evaluatePluginScript(script: string, api: ExifProHostAPI): ExifProPluginHooks {
+  private async evaluatePluginScript(script: string, api: ExifProHostAPI, isTypeScript: boolean): Promise<ExifProPluginHooks> {
     try {
-      const preprocessedScript = this.preprocessPluginCode(script);
+      const preprocessedScript = await this.preprocessPluginCode(script, isTypeScript);
 
-      // TODO 完善 api 提供的日志记录功能
       const customConsole = {
         log: (...args: any[]) => api.log(args.join(' ')),
         warn: (...args: any[]) => api.log('[WARN] ' + args.join(' ')),
@@ -179,7 +211,7 @@ class PluginManagerImpl {
       const values = Object.values(blockedGlobals);
 
       // 将这些全局变量作为函数的形参传入，以便覆盖当前作用域内的同名对象
-      const moduleFactory = new Function('exports', 'ExifProAPI', ...keys, preprocessedScript);
+      const moduleFactory = new Function('exports', 'exifProHostAPI', ...keys, preprocessedScript);
       const exports: any = {};
 
       moduleFactory(exports, api, ...values);
@@ -190,42 +222,51 @@ class PluginManagerImpl {
     }
   }
 
-  emitExifEnhance(exif: ExifInfo): ExifInfo {
+  emitParseExif(exif: ExifInfo[]): ExifInfo[] {
     let result = exif;
     for (const plugin of this.getEnabledPlugins()) {
-      if (plugin.hooks.onExifEnhance && plugin.manifest.capabilities.exif_enhancement) {
+      if (plugin.hooks.onParseExif && this.hasCapability(plugin.manifest, 'exif_enhancement')) {
         try {
-          result = plugin.hooks.onExifEnhance(result) || result;
+          result = plugin.hooks.onParseExif(result) || result;
         } catch (e) {
-          console.error(`Plugin ${plugin.manifest.id} onExifEnhance error:`, e);
+          console.error(`Plugin ${plugin.manifest.id} onParseExif error:`, e);
         }
       }
     }
     return result;
   }
 
-  emitGroupsCreated(groups: Group[], ungroupedPhotos: ExifInfo[], config: Config): Group[] {
-    this.currentGroups = groups;
-    let result = groups;
+  emitGroupCreated(group: Group): Group {
+    let result = group;
     for (const plugin of this.getEnabledPlugins()) {
-      if (plugin.hooks.onGroupsCreated && plugin.manifest.capabilities.grouping) {
+      if (plugin.hooks.onGroupCreated && this.hasCapability(plugin.manifest, 'grouping')) {
         try {
-          result = plugin.hooks.onGroupsCreated(result, ungroupedPhotos, config) || result;
-          this.currentGroups = result;
+          result = plugin.hooks.onGroupCreated(result) || result;
         } catch (e) {
-          console.error(`Plugin ${plugin.manifest.id} onGroupsCreated error:`, e);
+          console.error(`Plugin ${plugin.manifest.id} onGroupCreated error:`, e);
         }
       }
     }
     return result;
   }
 
-  emitGroupMerge(group: Group, outputDir: string): MergeResult | undefined {
+  emitMoveToGroup(group: Group, photos: ExifInfo[]): void {
     for (const plugin of this.getEnabledPlugins()) {
-      if (plugin.hooks.onGroupMerge && plugin.manifest.capabilities.merging) {
+      if (plugin.hooks.onMoveToGroup && this.hasCapability(plugin.manifest, 'grouping')) {
         try {
-          const result = plugin.hooks.onGroupMerge(group, outputDir);
-          if (result) return result;
+          plugin.hooks.onMoveToGroup(group, photos);
+        } catch (e) {
+          console.error(`Plugin ${plugin.manifest.id} onMoveToGroup error:`, e);
+        }
+      }
+    }
+  }
+
+  emitGroupMerge(originalGroups: Group[], mergedGroup: Group): void {
+    for (const plugin of this.getEnabledPlugins()) {
+      if (plugin.hooks.onGroupMerged && this.hasCapability(plugin.manifest, 'merging')) {
+        try {
+          plugin.hooks.onGroupMerged(originalGroups, mergedGroup);
         } catch (e) {
           console.error(`Plugin ${plugin.manifest.id} onGroupMerge error:`, e);
         }
@@ -234,9 +275,33 @@ class PluginManagerImpl {
     return undefined;
   }
 
+  emitGroupUpdated(group: Group, updates: Partial<Group>): void {
+    for (const plugin of this.getEnabledPlugins()) {
+      if (plugin.hooks.onGroupUpdated && this.hasCapability(plugin.manifest, 'merging')) {
+        try {
+          plugin.hooks.onGroupUpdated(group, updates);
+        } catch (e) {
+          console.error(`Plugin ${plugin.manifest.id} onGroupUpdated error:`, e);
+        }
+      }
+    }
+  }
+
+  emitGroupDisband(group: Group): void {
+    for (const plugin of this.getEnabledPlugins()) {
+      if (plugin.hooks.onGroupDisband && this.hasCapability(plugin.manifest, 'merging')) {
+        try {
+          plugin.hooks.onGroupDisband(group);
+        } catch (e) {
+          console.error(`Plugin ${plugin.manifest.id} onGroupDisband error:`, e);
+        }
+      }
+    }
+  }
+
   async emitGroupAction(actionId: string, group: Group): Promise<void> {
     for (const plugin of this.getEnabledPlugins()) {
-      if (plugin.hooks.onGroupAction && plugin.manifest.capabilities.ui_extensions) {
+      if (plugin.hooks.onGroupAction && this.hasCapability(plugin.manifest, 'ui_extensions')) {
         try {
           await plugin.hooks.onGroupAction(actionId, group);
         } catch (e) {
@@ -246,12 +311,39 @@ class PluginManagerImpl {
     }
   }
 
+  async emitImageAction(actionId: string, photo: ExifInfo): Promise<void> {
+    for (const plugin of this.getEnabledPlugins()) {
+      if (plugin.hooks.onImageAction && this.hasCapability(plugin.manifest, 'ui_extensions')) {
+        try {
+          await plugin.hooks.onImageAction(actionId, photo);
+        } catch (e) {
+          console.error(`Plugin ${plugin.manifest.id} onImageAction error:`, e);
+        }
+      }
+    }
+  }
+
+
   getGroupActions(groupType: GroupType): GroupActionDeclaration[] {
     const actions: GroupActionDeclaration[] = [];
     for (const plugin of this.getEnabledPlugins()) {
-      if (plugin.uiExtensions?.groupActions && plugin.manifest.capabilities.ui_extensions) {
+      if (plugin.uiExtensions?.groupActions && this.hasCapability(plugin.manifest, 'ui_extensions')) {
         for (const action of plugin.uiExtensions.groupActions) {
           if (action.groupTypes.length === 0 || action.groupTypes.includes(groupType)) {
+            actions.push(action);
+          }
+        }
+      }
+    }
+    return actions;
+  }
+
+  getImageActions(groupType: GroupType): ImageActionDeclaration[] {
+    const actions: ImageActionDeclaration[] = [];
+    for (const plugin of this.getEnabledPlugins()) {
+      if (plugin.uiExtensions?.imageActions && this.hasCapability(plugin.manifest, 'ui_extensions')) {
+        for (const action of plugin.uiExtensions.imageActions) {
+          if (!action.groupTypes || action.groupTypes.length === 0 || action.groupTypes.includes(groupType)) {
             actions.push(action);
           }
         }
@@ -271,14 +363,6 @@ class PluginManagerImpl {
       zip_path: p.zipPath,
       builtin: p.builtin ?? false,
     }));
-  }
-
-  getPluginConfigs(): Record<string, Record<string, any>> {
-    const configs: Record<string, Record<string, any>> = {};
-    for (const [id, plugin] of this.plugins) {
-      configs[id] = plugin.config;
-    }
-    return configs;
   }
 
   async enablePlugin(pluginId: string): Promise<void> {
@@ -306,12 +390,10 @@ class PluginManagerImpl {
     if (!plugin || !plugin.enabled) return;
 
     console.info(`ui.plugins: disable start id=${pluginId}`);
-    if (plugin.hooks.onUnload) {
-      try {
-        plugin.hooks.onUnload();
-      } catch (e) {
-        console.error(`Plugin ${pluginId} onUnload error:`, e);
-      }
+    try {
+      plugin.hooks.onUnload?.();
+    } catch (e) {
+      console.error(`Plugin ${pluginId} onUnload error:`, e);
     }
 
     await this.tauri.disablePlugin(pluginId);
@@ -322,72 +404,69 @@ class PluginManagerImpl {
     console.info(`ui.plugins: disable complete id=${pluginId}`);
   }
 
-  async setPluginConfig(pluginId: string, config: Record<string, any>): Promise<void> {
-    const plugin = this.plugins.get(pluginId);
-    if (!plugin) return;
-
-    await this.tauri.setPluginConfig(pluginId, config);
-    plugin.config = config;
-  }
-
-  async reloadPlugins(): Promise<void> {
-    console.info("ui.plugins: reload start");
-    for (const plugin of this.plugins.values()) {
-      try {
-        plugin.hooks.onUnload?.();
-      } catch (e) {
-        console.error(`Plugin ${plugin.manifest.id} onUnload error:`, e);
-      }
+  async updatePluginConfig(pluginId: string): Promise<void> {
+    const apiContext = this.apiContexts.get(pluginId);
+    if (!apiContext) {
+      throw new Error(`Plugin ${pluginId} not found`)
     }
-    this.plugins.clear();
-    await this.initialize();
-    console.info("ui.plugins: reload complete");
+    apiContext.updateConfig(await this.tauri.getPluginConfig(pluginId));
   }
 
-  // TODO 解决 getPluginConfig 没法获取实时配置的问题
-  private createHostAPI(pluginId: string, pluginConfig: Record<string, any>): ExifProHostAPI {
+  private createHostAPI(context: PluginAPIContext): ExifProHostAPI {
     return {
-      getPluginConfig: () => pluginConfig,
-      log: (msg: string) => console.log(`[Plugin:${pluginId}] ${msg}`),
+      getPluginConfig: () => context.getConfig(),
+      log: (msg: string) => console.log(`[Plugin:${context.id}] ${msg}`),
 
-      createGroup: (photos: ExifInfo[], groupType: string, name: string): Group => {
-        return {
-          id: `plugin_${pluginId}_${Date.now()}`,
-          group_type: groupType,
-          name,
-          photos,
-        };
+      getGroups: () => store.groups,
+
+      createGroup: (photos: ExifInfo[], groupType: GroupType, name: string) => {
+        const group = store.createGroup(name, `plugin_${context.id.trim()}_${name.trim()}`, groupType);
+        if (!group) return null;
+        store.movePhotoToGroup(photos, group.id);
+        return group;
       },
 
-      mergeGroups: (groupIds: string[]): Group | null => {
-        const groupsToMerge = this.currentGroups.filter(g => groupIds.includes(g.id));
-        if (groupsToMerge.length === 0) return null;
-        const allPhotos = groupsToMerge.flatMap(g => g.photos);
-        return {
-          id: `plugin_${pluginId}_merged_${Date.now()}`,
-          group_type: 'Single',
-          name: groupsToMerge.map(g => g.name).join('+'),
-          photos: allPhotos,
-        };
+      moveToGroup: (groupId: string, photos: ExifInfo[]): boolean => {
+        return store.movePhotoToGroup(photos, groupId);
       },
 
+      mergeGroups: (groupIds: string[], name: string): Group | null => {
+        return store.mergeGroups(groupIds, name);
+      },
+
+      // TODO 从 selectedGroupIds 中移除 groupId
       disbandGroup: (groupId: string): ExifInfo[] => {
-        const group = this.currentGroups.find(g => g.id === groupId);
-        return group ? [...group.photos] : [];
+        const group = store.findGroup(groupId);
+        if (!group) return [];
+
+        if (!store.disbandGroup(groupId)) {
+          return [];
+        }
+        return group.photos;
       },
 
-      readFile: async (path: string): Promise<Uint8Array> => {
-        const plugin = this.plugins.get(pluginId);
+      readFile: async (fileName: string): Promise<string> => {
+        const plugin = this.plugins.get(context.id);
         if (!plugin) throw new Error('Plugin not found');
-        return await this.tauri.readPluginBinary(plugin.zipPath, path);
+        return await this.tauri.readPluginFile(plugin.zipPath, fileName);
+      },
+
+      readFileBinary: async (fileName: string): Promise<Uint8Array> => {
+        const plugin = this.plugins.get(context.id);
+        if (!plugin) throw new Error('Plugin not found');
+        return await this.tauri.readPluginBinary(plugin.zipPath, fileName);
+      },
+
+      readExternalFile: async (path: string): Promise<Uint8Array> => {
+        return await this.tauri.pluginFileOp(context.id, 'read', path);
       },
 
       writeFile: async (path: string, data: Uint8Array): Promise<void> => {
-        await this.tauri.pluginFileOp('write', path, Array.from(data));
+        await this.tauri.pluginFileOp(context.id, 'write', path, data);
       },
 
       createDirectory: async (path: string): Promise<void> => {
-        await this.tauri.pluginFileOp('mkdir', path);
+        await this.tauri.pluginFileOp(context.id, 'mkdir', path);
       },
     };
   }

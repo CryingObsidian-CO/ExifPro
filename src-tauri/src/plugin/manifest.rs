@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri_plugin_log::log;
 
-pub const CURRENT_API_VERSION: u32 = 1;
+pub const CURRENT_API_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginManifest {
@@ -24,15 +24,21 @@ pub struct PluginManifest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginCapabilities {
     #[serde(default)]
+    pub exif_enhancement: bool,
+    #[serde(default)]
     pub grouping: bool,
     #[serde(default)]
     pub merging: bool,
     #[serde(default)]
-    pub exif_enhancement: bool,
-    #[serde(default)]
     pub ui_extensions: bool,
     #[serde(default)]
-    pub custom_group_types: Vec<String>,
+    pub file_read: bool,
+    #[serde(default)]
+    pub file_write: bool,
+    #[serde(default)]
+    pub directory_create: bool,
+    #[serde(default)]
+    pub custom_capabilities: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,5 +111,19 @@ impl PluginManifest {
             self.version
         );
         Ok(())
+    }
+}
+
+impl PluginCapabilities {
+    pub fn has_file_read(&self) -> bool {
+        self.file_read
+    }
+
+    pub fn has_file_write(&self) -> bool {
+        self.file_write
+    }
+
+    pub fn has_directory_create(&self) -> bool {
+        self.directory_create
     }
 }

@@ -2,28 +2,42 @@ use crate::plugin::manifest::PluginManifest;
 use std::env::current_exe;
 use std::fs;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
+use std::sync::OnceLock;
 use tauri_plugin_log::log;
 use zip::ZipArchive;
 
 pub struct PluginLoader;
 
+#[derive(Clone)]
 pub struct DiscoveredPlugin {
     pub zip_path: PathBuf,
     pub manifest: PluginManifest,
     pub builtin: bool,
 }
 
+static PLUGIN_CACHE: OnceLock<Vec<DiscoveredPlugin>> = OnceLock::new();
+
 impl PluginLoader {
-    pub fn discover_plugins() -> Result<Vec<DiscoveredPlugin>, String> {
-        log::info!("plugin.discover: start");
+    fn cached_discover() -> Result<&'static Vec<DiscoveredPlugin>, String> {
+        if let Some(plugins) = PLUGIN_CACHE.get() {
+            return Ok(plugins);
+        }
+
+        log::info!("plugin.discover: start (cache miss)");
         let mut plugins = Self::discover_builtin_plugins();
         log::debug!("plugin.discover: builtin_count={}", plugins.len());
         let mut zip_plugins = Self::discover_zip_plugins()?;
         log::debug!("plugin.discover: zip_count={}", zip_plugins.len());
         plugins.append(&mut zip_plugins);
-        log::info!("plugin.discover: complete total={}", plugins.len());
-        Ok(plugins)
+        log::info!("plugin.discover: complete total={} (cached)", plugins.len());
+
+        let _ = PLUGIN_CACHE.set(plugins);
+        Ok(PLUGIN_CACHE.get().unwrap())
+    }
+
+    pub fn discover_plugins() -> Result<Vec<DiscoveredPlugin>, String> {
+        Self::cached_discover().map(|v| v.clone())
     }
 
     pub fn discover_builtin_plugins() -> Vec<DiscoveredPlugin> {
@@ -185,6 +199,7 @@ impl PluginLoader {
             e.to_string()
         })?;
 
+        Self::validate_zip_entry_path(file_name)?;
         let mut entry = archive
             .by_name(file_name)
             .map_err(|e| format!("File '{}' not found in zip: {}", file_name, e))?;
@@ -196,5 +211,79 @@ impl PluginLoader {
             buf.len()
         );
         Ok(buf)
+    }
+
+    pub fn check_plugin_file_capability(plugin_id: &str, operation: &str) -> Result<(), String> {
+        let plugins =
+            Self::cached_discover().map_err(|e| format!("Failed to discover plugins: {}", e))?;
+
+        let plugin = plugins
+            .into_iter()
+            .find(|p| p.manifest.id == plugin_id)
+            .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+        let capabilities = &plugin.manifest.capabilities;
+
+        match operation {
+            "read" => {
+                if !capabilities.has_file_read() {
+                    log::error!(
+                        "command.plugin_file_op: capability_denied plugin={} operation={}",
+                        plugin_id,
+                        operation
+                    );
+                    return Err(format!(
+                        "Plugin {} does not have file_read capability",
+                        plugin_id
+                    ));
+                }
+            }
+            "write" => {
+                if !capabilities.has_file_write() {
+                    log::error!(
+                        "command.plugin_file_op: capability_denied plugin={} operation={}",
+                        plugin_id,
+                        operation
+                    );
+                    return Err(format!(
+                        "Plugin {} does not have file_write capability",
+                        plugin_id
+                    ));
+                }
+            }
+            "mkdir" => {
+                if !capabilities.has_directory_create() {
+                    log::error!(
+                        "command.plugin_file_op: capability_denied plugin={} operation={}",
+                        plugin_id,
+                        operation
+                    );
+                    return Err(format!(
+                        "Plugin {} does not have directory_create capability",
+                        plugin_id
+                    ));
+                }
+            }
+            _ => {}
+        }
+
+        Ok(())
+    }
+
+    fn validate_zip_entry_path(file_name: &str) -> Result<(), String> {
+        if file_name.trim().is_empty() {
+            return Err("Zip entry path must not be empty".to_string());
+        }
+        let path = Path::new(file_name);
+        if path.is_absolute() {
+            return Err("Absolute zip entry paths are not allowed".to_string());
+        }
+        for component in path.components() {
+            match component {
+                Component::Normal(_) => {}
+                _ => return Err("Invalid zip entry path".to_string()),
+            }
+        }
+        Ok(())
     }
 }
