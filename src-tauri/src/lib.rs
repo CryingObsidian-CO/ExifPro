@@ -6,7 +6,9 @@ pub mod plugin;
 
 use crate::config::Config;
 use crate::exif::{get_thumbnail_data, parse_exif, ExifInfo};
-use crate::file_ops::{create_dirs_if_not_exist, safe_copy, safe_move, scan_directory};
+use crate::file_ops::{
+    create_dirs_if_not_exist, filter_duplicate_raw_jpeg, safe_copy, safe_move, scan_directory,
+};
 use crate::grouping::{group_photos, Group};
 use crate::plugin::loader::PluginLoader;
 use crate::plugin::manifest::PluginInfo;
@@ -27,6 +29,9 @@ async fn scan_directory_command(path: String, recursive: bool) -> Result<Vec<Exi
     let image_paths = scan_directory(dir_path, recursive)
         .await
         .map_err(|e| format!("Failed to scan directory: {}", e))?;
+
+    let config = Config::load().unwrap_or_default();
+    let image_paths = filter_duplicate_raw_jpeg(image_paths, &config.duplicate_handling);
 
     let total = image_paths.len();
     let mut exif_infos = Vec::new();
