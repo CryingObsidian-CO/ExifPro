@@ -34,6 +34,9 @@ function normalizeConfig(config: Config) {
   if (!config.enabled_plugins) {
     config.enabled_plugins = [];
   }
+  if (!config.duplicate_handling) {
+    config.duplicate_handling = 'both';
+  }
 }
 
 // NOTE 确保存在插件配置对象，暂时保留
@@ -300,6 +303,43 @@ function getSortedPlugins() {
                       :modelValue="store.config?.preview_max_mb || 8"
                       @update:modelValue="(v) => updateField(store.config, 'preview_max_mb', Number(v))"
             />
+          </div>
+        </div>
+      </WinCard>
+
+      <WinCard title="RAW+JPEG 同名文件处理">
+        <template #header-extra>
+          <span class="card-type-badge duplicate-badge">去重</span>
+        </template>
+        <div class="setting-section">
+          <label class="setting-label has-tooltip"
+                 data-tooltip="当同一照片同时存在 JPEG/普通格式和 RAW 格式（文件名相同、扩展名不同）时，控制保留哪些文件。例如 IMG_001.JPG 和 IMG_001.CR3 同时存在时按此规则处理。"
+          >同名文件保留策略</label>
+          <div class="theme-options">
+            <button
+                class="theme-option"
+                :class="{ active: store.config?.duplicate_handling === 'both' }"
+                @click="updateField(store.config, 'duplicate_handling', 'both')"
+            >
+              <span class="theme-icon">📋</span>
+              <span>都保留</span>
+            </button>
+            <button
+                class="theme-option"
+                :class="{ active: store.config?.duplicate_handling === 'jpeg_only' }"
+                @click="updateField(store.config, 'duplicate_handling', 'jpeg_only')"
+            >
+              <span class="theme-icon">🖼️</span>
+              <span>仅 JPEG</span>
+            </button>
+            <button
+                class="theme-option"
+                :class="{ active: store.config?.duplicate_handling === 'raw_only' }"
+                @click="updateField(store.config, 'duplicate_handling', 'raw_only')"
+            >
+              <span class="theme-icon">🧪</span>
+              <span>仅 RAW</span>
+            </button>
           </div>
         </div>
       </WinCard>
@@ -750,6 +790,11 @@ function getSortedPlugins() {
 
 .burst-badge {
   background-color: var(--color-burst);
+  color: #fff;
+}
+
+.duplicate-badge {
+  background-color: #6b7280;
   color: #fff;
 }
 

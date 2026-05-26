@@ -3,6 +3,21 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{env, fs};
 use tauri_plugin_log::log;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum DuplicateHandling {
+    Both,
+    JpegOnly,
+    RawOnly,
+}
+
+impl Default for DuplicateHandling {
+    fn default() -> Self {
+        DuplicateHandling::Both
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub aeb_settings: AebSettings,
@@ -10,6 +25,8 @@ pub struct Config {
     pub burst_settings: BurstSettings,
     pub naming_rules: NamingRules,
     pub preview_max_mb: u64,
+    #[serde(default)]
+    pub duplicate_handling: DuplicateHandling,
     #[serde(default)]
     pub plugin_settings: HashMap<String, serde_json::Value>,
     #[serde(default)]
@@ -56,6 +73,7 @@ impl Default for Config {
             burst_settings: BurstSettings::default(),
             naming_rules: NamingRules::default(),
             preview_max_mb: 8,
+            duplicate_handling: DuplicateHandling::default(),
             plugin_settings: HashMap::new(),
             enabled_plugins: Vec::new(),
         }

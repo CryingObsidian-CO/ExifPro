@@ -3,6 +3,9 @@ use std::io::Error;
 use std::path::{Path, PathBuf};
 use tauri_plugin_log::log;
 use walkdir::WalkDir;
+use std::collections::HashMap;
+
+use crate::config::DuplicateHandling;
 
 pub async fn scan_directory(dir: &Path, recursive: bool) -> Result<Vec<PathBuf>, String> {
     let dir = dir.to_path_buf();
@@ -174,4 +177,95 @@ pub fn create_dirs_if_not_exist(path: &Path) -> Result<(), Error> {
         fs::create_dir_all(path)?;
     }
     Ok(())
+}
+
+fn is_raw_extension(ext: &str) -> bool {
+    matches!(
+        ext,
+        "arw" | "cr2" | "cr3" | "nef" | "dng" | "raf" | "rw2" | "orf" | "srw" | "pef" | "x3f"
+    )
+}
+
+fn is_regular_image_extension(ext: &str) -> bool {
+    matches!(
+        ext,
+        "jpg" | "jpeg" | "png" | "gif" | "bmp" | "tif" | "tiff" | "webp" | "heic" | "heif"
+    )
+}
+
+pub fn filter_duplicate_raw_jpeg(
+    paths: Vec<PathBuf>,
+    handling: &DuplicateHandling,
+) -> Vec<PathBuf> {
+    if *handling == DuplicateHandling::Both {
+        return paths;
+    }
+
+    let before_count = paths.len();
+
+    let mut stem_map: HashMap<String, Vec<PathBuf>> = HashMap::new();
+    for path in paths {
+        if let Some(stem) = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_lowercase())
+        {
+            stem_map.entry(stem).or_default().push(path);
+        }
+    }
+
+    let mut result = Vec::new();
+
+    for (_stem, group) in stem_map {
+        if group.len() <= 1 {
+            result.extend(group);
+            continue;
+        }
+
+        match handling {
+            DuplicateHandling::JpegOnly => {
+                for path in group {
+                    let ext = path
+                        .extension()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("")
+                        .to_lowercase();
+                    if is_regular_image_extension(&ext) {
+                        result.push(path);
+                    } else {
+                        log::debug!(
+                            "file_ops.filter: skip_raw path={} rule=jpeg_only",
+                            path.display()
+                        );
+                    }
+                }
+            }
+            DuplicateHandling::RawOnly => {
+                for path in group {
+                    let ext = path
+                        .extension()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("")
+                        .to_lowercase();
+                    if is_raw_extension(&ext) {
+                        result.push(path);
+                    } else {
+                        log::debug!(
+                            "file_ops.filter: skip_regular path={} rule=raw_only",
+                            path.display()
+                        );
+                    }
+                }
+            }
+            DuplicateHandling::Both => unreachable!(),
+        }
+    }
+
+    log::info!(
+        "file_ops.filter: complete before={} after={} rule={:?}",
+        before_count,
+        result.len(),
+        handling
+    );
+    result
 }
