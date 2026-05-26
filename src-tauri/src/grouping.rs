@@ -6,7 +6,7 @@ use std::cmp::Ordering;
 use std::fmt;
 use tauri_plugin_log::log;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub enum GroupType {
     FocusBracketing,
     AEB,
