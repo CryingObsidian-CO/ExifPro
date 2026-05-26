@@ -27,12 +27,15 @@ export interface NamingRules {
   single_prefix: string;
 }
 
+export type DuplicateHandling = 'both' | 'jpeg_only' | 'raw_only';
+
 export interface Config {
   aeb_settings: AebSettings;
   focus_bracket_settings: FocusBracketSettings;
   burst_settings: BurstSettings;
   naming_rules: NamingRules;
   preview_max_mb: number;
+  duplicate_handling: DuplicateHandling;
   plugin_settings: Record<string, Record<string, any>>;
   enabled_plugins: string[];
 }
