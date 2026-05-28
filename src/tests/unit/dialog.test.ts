@@ -163,7 +163,8 @@ describe("useDialog – overlapping calls", () => {
     const second = showConfirm("Second");
     await Promise.resolve();
 
-    expect(first).resolves.toBe(false);
+    const firstResult = await first;
+    expect(firstResult).toBe(false);
     expect(useDialogState().dialogState.message).toBe("Second");
 
     const {confirmDialog} = useDialogState();

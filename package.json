@@ -13,7 +13,7 @@
     "test:ui": "vitest --ui",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:rust": "cd src-tauri && cargo test",
-    "test:all": "vitest run && cd src-tauri && cargo test"
+    "test:all": "vitest run && vitest run --config vitest.e2e.config.ts && cd src-tauri && cargo test"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

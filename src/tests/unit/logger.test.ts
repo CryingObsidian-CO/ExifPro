@@ -1,5 +1,8 @@
-import {describe, it, expect, beforeEach} from "vitest";
-import {mockInvoke} from "./mock/tauri-api";
+import {describe, it, expect, beforeEach, vi} from "vitest";
+
+const {mockInvoke} = vi.hoisted(() => ({mockInvoke: vi.fn()}));
+vi.mock("@tauri-apps/api/core", () => ({invoke: mockInvoke}));
+
 import {formatError, initFrontendLogger} from "../../composables/logger";
 
 describe("formatError", () => {
@@ -16,7 +19,6 @@ describe("formatError", () => {
 
   it("returns error message when no stack", () => {
     const err = {message: "no stack"} as Error;
-    // JSON.stringify of a plain object with message
     expect(formatError(err)).toBe('{"message":"no stack"}');
   });
 
@@ -38,9 +40,7 @@ describe("initFrontendLogger", () => {
 
   it("patches console methods and sends logs to invoke", async () => {
     initFrontendLogger();
-
     console.error("test error");
-    // Flush microtasks so the fire-and-forget sendLog resolves
     await new Promise((r) => setTimeout(r, 10));
 
     const calls = mockInvoke.mock.calls.filter(
@@ -56,9 +56,7 @@ describe("initFrontendLogger", () => {
   it("does not throw when invoke fails", async () => {
     mockInvoke.mockRejectedValue(new Error("tauri unavailable"));
     initFrontendLogger();
-
     expect(() => console.warn("warn msg")).not.toThrow();
-
     await new Promise((r) => setTimeout(r, 10));
   });
 });

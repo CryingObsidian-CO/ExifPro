@@ -1,44 +1,26 @@
 import {describe, it, expect, beforeEach, vi} from "vitest";
 import {nextTick} from "vue";
 
-const {mockPluginManager} = vi.hoisted(() => {
-  const emitParseExif = vi.fn((exif: any[]) => exif);
-  const emitGroupCreated = vi.fn((g: any) => g);
-  const emitGroupUpdated = vi.fn();
-  const emitMoveToGroup = vi.fn();
-  const emitGroupMerge = vi.fn();
-  const emitGroupDisband = vi.fn();
-  const emitGroupAction = vi.fn();
-  const emitImageAction = vi.fn();
-  const getPlugins = vi.fn((): any[] => []);
-  const getGroupActions = vi.fn((): any[] => []);
-  const getImageActions = vi.fn((): any[] => []);
-  const enablePlugin = vi.fn().mockResolvedValue(undefined);
-  const disablePlugin = vi.fn().mockResolvedValue(undefined);
-  const updatePluginConfig = vi.fn().mockResolvedValue(undefined);
-  const initialize = vi.fn().mockResolvedValue(undefined);
-
-  return {
-    mockPluginManager: {
-      isInitialized: false,
-      initialize,
-      emitParseExif,
-      emitGroupCreated,
-      emitGroupUpdated,
-      emitMoveToGroup,
-      emitGroupMerge,
-      emitGroupDisband,
-      emitGroupAction,
-      emitImageAction,
-      getPlugins,
-      getGroupActions,
-      getImageActions,
-      enablePlugin,
-      disablePlugin,
-      updatePluginConfig,
-    },
-  };
-});
+const {mockPluginManager} = vi.hoisted(() => ({
+  mockPluginManager: {
+    isInitialized: false,
+    initialize: vi.fn().mockResolvedValue(undefined),
+    emitParseExif: vi.fn((exif: any[]) => exif),
+    emitGroupCreated: vi.fn((g: any) => g),
+    emitGroupUpdated: vi.fn(),
+    emitMoveToGroup: vi.fn(),
+    emitGroupMerge: vi.fn(),
+    emitGroupDisband: vi.fn(),
+    emitGroupAction: vi.fn(),
+    emitImageAction: vi.fn(),
+    getPlugins: vi.fn((): any[] => []),
+    getGroupActions: vi.fn((): any[] => []),
+    getImageActions: vi.fn((): any[] => []),
+    enablePlugin: vi.fn().mockResolvedValue(undefined),
+    disablePlugin: vi.fn().mockResolvedValue(undefined),
+    updatePluginConfig: vi.fn().mockResolvedValue(undefined),
+  },
+}));
 
 vi.mock("../../composables/pluginManager", () => ({
   pluginManager: mockPluginManager,
@@ -53,7 +35,6 @@ describe("Store", () => {
     vi.clearAllMocks();
     localStorage.clear();
     store = new Store();
-    // Reset state to a known baseline
     store.groups = [];
     store.photos = [];
   });
@@ -111,14 +92,12 @@ describe("Store", () => {
   // ── theme ────────────────────────────────────────────────────
 
   it("theme defaults to value from localStorage or 'system'", () => {
-    // jsdom localStorage is empty → falls back to 'system'
     expect(["light", "dark", "system"]).toContain(store.theme);
   });
 
   it("theme setter updates the reactive state and localStorage", async () => {
     store.theme = "dark";
     expect(store.theme).toBe("dark");
-    // Vue's watch callback is microtask-scheduled — wait for it to flush
     await nextTick();
     expect(localStorage.getItem("theme")).toBe("dark");
   });
@@ -197,7 +176,6 @@ describe("Store", () => {
   });
 
   it("deleteGroup returns true even for unknown id (no-op)", () => {
-    // The actual implementation always returns true except for 'ungrouped'
     expect(store.deleteGroup("nope")).toBe(true);
   });
 
@@ -208,7 +186,6 @@ describe("Store", () => {
     store.createGroup("Target", "target");
     const ok = store.movePhotoToGroup([photo], "target");
     expect(ok).toBe(true);
-    // Vue reactivity wraps objects in Proxy — use toEqual for deep comparison
     const photos = store.findGroup("target")!.photos;
     expect(photos.length).toBe(1);
     expect(photos[0]).toMatchObject({file_path: "/p.jpg", file_name: "p.jpg"});
@@ -226,11 +203,8 @@ describe("Store", () => {
     const p1 = {file_path: "/a.jpg", file_name: "a.jpg"};
     const p2 = {file_path: "/b.jpg", file_name: "b.jpg"};
 
-    // movePhotoToGroup deletes groups that become empty after removal.
-    // Create groups one at a time and add photos before creating the next group.
     store.createGroup("G1", "g1");
     store.movePhotoToGroup([p1], "g1");
-
     store.createGroup("G2", "g2");
     store.movePhotoToGroup([p2], "g2");
 
@@ -238,7 +212,6 @@ describe("Store", () => {
     expect(merged).not.toBeNull();
     expect(merged!.name).toBe("Merged");
     expect(merged!.photos).toHaveLength(2);
-    // Old groups should be removed
     expect(store.findGroup("g1")).toBeUndefined();
     expect(store.findGroup("g2")).toBeUndefined();
     expect(mockPluginManager.emitGroupMerge).toHaveBeenCalled();
@@ -285,7 +258,7 @@ describe("Store", () => {
           name: "P1",
           entry_point: "",
           capabilities: {},
-          api_version: 1
+          api_version: 1,
         },
         enabled: false,
         zip_path: "",
@@ -297,7 +270,7 @@ describe("Store", () => {
           name: "P2",
           entry_point: "",
           capabilities: {},
-          api_version: 1
+          api_version: 1,
         },
         enabled: true,
         zip_path: "",
