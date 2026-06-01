@@ -39,7 +39,7 @@ const checked = computed({
 }
 
 .win-toggle.disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -50,38 +50,39 @@ const checked = computed({
 }
 
 .toggle-track {
-  width: 40px;
-  height: 22px;
-  border: 1px solid var(--color-border);
-  border-radius: 11px;
-  background-color: var(--color-bg-secondary);
+  width: 38px;
+  height: 20px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 10px;
+  background: var(--color-glass-bg);
   display: flex;
   align-items: center;
-  transition: all var(--transition-fast);
+  transition: all var(--prim-duration-fast) var(--prim-ease-out);
   position: relative;
   flex-shrink: 0;
 }
 
 .win-toggle:not(.disabled):hover .toggle-track {
-  border-color: var(--color-border-hover);
+  border-color: var(--color-border-strong);
 }
 
 .win-toggle input:checked + .toggle-track {
-  background-color: var(--color-accent);
-  border-color: var(--color-accent);
+  background: var(--color-brand);
+  border-color: var(--color-brand);
 }
 
 .toggle-thumb {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background-color: var(--color-text-secondary);
+  background: var(--color-text-tertiary);
   margin-left: 2px;
-  transition: all var(--transition-fast);
+  transition: all var(--prim-duration-fast) var(--prim-ease-out);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .win-toggle input:checked + .toggle-track .toggle-thumb {
   transform: translateX(18px);
-  background-color: #fff;
+  background: #fff;
 }
 </style>

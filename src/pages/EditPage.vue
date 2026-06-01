@@ -10,6 +10,16 @@ import {useDialog} from "../composables/dialog.ts";
 import {pluginManager} from "../composables/pluginManager.ts";
 import type {GroupActionDeclaration, ImageActionDeclaration} from "../types/plugin.ts";
 import {formatError} from "../composables/logger";
+import IconSave from "../component/icons/IconSave.vue";
+import IconUndo from "../component/icons/IconUndo.vue";
+import IconPlus from "../component/icons/IconPlus.vue";
+import IconMove from "../component/icons/IconMove.vue";
+import IconMerge from "../component/icons/IconMerge.vue";
+import IconEdit from "../component/icons/IconEdit.vue";
+import IconTrash from "../component/icons/IconTrash.vue";
+import IconClose from "../component/icons/IconClose.vue";
+import IconImage from "../component/icons/IconImage.vue";
+import IconPlugin from "../component/icons/IconPlugin.vue";
 
 const router = useRouter();
 const tauriImpl = useTauri();
@@ -109,23 +119,20 @@ async function loadThumbnail(filePath: string, level: 'small' | 'large') {
 
 function getGroupTypeLabel(type: GroupType) {
   const labels: Partial<Record<GroupType, string>> = {
-    FocusBracketing: '对焦包围',
+    FocusBracketing: 'Focus Bracket',
     AEB: 'AEB',
-    Burst: '连拍',
-    Single: '单张',
+    Burst: 'Burst',
+    Single: 'Single',
   };
   return labels[type] || type;
 }
 
-// TODO 配置颜色？
-// TODO 更好的方案解决 custom 类型的颜色问题
 function getGroupTypeColor(type: GroupType) {
   const colors: Record<GroupType, string> = {
     FocusBracketing: 'var(--color-focus-bracketing)',
     AEB: 'var(--color-aeb)',
     Burst: 'var(--color-burst)',
     Single: 'var(--color-single)',
-    // Custom: 'var(--color-custom)',
   };
   return colors[type];
 }
@@ -222,13 +229,13 @@ function toCleanText(value?: string | number) {
 
 function displayValue(value?: string | number) {
   const text = toCleanText(value);
-  return text.length > 0 ? text : '—';
+  return text.length > 0 ? text : '--';
 }
 
 function formatWithUnit(value: string | number | undefined, unit: string) {
   const text = toCleanText(value);
   if (!text) {
-    return '—';
+    return '--';
   }
   const lowerText = text.toLowerCase();
   const lowerUnit = unit.toLowerCase();
@@ -241,7 +248,7 @@ function formatWithUnit(value: string | number | undefined, unit: string) {
 function formatAperture(value: string | undefined) {
   const text = toCleanText(value);
   if (!text) {
-    return '—';
+    return '--';
   }
   if (/^f\s*\//i.test(text)) {
     return text;
@@ -252,7 +259,7 @@ function formatAperture(value: string | undefined) {
 function formatIso(value: string | undefined) {
   const text = toCleanText(value);
   if (!text) {
-    return '—';
+    return '--';
   }
   if (/^iso\s*/i.test(text)) {
     return text;
@@ -262,14 +269,14 @@ function formatIso(value: string | undefined) {
 
 function formatExposureMode(value?: number) {
   if (value === undefined || value === null) {
-    return '—';
+    return '--';
   }
   const labels: Record<number, string> = {
-    0: '自动曝光',
-    1: '手动曝光',
-    2: '自动包围曝光',
+    0: 'Auto',
+    1: 'Manual',
+    2: 'Auto Bracket',
   };
-  return labels[value] ?? `未知(${value})`;
+  return labels[value] ?? `Unknown (${value})`;
 }
 
 function getSubSecondDigits() {
@@ -283,7 +290,7 @@ function formatCaptureTime(photo: ExifInfo) {
   const subSecond = toCleanText(photo.sub_time).replace(/^\.+/, '');
   const offsetTime = toCleanText(photo.offset_time_original);
   if (!captureTime) {
-    return '—';
+    return '--';
   }
 
   const digits = getSubSecondDigits();
@@ -555,11 +562,11 @@ async function handleBlur() {
     return;
   }
 
-  if (!await showConfirm('确定要保存分组名称吗？', {
-    title: '确认重命名',
+  if (!await showConfirm('Save group name?', {
+    title: 'Confirm Rename',
     tone: 'warning',
-    confirmText: '保存',
-    cancelText: '取消',
+    confirmText: 'Save',
+    cancelText: 'Cancel',
   })) {
     cancelRenaming();
     return;
@@ -580,7 +587,7 @@ function cancelRenaming() {
 function finishRenaming() {
   if (renamingGroupId.value === 'ungrouped') {
     console.warn("ui.edit.rename: rejected reason=ungrouped");
-    showAlert('不能重命名未分组', {title: '操作无效', tone: 'warning'});
+    showAlert('Cannot rename ungrouped items.', {title: 'Invalid Operation', tone: 'warning'});
     return;
   }
 
@@ -596,22 +603,25 @@ function finishRenaming() {
 async function disbandGroup(groupId: string) {
   if (groupId === 'ungrouped') {
     console.warn("ui.edit.disband_group: rejected reason=ungrouped");
-    await showAlert('不能解散未分组', {title: '操作无效', tone: 'warning'});
+    await showAlert('Cannot disband ungrouped items.', {
+      title: 'Invalid Operation',
+      tone: 'warning'
+    });
     return;
   }
 
   const group = store.findGroup(groupId);
   if (!group) return;
 
-  if (await showConfirm(`确定要解散分组 "${group.name}" 吗？照片将移动到未分组。`, {
-    title: '确认解散',
+  if (await showConfirm(`Disband group "${group.name}"? Photos will be moved to ungrouped.`, {
+    title: 'Confirm Disband',
     tone: 'warning',
-    confirmText: '确认解散',
-    cancelText: '取消',
+    confirmText: 'Disband',
+    cancelText: 'Cancel',
   })) {
     console.info(`ui.edit.disband_group: confirmed group=${group.id} name=${group.name}`);
     if (!store.disbandGroup(groupId)) {
-      await showAlert('解散分组失败，请重试', {title: '操作失败', tone: 'error'});
+      await showAlert('Failed to disband group.', {title: 'Operation Failed', tone: 'error'});
       return;
     }
     clearPhotoSelection();
@@ -623,15 +633,15 @@ async function disbandGroup(groupId: string) {
 async function createGroupFromSelected() {
   if (selectedPhotos.value.length === 0) {
     console.warn("ui.edit.create_group: rejected reason=no_selection");
-    await showAlert('请选择照片', {title: '未选择照片', tone: 'warning'});
+    await showAlert('Please select photos first.', {title: 'No Photos Selected', tone: 'warning'});
     return;
   }
-  const name = prompt('请输入分组名称:', '新分组');
+  const name = prompt('Group name:', 'New Group');
   if (name) {
     console.info(`ui.edit.create_group: confirmed name=${name} photos=${selectedPhotos.value.length}`);
     const newGroup = store.createGroup(name);
     if (!newGroup) {
-      await showAlert('创建分组失败，请重试', {title: '操作失败', tone: 'error'});
+      await showAlert('Failed to create group.', {title: 'Operation Failed', tone: 'error'});
       return;
     }
     store.movePhotoToGroup(selectedPhotos.value, newGroup.id);
@@ -644,12 +654,11 @@ async function createGroupFromSelected() {
 async function moveSelectedToGroup() {
   if (selectedPhotos.value.length === 0) {
     console.warn("ui.edit.move_photos: rejected reason=no_selection");
-    await showAlert('请先选择照片', {title: '未选择照片', tone: 'warning'});
+    await showAlert('Please select photos first.', {title: 'No Photos Selected', tone: 'warning'});
     return;
   }
 
-  // TODO 提供选择框
-  const targetGroupId = prompt('请输入目标分组 ID:');
+  const targetGroupId = prompt('Target group ID:');
   if (!targetGroupId) {
     console.info("ui.edit.move_photos: canceled");
     return;
@@ -658,7 +667,7 @@ async function moveSelectedToGroup() {
   const targetGroup = store.findGroup(targetGroupId);
   if (!targetGroup) {
     console.warn(`ui.edit.move_photos: rejected reason=group_not_found id=${targetGroupId}`);
-    await showAlert('未找到目标分组', {title: '分组不存在', tone: 'error'});
+    await showAlert('Target group not found.', {title: 'Group Not Found', tone: 'error'});
     return;
   }
 
@@ -670,22 +679,25 @@ async function moveSelectedToGroup() {
 async function mergeSelectedGroups() {
   if (selectedGroupIds.value.length < 2) {
     console.warn("ui.edit.merge_groups: rejected reason=insufficient_selection");
-    await showAlert('请选择至少两个分组', {title: '选择不足', tone: 'warning'});
+    await showAlert('Please select at least two groups.', {
+      title: 'Insufficient Selection',
+      tone: 'warning'
+    });
     return;
   }
 
   if (selectedGroupIds.value.includes('ungrouped')) {
     console.warn("ui.edit.merge_groups: rejected reason=includes_ungrouped");
-    await showAlert('不能合并未分组', {title: '操作无效', tone: 'warning'});
+    await showAlert('Cannot merge ungrouped items.', {title: 'Invalid Operation', tone: 'warning'});
     return;
   }
-  
-  const name = prompt('请输入新分组名称:', '合并分组');
+
+  const name = prompt('New group name:', 'Merged Group');
   if (name) {
     console.info(`ui.edit.merge_groups: confirmed name=${name} groups=${selectedGroupIds.value.length}`);
     let mergedGroup = store.mergeGroups(selectedGroupIds.value, name);
     if (!mergedGroup) {
-      await showAlert('合并分组失败，请重试', {title: '操作失败', tone: 'error'});
+      await showAlert('Failed to merge groups.', {title: 'Operation Failed', tone: 'error'});
       return;
     }
   } else {
@@ -696,27 +708,30 @@ async function mergeSelectedGroups() {
 async function executeOrganize() {
   if (!store.outputDirectory) {
     console.warn("ui.edit.organize: rejected reason=missing_output_dir");
-    await showAlert('请先选择输出目录', {title: '缺少输出目录', tone: 'warning'});
+    await showAlert('Please select an output directory first.', {
+      title: 'Missing Output Directory',
+      tone: 'warning'
+    });
     await router.push('/');
     return;
   }
 
   if (store.groupsNumber === 0) {
     console.warn("ui.edit.organize: rejected reason=no_groups");
-    await showAlert('没有可整理的分组', {title: '无可用分组', tone: 'warning'});
+    await showAlert('No groups available to organize.', {title: 'No Groups', tone: 'warning'});
     return;
   }
 
   if (
       !await showConfirm(
-          `确定要整理 ${store.groupsNumber} 个分组吗？${
-              store.copyMode ? '文件将被复制到输出目录。' : '文件将被移动到输出目录。'
+          `Organize ${store.groupsNumber} groups? ${
+              store.copyMode ? 'Files will be copied to output directory.' : 'Files will be moved to output directory.'
           }`,
           {
-            title: '确认整理',
+            title: 'Confirm Organization',
             tone: 'warning',
-            confirmText: '开始整理',
-            cancelText: '取消',
+            confirmText: 'Organize',
+            cancelText: 'Cancel',
             closeOnOverlay: false,
           }
       )
@@ -736,10 +751,13 @@ async function executeOrganize() {
         store.copyMode,
         store.overwrite);
     console.info("ui.edit.organize: complete");
-    await showAlert('整理完成', {title: '整理完成', tone: 'success'});
+    await showAlert('Organization complete.', {title: 'Complete', tone: 'success'});
   } catch (error) {
     console.error(`ui.edit.organize: failed err=${formatError(error)}`);
-    await showAlert('整理失败: ' + (error as Error).message, {title: '整理失败', tone: 'error'});
+    await showAlert('Organization failed: ' + (error as Error).message, {
+      title: 'Failed',
+      tone: 'error'
+    });
   } finally {
     store.isOrganizing = false;
   }
@@ -748,58 +766,65 @@ async function executeOrganize() {
 
 <template>
   <div class="edit-page">
-    <div class="page-header">
+    <div class="page-header glass-navbar">
       <div class="header-left">
-        <h1>编辑配置</h1>
-        <p>{{ store.groupsNumber }} 个分组，共 {{ store.photosNumber }} 张照片</p>
+        <h1>Edit Groups</h1>
+        <p>{{ store.groupsNumber }} groups, {{ store.photosNumber }} photos</p>
       </div>
       <div class="header-actions">
-        <WinButton @click="$router.push('/')">返回</WinButton>
+        <WinButton @click="$router.push('/')">
+          <IconUndo :size="16"/>
+          Back
+        </WinButton>
         <WinButton variant="primary"
                    :disabled="store.isOrganizing"
                    @click="executeOrganize"
         >
-          {{ store.isOrganizing ? '保存中...' : '保存' }}
+          <IconSave :size="16"/>
+          {{ store.isOrganizing ? 'Saving...' : 'Save' }}
         </WinButton>
       </div>
     </div>
 
     <div class="page-content">
-      <div class="sidebar">
-        <WinCard title="分组操作">
+      <div class="sidebar glass-sidebar">
+        <WinCard title="Group Operations">
           <div class="action-group">
             <WinButton full-width
                        :disabled="selectedGroupIds.length < 2"
                        @click="mergeSelectedGroups"
             >
-              合并选中的分组
+              <IconMerge :size="16"/>
+              Merge Selected Groups
             </WinButton>
           </div>
         </WinCard>
 
-        <WinCard title="照片操作">
+        <WinCard title="Photo Operations">
           <div class="action-group">
             <WinButton
                 full-width
                 :disabled="selectedPhotos.length === 0"
                 @click="createGroupFromSelected"
             >
-              从选中创建分组
+              <IconPlus :size="16"/>
+              Create Group from Selection
             </WinButton>
             <WinButton
                 full-width
                 :disabled="selectedPhotos.length === 0"
                 @click="moveSelectedToGroup"
             >
-              移动选中到分组
+              <IconMove :size="16"/>
+              Move Selection to Group
             </WinButton>
           </div>
         </WinCard>
 
-        <div class="group-list">
+        <div class="group-list glass-scrollbar">
           <div v-for="group in store.groups"
                :key="group.id"
-               class="group-item"
+               class="group-item glass-item"
                :class="{ selected: selectedGroupIds.includes(group.id) }"
                @click="toggleGroupSelection(group.id)"
           >
@@ -812,6 +837,7 @@ async function executeOrganize() {
                        @keyup.esc="cancelRenaming"
                        ref="renameInput"
                        @focus="(e) => (e.target as HTMLInputElement).select()"
+                       class="glass-input"
                 />
               </div>
               <div v-else class="group-name">
@@ -820,9 +846,9 @@ async function executeOrganize() {
               </div>
             </div>
             <div class="group-meta">
-            <span class="group-type"
-                  :style="{ backgroundColor: getGroupTypeColor(group.group_type) }"
-            >
+              <span class="group-type"
+                    :style="{ backgroundColor: getGroupTypeColor(group.group_type) }"
+              >
                 {{ getGroupTypeLabel(group.group_type) }}
               </span>
             </div>
@@ -833,28 +859,28 @@ async function executeOrganize() {
                     @click.stop="handlePluginGroupAction(action, group)"
                     :title="action.label"
                 >
-                  {{ action.icon || '⚡' }}
+                  <IconPlugin :size="14"/>
                 </button>
               </template>
               <button v-if="group.id !== 'ungrouped'"
                       class="icon-btn"
                       @click.stop="startRenaming(group)"
-                      title="重命名"
+                      title="Rename"
               >
-                ✏️
+                <IconEdit :size="14"/>
               </button>
               <button v-if="group.id !== 'ungrouped'"
                       class="icon-btn"
                       @click.stop="disbandGroup(group.id)"
-                      title="解散"
+                      title="Disband"
               >
-                🗑️
+                <IconTrash :size="14"/>
               </button>
             </div>
           </div>
         </div>
       </div>
-      <div class="main-content"
+      <div class="main-content glass-scrollbar"
            ref="mainContentRef"
            @pointerdown="handleMainContentPointerDown"
            @pointermove="handleMainContentPointerMove"
@@ -889,7 +915,7 @@ async function executeOrganize() {
                        :alt="photo.file_name"
                        class="thumb-img"
                   />
-                  <span v-else class="placeholder">🖼️</span>
+                  <IconImage v-else :size="36" class="placeholder-icon"/>
                 </div>
                 <div class="thumb-info">
                   <span class="thumb-name">{{ photo.file_name }}</span>
@@ -902,7 +928,7 @@ async function executeOrganize() {
                         @click.stop="handlePluginImageAction(action, photo)"
                         :title="action.label"
                     >
-                      {{ action.icon || '⚡' }}
+                      <IconPlugin :size="14"/>
                     </button>
                   </template>
                 </div>
@@ -921,11 +947,14 @@ async function executeOrganize() {
         />
       </div>
 
-      <div v-if="detailPhoto" class="photo-detail-overlay" @click.self="closePhotoDetail">
-        <div class="photo-detail-dialog" role="dialog" aria-modal="true">
+      <div v-if="detailPhoto" class="photo-detail-overlay glass-overlay"
+           @click.self="closePhotoDetail">
+        <div class="photo-detail-dialog glass-dialog anim-scale-in" role="dialog" aria-modal="true">
           <div class="photo-detail-header">
-            <h3>图片详情</h3>
-            <WinButton variant="secondary" @click="closePhotoDetail">关闭</WinButton>
+            <h3>Photo Details</h3>
+            <WinButton variant="secondary" size="small" @click="closePhotoDetail">
+              <IconClose :size="16"/>
+            </WinButton>
           </div>
 
           <div class="photo-detail-body">
@@ -935,51 +964,55 @@ async function executeOrganize() {
                    :alt="detailPhoto.file_name"
                    class="photo-detail-image"
               />
-              <div v-else-if="isDetailLoading" class="photo-detail-placeholder">加载中...</div>
-              <div v-else class="photo-detail-placeholder">无预览图</div>
+              <div v-else-if="isDetailLoading" class="photo-detail-placeholder">Loading...</div>
+              <div v-else class="photo-detail-placeholder">No preview available</div>
             </div>
 
             <div class="photo-detail-grid">
               <div class="detail-item">
-                <span>文件名</span><strong>{{ displayValue(detailPhoto.file_name) }}</strong></div>
-              <div class="detail-item">
-                <span>文件路径</span><strong>{{ displayValue(detailPhoto.file_path) }}</strong>
+                <span>File Name</span><strong>{{ displayValue(detailPhoto.file_name) }}</strong>
               </div>
               <div class="detail-item">
-                <span>拍摄时间</span><strong>{{ formatCaptureTime(detailPhoto) }}</strong>
+                <span>File Path</span><strong>{{ displayValue(detailPhoto.file_path) }}</strong>
               </div>
               <div class="detail-item">
-                <span>快门速度</span><strong>{{
+                <span>Capture Time</span><strong>{{ formatCaptureTime(detailPhoto) }}</strong>
+              </div>
+              <div class="detail-item">
+                <span>Shutter Speed</span><strong>{{
                   formatWithUnit(detailPhoto.shutter_speed, 's')
                 }}</strong>
               </div>
               <div class="detail-item">
-                <span>光圈</span><strong>{{ formatAperture(detailPhoto.aperture) }}</strong></div>
+                <span>Aperture</span><strong>{{ formatAperture(detailPhoto.aperture) }}</strong>
+              </div>
               <div class="detail-item"><span>ISO</span><strong>{{
                   formatIso(detailPhoto.iso)
                 }}</strong></div>
-              <div class="detail-item"><span>曝光补偿</span><strong>{{
+              <div class="detail-item"><span>Exposure Comp.</span><strong>{{
                   formatWithUnit(detailPhoto.exposure_compensation, 'EV')
                 }}</strong></div>
               <div class="detail-item">
-                <span>曝光模式</span><strong>{{
+                <span>Exposure Mode</span><strong>{{
                   formatExposureMode(detailPhoto.exposure_mode)
                 }}</strong>
               </div>
               <div class="detail-item">
-                <span>焦距</span><strong>{{
+                <span>Focal Length</span><strong>{{
                   formatWithUnit(detailPhoto.focal_length, 'mm')
                 }}</strong></div>
               <div class="detail-item">
-                <span>对焦距离</span><strong>{{
+                <span>Focus Distance</span><strong>{{
                   formatWithUnit(detailPhoto.focus_distance, 'm')
                 }}</strong>
               </div>
               <div class="detail-item">
-                <span>相机品牌</span><strong>{{ displayValue(detailPhoto.camera_make) }}</strong>
+                <span>Camera Make</span><strong>{{ displayValue(detailPhoto.camera_make) }}</strong>
               </div>
               <div class="detail-item">
-                <span>相机型号</span><strong>{{ displayValue(detailPhoto.camera_model) }}</strong>
+                <span>Camera Model</span><strong>{{
+                  displayValue(detailPhoto.camera_model)
+                }}</strong>
               </div>
             </div>
           </div>
@@ -997,27 +1030,30 @@ async function executeOrganize() {
 }
 
 .page-header {
-  padding: 16px 32px;
-  border-bottom: 1px solid var(--color-border);
+  padding: 0 var(--prim-space-5);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  height: 44px;
+  flex-shrink: 0;
 }
 
 .header-left h1 {
-  font-size: 20px;
-  font-weight: 600;
-  margin-bottom: 2px;
+  font-size: var(--prim-font-size-md);
+  font-weight: var(--prim-font-weight-semibold);
+  margin-bottom: 0;
+  line-height: 1;
 }
 
 .header-left p {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--prim-font-size-xs);
+  line-height: 1;
 }
 
 .header-actions {
   display: flex;
-  gap: 12px;
+  gap: var(--prim-space-2);
 }
 
 .page-content {
@@ -1027,8 +1063,7 @@ async function executeOrganize() {
 }
 
 .sidebar {
-  width: 320px;
-  border-right: 1px solid var(--color-border);
+  width: 280px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1037,109 +1072,102 @@ async function executeOrganize() {
 .action-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--prim-space-2);
 }
 
 .group-list {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: var(--prim-space-3);
 }
 
 .group-item {
-  padding: 12px;
-  border-radius: var(--border-radius);
-  margin-bottom: 8px;
-  background-color: var(--color-bg-secondary);
-  border: 2px solid transparent;
+  padding: var(--prim-space-3);
+  margin-bottom: var(--prim-space-2);
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.group-item:hover {
-  background-color: var(--color-bg-tertiary);
 }
 
 .group-item.selected {
-  border-color: var(--color-accent);
-  background-color: var(--color-accent-light);
+  border-color: var(--color-brand);
+  background: var(--sidebar-item-active);
 }
 
 .group-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: var(--prim-space-2);
 }
 
 .group-name {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--prim-space-2);
 }
 
 .group-name-text {
-  font-weight: 500;
-  font-size: 14px;
+  font-weight: var(--prim-font-weight-medium);
+  font-size: var(--prim-font-size-md);
 }
 
 .group-count {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--prim-font-size-sm);
 }
 
 .rename-input input {
   width: 100%;
-  padding: 4px 8px;
-  border: 1px solid var(--color-accent);
-  border-radius: var(--border-radius-sm);
-  background-color: var(--color-bg-secondary);
-  color: var(--color-text);
-  font-size: 14px;
-  outline: none;
+  padding: 4px var(--prim-space-2);
+  border-radius: var(--prim-radius-sm);
+  font-size: var(--prim-font-size-md);
 }
 
 .group-meta {
   display: flex;
-  gap: 8px;
+  gap: var(--prim-space-2);
   align-items: center;
 }
 
 .group-type {
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 11px;
+  padding: 2px var(--prim-space-2);
+  border-radius: var(--prim-radius-full);
+  font-size: var(--prim-font-size-xs);
   color: white;
-  font-weight: 500;
+  font-weight: var(--prim-font-weight-medium);
 }
 
 .group-actions {
   display: flex;
-  gap: 4px;
-  margin-top: 8px;
+  gap: var(--prim-space-1);
+  margin-top: var(--prim-space-2);
 }
 
 .icon-btn {
-  padding: 6px 10px;
-  border-radius: var(--border-radius-sm);
-  background-color: transparent;
-  transition: all var(--transition-fast);
-  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: var(--prim-radius-sm);
+  background: transparent;
+  transition: all var(--prim-duration-fast) var(--prim-ease-out);
+  color: var(--color-text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .icon-btn:hover {
-  background-color: var(--color-bg-tertiary);
+  background: var(--color-glass-bg-hover);
+  color: var(--color-text-primary);
 }
 
 .plugin-action-btn {
-  color: var(--color-accent);
+  color: var(--color-brand);
 }
 
 .main-content {
   flex: 1;
   overflow: auto;
-  padding: 24px;
+  padding: var(--prim-space-5);
   position: relative;
   user-select: none;
   -webkit-user-select: none;
@@ -1148,54 +1176,64 @@ async function executeOrganize() {
 .photos-grid {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--prim-space-6);
 }
 
 .group-section-title {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: var(--color-text);
+  font-size: var(--prim-font-size-md);
+  font-weight: var(--prim-font-weight-semibold);
+  margin-bottom: var(--prim-space-3);
+  color: var(--color-text-primary);
 }
 
 .group-section-count {
   color: var(--color-text-secondary);
-  font-weight: 400;
+  font-weight: var(--prim-font-weight-normal);
 }
 
 .photo-thumbs {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
+  gap: var(--prim-space-3);
 }
 
 .photo-thumb {
-  border-radius: var(--border-radius);
+  border-radius: var(--prim-radius-md);
   overflow: hidden;
-  background-color: var(--color-bg-secondary);
-  border: 2px solid transparent;
+  background: var(--color-glass-bg);
+  border: 1px solid var(--color-glass-border);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all var(--prim-duration-fast) var(--prim-ease-out);
+}
+
+.photo-thumb:hover {
+  box-shadow: var(--prim-shadow-md);
+  border-color: var(--color-border-strong);
+}
+
+.photo-thumb.selected {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 1px var(--color-brand);
 }
 
 .selection-box {
   position: absolute;
-  border: 1px solid var(--color-accent);
-  background-color: var(--color-accent-light);
-  opacity: 0.5;
+  border: 1px solid var(--color-brand);
+  background: var(--color-brand-light);
+  opacity: 0.4;
   pointer-events: none;
-  z-index: 10;
+  z-index: var(--prim-z-overlay);
+  border-radius: var(--prim-radius-xs);
 }
 
 .photo-detail-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.45);
-  z-index: 1200;
+  z-index: var(--prim-z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: var(--prim-space-4);
 }
 
 .photo-detail-dialog {
@@ -1203,10 +1241,6 @@ async function executeOrganize() {
   max-height: min(85vh, 820px);
   display: flex;
   flex-direction: column;
-  background-color: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-lg);
   overflow: hidden;
 }
 
@@ -1214,27 +1248,27 @@ async function executeOrganize() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--color-border);
+  padding: var(--prim-space-3) var(--prim-space-4);
+  border-bottom: 1px solid var(--color-glass-border);
 }
 
 .photo-detail-header h3 {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: var(--prim-font-size-md);
+  font-weight: var(--prim-font-weight-semibold);
 }
 
 .photo-detail-body {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(320px, 1fr);
-  gap: 16px;
-  padding: 16px;
+  gap: var(--prim-space-4);
+  padding: var(--prim-space-4);
   overflow: auto;
 }
 
 .photo-detail-preview {
-  background-color: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-sm);
+  background: var(--color-glass-bg);
+  border: 1px solid var(--color-glass-border);
+  border-radius: var(--prim-radius-sm);
   min-height: 280px;
   display: flex;
   align-items: center;
@@ -1250,32 +1284,32 @@ async function executeOrganize() {
 
 .photo-detail-placeholder {
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--prim-font-size-base);
 }
 
 .photo-detail-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: var(--prim-space-3);
 }
 
 .detail-item {
   display: grid;
-  grid-template-columns: 90px 1fr;
-  gap: 8px;
+  grid-template-columns: 110px 1fr;
+  gap: var(--prim-space-2);
   align-items: start;
 }
 
 .detail-item span {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--prim-font-size-sm);
 }
 
 .detail-item strong {
-  color: var(--color-text);
-  font-size: 13px;
-  line-height: 1.5;
-  font-weight: 500;
+  color: var(--color-text-primary);
+  font-size: var(--prim-font-size-base);
+  line-height: var(--prim-line-height-normal);
+  font-weight: var(--prim-font-weight-medium);
   overflow-wrap: anywhere;
 }
 
@@ -1289,21 +1323,12 @@ async function executeOrganize() {
   }
 }
 
-.photo-thumb:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-
-.photo-thumb.selected {
-  border-color: var(--color-accent);
-}
-
 .thumb-image {
   aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-bg-tertiary);
+  background: var(--color-glass-bg);
   overflow: hidden;
 }
 
@@ -1313,18 +1338,18 @@ async function executeOrganize() {
   object-fit: cover;
 }
 
-.thumb-image .placeholder {
-  font-size: 48px;
-  opacity: 0.5;
+.placeholder-icon {
+  opacity: 0.35;
+  color: var(--color-text-tertiary);
 }
 
 .thumb-info {
-  padding: 8px;
+  padding: var(--prim-space-2);
 }
 
 .thumb-name {
-  font-size: 12px;
-  color: var(--color-text);
+  font-size: var(--prim-font-size-xs);
+  color: var(--color-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1334,12 +1359,11 @@ async function executeOrganize() {
 .photo-actions {
   display: flex;
   gap: 2px;
-  padding: 0 8px 6px;
+  padding: 0 var(--prim-space-2) var(--prim-space-2);
   justify-content: flex-start;
 }
 
 .photo-actions .icon-btn {
-  padding: 3px 7px;
-  font-size: 12px;
+  padding: 3px 5px;
 }
 </style>

@@ -2,19 +2,23 @@
 import {computed} from "vue";
 import WinButton from "./WinButton.vue";
 import {useDialogState} from "../composables/dialog.ts";
+import IconInfo from "./icons/IconInfo.vue";
+import IconCheck from "./icons/IconCheck.vue";
+import IconWarning from "./icons/IconWarning.vue";
+import IconError from "./icons/IconError.vue";
 
 const {dialogState, confirmDialog, cancelDialog, closeByOverlay} = useDialogState();
 
 const toneIcon = computed(() => {
   switch (dialogState.tone) {
     case "success":
-      return "✓";
+      return IconCheck;
     case "warning":
-      return "!";
+      return IconWarning;
     case "error":
-      return "×";
+      return IconError;
     default:
-      return "i";
+      return IconInfo;
   }
 });
 
@@ -23,10 +27,13 @@ const confirmVariant = computed(() => (dialogState.tone === "error" ? "danger" :
 
 <template>
   <Teleport to="body">
-    <div v-if="dialogState.visible" class="dialog-overlay" @click.self="closeByOverlay">
-      <div class="dialog-panel" role="dialog" aria-modal="true">
+    <div v-if="dialogState.visible" class="dialog-overlay glass-overlay"
+         @click.self="closeByOverlay">
+      <div class="dialog-panel glass-dialog anim-scale-in" role="dialog" aria-modal="true">
         <div class="dialog-header">
-          <div class="dialog-icon" :class="`tone-${dialogState.tone}`">{{ toneIcon }}</div>
+          <div class="dialog-icon" :class="`tone-${dialogState.tone}`">
+            <component :is="toneIcon" :size="20"/>
+          </div>
           <h3>{{ dialogState.title }}</h3>
         </div>
         <p class="dialog-message">{{ dialogState.message }}</p>
@@ -48,79 +55,71 @@ const confirmVariant = computed(() => (dialogState.tone === "error" ? "danger" :
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2000;
-  background-color: rgba(0, 0, 0, 0.35);
+  z-index: var(--prim-z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: var(--prim-space-4);
 }
 
 .dialog-panel {
-  width: min(460px, 100%);
-  background-color: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-lg);
-  padding: 18px;
+  width: min(440px, 100%);
+  padding: var(--prim-space-5);
 }
 
 .dialog-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: var(--prim-space-3);
+  margin-bottom: var(--prim-space-3);
 }
 
 .dialog-header h3 {
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--color-text);
+  font-size: var(--prim-font-size-lg);
+  font-weight: var(--prim-font-weight-semibold);
+  color: var(--color-text-primary);
 }
 
 .dialog-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--prim-radius-full);
+  display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 14px;
+  flex-shrink: 0;
 }
 
 .dialog-icon.tone-info {
-  color: var(--color-accent);
-  background-color: var(--color-accent-light);
+  color: var(--color-info);
+  background: var(--color-info-light);
 }
 
 .dialog-icon.tone-success {
   color: var(--color-success);
-  background-color: rgba(16, 124, 16, 0.16);
+  background: var(--color-success-light);
 }
 
 .dialog-icon.tone-warning {
   color: var(--color-warning);
-  background-color: rgba(255, 140, 0, 0.16);
+  background: var(--color-warning-light);
 }
 
 .dialog-icon.tone-error {
-  color: var(--color-error);
-  background-color: rgba(209, 52, 56, 0.16);
+  color: var(--color-danger);
+  background: var(--color-danger-light);
 }
 
 .dialog-message {
-  color: var(--color-text);
-  line-height: 1.6;
-  margin-bottom: 16px;
-  white-space: pre-wrap;
+  color: var(--color-text-secondary);
+  line-height: var(--prim-line-height-relaxed);
+  margin-bottom: var(--prim-space-5);
+  font-size: var(--prim-font-size-base);
 }
 
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: var(--prim-space-2);
 }
 </style>
-
-

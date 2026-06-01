@@ -1,0 +1,187 @@
+/* ============================================================
+   ExifPro Glass Effects — Fluent 3 Glass Morphism Utilities
+   Uses backdrop-filter for native glass effects
+   ============================================================ */
+
+/* ---- Glass surface base (standard panel/card) ---- */
+.glass-surface {
+  background: var(--color-glass-bg);
+  backdrop-filter: blur(var(--prim-glass-blur-md));
+  -webkit-backdrop-filter: blur(var(--prim-glass-blur-md));
+  border: 1px solid var(--color-glass-border);
+  box-shadow: 0 1px 4px var(--color-glass-shadow);
+}
+
+/* ---- Glass surface raised (dialogs, dropdowns) ---- */
+.glass-surface-raised {
+  background: var(--color-glass-bg);
+  backdrop-filter: blur(var(--prim-glass-blur-lg));
+  -webkit-backdrop-filter: blur(var(--prim-glass-blur-lg));
+  border: 1px solid var(--color-glass-border);
+  box-shadow: var(--prim-shadow-lg), 0 0 0 1px var(--color-glass-border);
+}
+
+/* ---- Glass surface elevated (modals, overlays) ---- */
+.glass-surface-elevated {
+  background: var(--color-glass-bg-hover);
+  backdrop-filter: blur(var(--prim-glass-blur-xl));
+  -webkit-backdrop-filter: blur(var(--prim-glass-blur-xl));
+  border: 1px solid var(--color-glass-border);
+  box-shadow: var(--prim-shadow-xl);
+}
+
+/* ---- Glass navbar ---- */
+.glass-navbar {
+  background: var(--navbar-bg);
+  backdrop-filter: blur(var(--prim-glass-blur-md));
+  -webkit-backdrop-filter: blur(var(--prim-glass-blur-md));
+  border-bottom: 1px solid var(--navbar-border);
+}
+
+/* ---- Glass sidebar ---- */
+.glass-sidebar {
+  background: var(--sidebar-bg);
+  backdrop-filter: blur(var(--prim-glass-blur-md));
+  -webkit-backdrop-filter: blur(var(--prim-glass-blur-md));
+  border-right: 1px solid var(--sidebar-border);
+}
+
+/* ---- Glass overlay (modal backdrop) ---- */
+.glass-overlay {
+  background: var(--color-bg-overlay);
+  backdrop-filter: blur(var(--prim-glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--prim-glass-blur-sm));
+}
+
+/* ---- Glass input ---- */
+.glass-input {
+  background: var(--input-bg);
+  backdrop-filter: blur(var(--prim-glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--prim-glass-blur-sm));
+  border: 1px solid var(--input-border);
+  color: var(--input-text);
+  transition: all var(--prim-duration-fast) var(--prim-ease-out);
+}
+
+.glass-input:hover {
+  border-color: var(--input-border-hover);
+}
+
+.glass-input:focus {
+  border-color: var(--input-border-focus);
+  background: var(--input-bg-focus);
+  box-shadow: 0 0 0 3px var(--input-focus-ring);
+  outline: none;
+}
+
+/* ---- Glass button base ---- */
+.glass-btn {
+  background: var(--btn-secondary-bg);
+  backdrop-filter: blur(var(--prim-glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--prim-glass-blur-sm));
+  border: 1px solid var(--btn-secondary-border);
+  color: var(--btn-secondary-text);
+  transition: all var(--prim-duration-fast) var(--prim-ease-out);
+}
+
+.glass-btn:hover {
+  background: var(--btn-secondary-bg-hover);
+  border-color: var(--color-border-strong);
+}
+
+.glass-btn:active {
+  background: var(--color-glass-bg-active);
+  transform: scale(0.985);
+}
+
+/* ---- Glass card ---- */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(var(--prim-glass-blur-md));
+  -webkit-backdrop-filter: blur(var(--prim-glass-blur-md));
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  border-radius: var(--prim-radius-lg);
+  transition: box-shadow var(--prim-duration-normal) var(--prim-ease-out);
+}
+
+.glass-card:hover {
+  box-shadow: var(--prim-shadow-md);
+}
+
+/* ---- Glass dialog ---- */
+.glass-dialog {
+  background: var(--dialog-bg);
+  backdrop-filter: blur(var(--prim-glass-blur-xl));
+  -webkit-backdrop-filter: blur(var(--prim-glass-blur-xl));
+  border: 1px solid var(--dialog-border);
+  box-shadow: var(--dialog-shadow);
+  border-radius: var(--prim-radius-xl);
+}
+
+/* ---- Glass item (sidebar list items, nav items) ---- */
+.glass-item {
+  border-radius: var(--prim-radius-md);
+  transition: all var(--prim-duration-fast) var(--prim-ease-out);
+}
+
+.glass-item:hover {
+  background: var(--color-glass-bg-hover);
+}
+
+.glass-item:active {
+  background: var(--color-glass-bg-active);
+}
+
+.glass-item.active {
+  background: var(--sidebar-item-active);
+  color: var(--color-brand);
+}
+
+/* ---- Glass scrollbar (thin) ---- */
+.glass-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.glass-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.glass-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar-thumb);
+  border-radius: 3px;
+}
+
+.glass-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbar-thumb-hover);
+}
+
+/* ---- Animation utilities ---- */
+.anim-fade-in {
+  animation: animFadeIn var(--prim-duration-normal) var(--prim-ease-out);
+}
+
+.anim-scale-in {
+  animation: animScaleIn var(--prim-duration-modal) var(--prim-ease-out);
+}
+
+@keyframes animFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes animScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
