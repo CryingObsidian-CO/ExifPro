@@ -72,6 +72,10 @@ const checked = computed({
   border-color: var(--color-border-strong);
 }
 
+.win-checkbox input:focus-visible + .checkbox-box {
+  box-shadow: 0 0 0 2px var(--color-border-focus);
+}
+
 .win-checkbox input:checked + .checkbox-box {
   background: var(--color-brand);
   border-color: var(--color-brand);

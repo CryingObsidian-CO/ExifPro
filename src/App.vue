@@ -182,6 +182,12 @@ onMounted(async () => {
   justify-content: center;
 }
 
+.nav-item:focus-visible,
+.theme-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-border-focus);
+}
+
 .app-content {
   flex: 1;
   overflow: hidden;

@@ -66,6 +66,10 @@ const checked = computed({
   border-color: var(--color-border-strong);
 }
 
+.win-toggle input:focus-visible + .toggle-track {
+  box-shadow: 0 0 0 2px var(--color-border-focus);
+}
+
 .win-toggle input:checked + .toggle-track {
   background: var(--color-brand);
   border-color: var(--color-brand);
@@ -78,11 +82,11 @@ const checked = computed({
   background: var(--color-text-tertiary);
   margin-left: 2px;
   transition: all var(--prim-duration-fast) var(--prim-ease-out);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 2px rgba(var(--prim-black-rgb), var(--prim-opacity-10));
 }
 
 .win-toggle input:checked + .toggle-track .toggle-thumb {
   transform: translateX(18px);
-  background: #fff;
+  background: var(--prim-neutral-0);
 }
 </style>

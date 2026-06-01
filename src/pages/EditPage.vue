@@ -827,6 +827,9 @@ async function executeOrganize() {
                class="group-item glass-item"
                :class="{ selected: selectedGroupIds.includes(group.id) }"
                @click="toggleGroupSelection(group.id)"
+               tabindex="0"
+               @keydown.enter.prevent="toggleGroupSelection(group.id)"
+               @keydown.space.prevent="toggleGroupSelection(group.id)"
           >
             <div class="group-header">
               <div v-if="renamingGroupId === group.id" class="rename-input">
@@ -907,7 +910,9 @@ async function executeOrganize() {
                   :class="{ selected: isPhotoSelected(photo.file_path) }"
                   @click="handlePhotoClick(photo, $event)"
                   @dblclick.stop="openPhotoDetail(photo)"
+                  @keydown.enter.prevent="openPhotoDetail(photo)"
                   @dragstart.prevent
+                  tabindex="0"
               >
                 <div class="thumb-image">
                   <img v-if="thumbnailCache[photo.file_path]"
@@ -1093,6 +1098,11 @@ async function executeOrganize() {
   background: var(--sidebar-item-active);
 }
 
+.group-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-border-focus);
+}
+
 .group-header {
   display: flex;
   justify-content: space-between;
@@ -1134,7 +1144,7 @@ async function executeOrganize() {
   padding: 2px var(--prim-space-2);
   border-radius: var(--prim-radius-full);
   font-size: var(--prim-font-size-xs);
-  color: white;
+  color: var(--prim-neutral-0);
   font-weight: var(--prim-font-weight-medium);
 }
 
@@ -1158,6 +1168,11 @@ async function executeOrganize() {
 .icon-btn:hover {
   background: var(--color-glass-bg-hover);
   color: var(--color-text-primary);
+}
+
+.icon-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-border-focus);
 }
 
 .plugin-action-btn {
@@ -1209,6 +1224,11 @@ async function executeOrganize() {
 .photo-thumb:hover {
   box-shadow: var(--prim-shadow-md);
   border-color: var(--color-border-strong);
+}
+
+.photo-thumb:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-border-focus);
 }
 
 .photo-thumb.selected {

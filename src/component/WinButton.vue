@@ -129,4 +129,9 @@ defineProps({
   opacity: var(--btn-disabled-opacity);
   cursor: not-allowed;
 }
+
+.win-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-border-focus);
+}
 </style>

@@ -783,6 +783,11 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
   color: var(--color-brand);
 }
 
+.theme-option:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-border-focus);
+}
+
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -806,22 +811,22 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
 
 .aeb-badge {
   background: var(--color-aeb);
-  color: #fff;
+  color: var(--prim-neutral-0);
 }
 
 .focus-badge {
   background: var(--color-focus-bracketing);
-  color: #fff;
+  color: var(--prim-neutral-0);
 }
 
 .burst-badge {
   background: var(--color-burst);
-  color: #fff;
+  color: var(--prim-neutral-0);
 }
 
 .plugin-badge {
   background: var(--color-plugin);
-  color: #fff;
+  color: var(--prim-neutral-0);
 }
 
 .plugin-section {
