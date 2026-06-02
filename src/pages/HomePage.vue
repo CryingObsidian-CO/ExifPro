@@ -10,10 +10,12 @@ import {useDialog} from "../composables/dialog.ts";
 import {formatError} from "../composables/logger";
 import IconFolder from "../component/icons/IconFolder.vue";
 import IconUpload from "../component/icons/IconUpload.vue";
+import { useI18n } from 'vue-i18n';
 
 const router = useRouter();
 const tauriImpl = useTauri();
 const {showAlert} = useDialog();
+const { t } = useI18n();
 
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error && error.message) {
@@ -28,7 +30,7 @@ const getErrorMessage = (error: unknown) => {
       return message;
     }
   }
-  return 'Unknown error';
+  return t('home.unknown_error');
 };
 
 const selectSourceDir = async () => {
@@ -54,8 +56,8 @@ const selectOutputDir = async () => {
 const startAnalysis = async () => {
   if (!store.selectedDirectory) {
     console.warn("ui.home.start_analysis: missing_directory");
-    await showAlert('Please select a valid photo directory.', {
-      title: 'Invalid Directory',
+    await showAlert(t('home.no_dir'), {
+      title: t('home.invalid_dir'),
       tone: 'warning'
     });
     return;
@@ -77,15 +79,15 @@ const startAnalysis = async () => {
       await router.push('/edit');
     } else {
       console.warn("ui.home.start_analysis: missing_config");
-      await showAlert('Please configure grouping parameters first.', {
-        title: 'Configuration Missing',
+      await showAlert(t('home.no_config'), {
+        title: t('home.config_missing'),
         tone: 'warning'
       });
     }
   } catch (error) {
     const message = getErrorMessage(error);
     console.error(`ui.home.start_analysis: failed err=${formatError(error)}`);
-    await showAlert('Analysis failed: ' + message, {title: 'Analysis Failed', tone: 'error'});
+    await showAlert(t('home.analysis_failed', { message }), {title: t('home.analysis_failed_title'), tone: 'error'});
   } finally {
     store.isAnalyzing = false;
   }
@@ -120,58 +122,58 @@ const outputDirectory = computed({
 <template>
   <div class="home-page">
     <div class="page-header">
-      <h1>Photo Analysis</h1>
-      <p>Select your photo directory to begin intelligent grouping and organization</p>
+      <h1>{{ t('home.title') }}</h1>
+      <p>{{ t('home.subtitle') }}</p>
     </div>
 
     <div class="page-content glass-scrollbar">
-      <WinCard title="Source Directory">
+      <WinCard :title="t('home.source_dir')">
         <div class="input-group">
           <div class="path-input">
             <input type="text"
                    v-model="selectedDirectory"
-                   placeholder="Select photo directory..."
+                   :placeholder="t('home.source_dir_placeholder')"
                    class="glass-input"
             />
           </div>
           <WinButton @click="selectSourceDir">
             <IconFolder :size="16"/>
-            Browse
+            {{ t('home.browse') }}
           </WinButton>
         </div>
         <div class="options-row">
-          <WinCheckbox v-model="recursive" label="Include subdirectories"/>
+          <WinCheckbox v-model="recursive" :label="t('home.include_subdirs')"/>
         </div>
       </WinCard>
 
-      <WinCard title="Processing Mode">
+      <WinCard :title="t('home.processing_mode')">
         <div class="options-group">
-          <WinCheckbox v-model="copyMode" label="Copy files (preserve originals)"/>
-          <WinCheckbox v-model="overwrite" label="Overwrite existing files"/>
+          <WinCheckbox v-model="copyMode" :label="t('home.copy_mode')"/>
+          <WinCheckbox v-model="overwrite" :label="t('home.overwrite')"/>
         </div>
         <div class="input-group">
           <div class="path-input">
             <input type="text"
                    v-model="outputDirectory"
-                   placeholder="Select output directory..."
+                   :placeholder="t('home.output_dir_placeholder')"
                    class="glass-input"
             />
           </div>
           <WinButton @click="selectOutputDir">
             <IconFolder :size="16"/>
-            Browse
+            {{ t('home.browse') }}
           </WinButton>
         </div>
       </WinCard>
 
-      <WinCard title="Status">
+      <WinCard :title="t('home.status')">
         <div class="status-info">
           <div class="status-item">
-            <span class="label">Photos</span>
+            <span class="label">{{ t('home.photos') }}</span>
             <span class="value">{{ store.photosNumber }}</span>
           </div>
           <div class="status-item">
-            <span class="label">Groups</span>
+            <span class="label">{{ t('home.groups') }}</span>
             <span class="value">{{ store.groupsNumber }}</span>
           </div>
         </div>
@@ -182,13 +184,13 @@ const outputDirectory = computed({
                      @click="startAnalysis"
           >
             <IconUpload :size="16"/>
-            {{ store.isAnalyzing ? 'Analyzing...' : 'Start Analysis' }}
+            {{ store.isAnalyzing ? t('home.analyzing') : t('home.start_analysis') }}
           </WinButton>
           <WinButton size="large"
                      :disabled="store.groupsNumber === 0"
                      @click="$router.push('/edit')"
           >
-            Edit Groups
+            {{ t('home.edit_groups') }}
           </WinButton>
         </div>
       </WinCard>

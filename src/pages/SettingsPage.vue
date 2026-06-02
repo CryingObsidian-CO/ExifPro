@@ -10,6 +10,8 @@ import {onMounted, ref} from "vue";
 import WinInput from "../component/WinInput.vue";
 import WinToggle from "../component/WinToggle.vue";
 import {onBeforeRouteLeave} from "vue-router";
+import {useI18n} from "vue-i18n";
+import {setLocale, getCurrentLocale, type SupportedLocale} from "../i18n";
 import {useDialog} from "../composables/dialog.ts";
 import {formatError} from "../composables/logger";
 import IconSun from "../component/icons/IconSun.vue";
@@ -18,6 +20,7 @@ import IconMonitor from "../component/icons/IconMonitor.vue";
 
 const tauri = useTauri();
 const {showAlert, showConfirm} = useDialog();
+const {t} = useI18n();
 const dirty = ref(false);
 
 function markDirty() {
@@ -130,12 +133,12 @@ async function saveSettings(): Promise<boolean> {
       await reloadConfig();
       dirty.value = false;
       console.info("ui.settings.save: complete");
-      await showAlert('Settings saved successfully.', {title: 'Saved', tone: 'success'});
+      await showAlert(t('settings.save_success'), {title: t('settings.saved'), tone: 'success'});
       return true;
     } catch (error) {
       console.error(`ui.settings.save: failed err=${formatError(error)}`);
-      await showAlert('Failed to save settings. Please try again.', {
-        title: 'Save Failed',
+      await showAlert(t('settings.save_failed'), {
+        title: t('settings.save_failed_title'),
         tone: 'error'
       });
       return false;
@@ -153,11 +156,14 @@ async function resetSettings() {
     await store.syncPluginsEnabled(config.enabled_plugins);
     dirty.value = false;
     console.info("ui.settings.reset: complete");
-    await showAlert('Settings reset to default.', {title: 'Reset Complete', tone: 'success'});
+    await showAlert(t('settings.reset_success'), {
+      title: t('settings.reset_complete'),
+      tone: 'success'
+    });
   } catch (error) {
     console.error(`ui.settings.reset: failed err=${formatError(error)}`);
-    await showAlert('Failed to reset settings. Please try again.', {
-      title: 'Reset Failed',
+    await showAlert(t('settings.reset_failed'), {
+      title: t('settings.reset_failed_title'),
       tone: 'error'
     });
   }
@@ -181,8 +187,8 @@ async function reloadConfig() {
     const config = await tauri.resetConfig();
     normalizeConfig(config);
     store.config = config;
-    await showAlert('Configuration file read failed. Restored to default settings.', {
-      title: 'Configuration Reset',
+    await showAlert(t('settings.reset_success'), {
+      title: t('settings.reset_complete'),
       tone: 'warning'
     });
   }
@@ -192,11 +198,11 @@ onBeforeRouteLeave(async (_to, _from) => {
   if (!dirty.value) {
     return;
   }
-  const save = await showConfirm('Settings have been modified. Save before leaving?', {
-    title: 'Unsaved Changes',
+  const save = await showConfirm(t('settings.unsaved_changes'), {
+    title: t('settings.unsaved_title'),
     tone: 'warning',
-    confirmText: 'Save and Leave',
-    cancelText: 'Leave Without Saving',
+    confirmText: t('settings.save_leave'),
+    cancelText: t('settings.leave_without_save'),
     closeOnOverlay: false,
   });
   if (save) {
@@ -285,19 +291,27 @@ function getStandardCapabilities(capabilities: PluginCapabilities): CapabilityTy
 function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
   return capabilities.custom_capabilities?.filter((cap) => cap && cap.trim().length > 0) ?? [];
 }
+
+function changeLanguage(locale: SupportedLocale) {
+  setLocale(locale);
+}
+
+function currentLanguage(): SupportedLocale {
+  return getCurrentLocale();
+}
 </script>
 
 <template>
   <div class="settings-page">
     <div class="page-header">
-      <h1>Settings</h1>
-      <p>Configure grouping parameters, naming rules, and appearance</p>
+      <h1>{{ t('settings.title') }}</h1>
+      <p>{{ t('settings.subtitle') }}</p>
     </div>
 
     <div class="page-content glass-scrollbar">
-      <WinCard title="Appearance">
+      <WinCard :title="t('settings.appearance')">
         <div class="setting-section">
-          <label class="setting-label">Theme</label>
+          <label class="setting-label">{{ t('settings.theme_label') }}</label>
           <div class="theme-options">
             <button
                 class="theme-option"
@@ -305,7 +319,7 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
                 @click="setTheme('light')"
             >
               <IconSun :size="20"/>
-              <span>Light</span>
+              <span>{{ t('settings.theme.light') }}</span>
             </button>
             <button
                 class="theme-option"
@@ -313,7 +327,7 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
                 @click="setTheme('dark')"
             >
               <IconMoon :size="20"/>
-              <span>Dark</span>
+              <span>{{ t('settings.theme.dark') }}</span>
             </button>
             <button
                 class="theme-option"
@@ -321,18 +335,37 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
                 @click="setTheme('system')"
             >
               <IconMonitor :size="20"/>
-              <span>System</span>
+              <span>{{ t('settings.theme.system') }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="setting-section">
+          <label class="setting-label">{{ t('settings.language_label') }}</label>
+          <div class="theme-options">
+            <button
+                class="theme-option"
+                :class="{ active: currentLanguage() === 'en' }"
+                @click="changeLanguage('en')"
+            >
+              <span>English</span>
+            </button>
+            <button
+                class="theme-option"
+                :class="{ active: currentLanguage() === 'zh' }"
+                @click="changeLanguage('zh')"
+            >
+              <span>中文</span>
             </button>
           </div>
         </div>
       </WinCard>
 
-      <WinCard title="Preview Settings">
+      <WinCard :title="t('settings.preview_settings')">
         <div class="settings-grid">
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Maximum preview size (MB) for individual images. Images exceeding this size will not generate previews. Set to 0 to disable previews. Currently only applies to common bitmap formats; RAW previews are not yet supported."
-            >Preview Max Size (MB)</label>
+                   :data-tooltip="t('settings.preview_max_mb_tooltip')"
+            >{{ t('settings.preview_max_mb') }}</label>
             <WinInput type="number"
                       :step="1"
                       :min="0"
@@ -343,8 +376,8 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Number of sub-second digits displayed in capture time. Set to 0 to hide sub-seconds."
-            >Sub-Second Digits</label>
+                   :data-tooltip="t('settings.sub_second_digits_tooltip')"
+            >{{ t('settings.sub_second_digits') }}</label>
             <WinInput type="number"
                       :step="1"
                       :min="0"
@@ -357,15 +390,15 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
         </div>
       </WinCard>
 
-      <WinCard title="AEB Settings">
+      <WinCard :title="t('settings.aeb_settings')">
         <template #header-extra>
-          <span class="card-type-badge aeb-badge">AEB</span>
+          <span class="card-type-badge aeb-badge">{{ t('settings.aeb_badge') }}</span>
         </template>
         <div class="settings-grid">
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Maximum allowed time difference (seconds) between the first and last photo in an AEB group. Sequences exceeding this span will not be recognized as AEB groups. Recommended: 0.3-1.0 seconds. Set to -1 to disable this constraint."
-            >Max Span (s)</label>
+                   :data-tooltip="t('settings.aeb_max_span_tooltip')"
+            >{{ t('settings.aeb_max_span') }}</label>
             <WinInput type="number"
                       :step="0.1"
                       :min="0"
@@ -376,8 +409,8 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Minimum time interval (seconds) between consecutive photos in an AEB group. Helps filter out duplicate records. Recommended: 0.01-0.1 seconds. Set to -1 to disable this constraint."
-            >Min Consecutive Interval (s)</label>
+                   :data-tooltip="t('settings.aeb_min_consecutive_tooltip')"
+            >{{ t('settings.aeb_min_consecutive') }}</label>
             <WinInput type="number"
                       :step="0.1"
                       :min="0"
@@ -388,8 +421,8 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Maximum time interval (seconds) between consecutive photos in an AEB group. Recommended: 0.1-0.5 seconds. Set to -1 to disable this constraint."
-            >Max Consecutive Interval (s)</label>
+                   :data-tooltip="t('settings.aeb_max_consecutive_tooltip')"
+            >{{ t('settings.aeb_max_consecutive') }}</label>
             <WinInput type="number"
                       :step="0.1"
                       :min="0"
@@ -400,8 +433,8 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Minimum number of photos required to form an AEB group. Typical AEB captures are 3, 5, or 7 shots."
-            >Min Count</label>
+                   :data-tooltip="t('settings.aeb_min_count_tooltip')"
+            >{{ t('settings.aeb_min_count') }}</label>
             <WinInput type="number"
                       :step="1"
                       :min="2"
@@ -413,8 +446,8 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="When enabled, only photos with EXIF ExposureMode set to 'Auto Bracket' (value: 2) will be recognized as AEB groups. Manual bracketing will not be recognized."
-            >Auto Bracket Only</label>
+                   :data-tooltip="t('settings.aeb_auto_bracket_tooltip')"
+            >{{ t('settings.aeb_auto_bracket') }}</label>
             <WinToggle
                 :modelValue="store.config?.aeb_settings.auto_bracket_only || false"
                 @update:modelValue="(v) => updateField(store.config?.aeb_settings, 'auto_bracket_only', v)"
@@ -423,15 +456,15 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
         </div>
       </WinCard>
 
-      <WinCard title="Focus Bracketing Settings">
+      <WinCard :title="t('settings.focus_settings')">
         <template #header-extra>
-          <span class="card-type-badge focus-badge">Focus Bracket</span>
+          <span class="card-type-badge focus-badge">{{ t('settings.focus_badge') }}</span>
         </template>
         <div class="settings-grid">
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Disable to stop recognizing focus bracket groups and avoid confusion with burst sequences. Enable only when focus bracketing is needed."
-            >Enable Focus Bracket Detection</label>
+                   :data-tooltip="t('settings.focus_enabled_tooltip')"
+            >{{ t('settings.focus_enabled') }}</label>
             <WinToggle
                 :modelValue="store.config?.focus_bracket_settings.enabled || false"
                 @update:modelValue="(v) => updateField(store.config?.focus_bracket_settings, 'enabled', v)"
@@ -439,8 +472,8 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Maximum allowed time difference (seconds) between the first and last photo in a focus bracket group. Recommended: 0.5-2.0 seconds. Set to -1 to disable this constraint."
-            >Max Span (s)</label>
+                   :data-tooltip="t('settings.focus_max_span_tooltip')"
+            >{{ t('settings.focus_max_span') }}</label>
             <WinInput type="number"
                       :step="0.1"
                       :min="0"
@@ -451,8 +484,8 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Minimum time interval (seconds) between consecutive photos. Recommended: 0.01-0.05 seconds. Set to -1 to disable this constraint."
-            >Min Consecutive Interval (s)</label>
+                   :data-tooltip="t('settings.focus_min_consecutive_tooltip')"
+            >{{ t('settings.focus_min_consecutive') }}</label>
             <WinInput type="number"
                       :step="0.1"
                       :min="0"
@@ -463,8 +496,8 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Maximum time interval (seconds) between consecutive photos. Recommended: 0.2-1.0 seconds. Set to -1 to disable this constraint."
-            >Max Consecutive Interval (s)</label>
+                   :data-tooltip="t('settings.focus_max_consecutive_tooltip')"
+            >{{ t('settings.focus_max_consecutive') }}</label>
             <WinInput type="number"
                       :step="0.1"
                       :min="0"
@@ -475,8 +508,8 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Minimum number of photos required to form a focus bracket group. Recommended: 3-7 photos."
-            >Min Count</label>
+                   :data-tooltip="t('settings.focus_min_count_tooltip')"
+            >{{ t('settings.focus_min_count') }}</label>
             <WinInput type="number"
                       :step="1"
                       :min="2"
@@ -488,16 +521,16 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
         </div>
       </WinCard>
 
-      <WinCard title="Burst Settings">
+      <WinCard :title="t('settings.burst_settings')">
         <template #header-extra>
-          <span class="card-type-badge burst-badge">Burst</span>
+          <span class="card-type-badge burst-badge">{{ t('settings.burst_badge') }}</span>
         </template>
         <div class="settings-grid">
           <div class="setting-item">
             <label
                 class="setting-label has-tooltip"
-                data-tooltip="Minimum time interval (seconds) between consecutive photos in a burst group. Recommended: 0.01-0.05 seconds. Set to -1 to disable this constraint."
-            >Min Consecutive Interval (s)</label>
+                :data-tooltip="t('settings.burst_min_consecutive_tooltip')"
+            >{{ t('settings.burst_min_consecutive') }}</label>
             <WinInput type="number"
                       :step="0.1"
                       :min="0"
@@ -509,8 +542,8 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
           <div class="setting-item">
             <label
                 class="setting-label has-tooltip"
-                data-tooltip="Maximum time interval (seconds) between consecutive photos in a burst group. Recommended: 0.3-1.0 seconds. Set to -1 to disable this constraint."
-            >Max Consecutive Interval (s)</label>
+                :data-tooltip="t('settings.burst_max_consecutive_tooltip')"
+            >{{ t('settings.burst_max_consecutive') }}</label>
             <WinInput type="number"
                       :step="0.1"
                       :min="0"
@@ -522,8 +555,8 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
           <div class="setting-item">
             <label
                 class="setting-label has-tooltip"
-                data-tooltip="Minimum number of photos required to form a burst group. Usually at least 3 photos."
-            >Min Count</label>
+                :data-tooltip="t('settings.burst_min_count_tooltip')"
+            >{{ t('settings.burst_min_count') }}</label>
             <WinInput type="number"
                       :step="1"
                       :min="2"
@@ -535,36 +568,36 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
         </div>
       </WinCard>
 
-      <WinCard title="Naming Rules">
+      <WinCard :title="t('settings.naming_rules')">
         <div class="settings-grid">
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Output directory prefix for focus bracket groups. Organized photos will be placed in directories starting with this prefix."
-            >Focus Bracket Prefix</label>
+                   :data-tooltip="t('settings.focus_bracket_prefix_tooltip')"
+            >{{ t('settings.focus_bracket_prefix') }}</label>
             <WinInput :modelValue="store.config?.naming_rules.focus_bracketing_prefix || ''"
                       @update:modelValue="(v) => updateField(store.config?.naming_rules, 'focus_bracketing_prefix', v as string)"
             />
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Output directory prefix for AEB groups."
-            >AEB Prefix</label>
+                   :data-tooltip="t('settings.aeb_prefix_tooltip')"
+            >{{ t('settings.aeb_prefix') }}</label>
             <WinInput :modelValue="store.config?.naming_rules.aeb_prefix || ''"
                       @update:modelValue="(v) => updateField(store.config?.naming_rules, 'aeb_prefix', v as string)"
             />
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Output directory prefix for burst groups."
-            >Burst Prefix</label>
+                   :data-tooltip="t('settings.burst_prefix_tooltip')"
+            >{{ t('settings.burst_prefix') }}</label>
             <WinInput :modelValue="store.config?.naming_rules.burst_prefix || ''"
                       @update:modelValue="(v) => updateField(store.config?.naming_rules, 'burst_prefix', v as string)"
             />
           </div>
           <div class="setting-item">
             <label class="setting-label has-tooltip"
-                   data-tooltip="Output directory prefix for single photos. Leave empty to use original filenames without a prefix."
-            >Single Prefix</label>
+                   :data-tooltip="t('settings.single_prefix_tooltip')"
+            >{{ t('settings.single_prefix') }}</label>
             <WinInput :modelValue="store.config?.naming_rules.single_prefix || ''"
                       @update:modelValue="(v) => updateField(store.config?.naming_rules, 'single_prefix', v as string)"
             />
@@ -572,25 +605,29 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
         </div>
       </WinCard>
 
-      <WinCard title="Plugin Management">
+      <WinCard :title="t('settings.plugin_management')">
         <template #header-extra>
-          <span class="card-type-badge plugin-badge">Plugins</span>
+          <span class="card-type-badge plugin-badge">{{ t('settings.plugin_badge') }}</span>
         </template>
         <div class="plugin-section">
           <div v-if="!store.pluginsInitialized" class="plugin-loading">
-            <WinButton variant="secondary" @click="loadPlugins">Load Plugins</WinButton>
+            <WinButton variant="secondary" @click="loadPlugins">{{
+                t('settings.load_plugins')
+              }}
+            </WinButton>
           </div>
           <div v-else-if="store.plugins.length === 0" class="plugin-empty">
-            <p>No plugins found</p>
-            <p class="plugin-hint">Place plugin ZIP files in the plugins/ directory under the
-              application folder</p>
+            <p>{{ t('settings.no_plugins') }}</p>
+            <p class="plugin-hint">{{ t('settings.plugin_hint') }}</p>
           </div>
           <div v-else class="plugin-list">
             <div v-for="plugin in getSortedPlugins()" :key="plugin.manifest.id" class="plugin-item">
               <div class="plugin-info">
                 <div class="plugin-header">
                   <span class="plugin-name">{{ plugin.manifest.name }}</span>
-                  <span v-if="plugin.builtin" class="plugin-builtin-badge">Built-in</span>
+                  <span v-if="plugin.builtin" class="plugin-builtin-badge">{{
+                      t('settings.builtin')
+                    }}</span>
                   <span class="plugin-version">v{{ plugin.manifest.version }}</span>
                 </div>
                 <p v-if="plugin.manifest.description" class="plugin-description">
@@ -607,7 +644,7 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
                       :key="cap"
                       class="capability-tag"
                       :style="{ backgroundColor: getCapabilityColor(cap) }"
-                      :title="'Risk Level: ' + getCapabilityRiskLevel(cap)"
+                      :title="t('settings.risk_level', { level: getCapabilityRiskLevel(cap) })"
                   >
                     {{ getCapabilityLabel(cap) }}
                   </span>
@@ -662,8 +699,14 @@ function getCustomCapabilities(capabilities: PluginCapabilities): string[] {
       </WinCard>
 
       <div class="action-buttons">
-        <WinButton variant="danger" @click="resetSettings">Reset to Default</WinButton>
-        <WinButton variant="primary" @click="saveSettings">Save Settings</WinButton>
+        <WinButton variant="danger" @click="resetSettings">{{
+            t('settings.reset_default')
+          }}
+        </WinButton>
+        <WinButton variant="primary" @click="saveSettings">{{
+            t('settings.save_settings')
+          }}
+        </WinButton>
       </div>
     </div>
   </div>

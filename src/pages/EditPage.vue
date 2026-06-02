@@ -2,6 +2,7 @@
 import {store} from "../store/store.ts";
 import WinButton from "../component/WinButton.vue";
 import {useRouter} from "vue-router";
+import {useI18n} from 'vue-i18n';
 import {useTauri} from "../composables/tauri.ts";
 import WinCard from "../component/WinCard.vue";
 import {ExifInfo, Group, GroupType} from "../types/photo.ts";
@@ -24,6 +25,7 @@ import IconPlugin from "../component/icons/IconPlugin.vue";
 const router = useRouter();
 const tauriImpl = useTauri();
 const {showAlert, showConfirm} = useDialog();
+const { t } = useI18n();
 
 const selectedGroupIds = ref<string[]>([]);
 const selectedPhotos = ref<ExifInfo[]>([]);
@@ -119,10 +121,10 @@ async function loadThumbnail(filePath: string, level: 'small' | 'large') {
 
 function getGroupTypeLabel(type: GroupType) {
   const labels: Partial<Record<GroupType, string>> = {
-    FocusBracketing: 'Focus Bracket',
-    AEB: 'AEB',
-    Burst: 'Burst',
-    Single: 'Single',
+    FocusBracketing: t('edit.group_type.focus_bracket'),
+    AEB: t('edit.group_type.aeb'),
+    Burst: t('edit.group_type.burst'),
+    Single: t('edit.group_type.single'),
   };
   return labels[type] || type;
 }
@@ -229,13 +231,13 @@ function toCleanText(value?: string | number) {
 
 function displayValue(value?: string | number) {
   const text = toCleanText(value);
-  return text.length > 0 ? text : '--';
+  return text.length > 0 ? text : t('common.no_value');
 }
 
 function formatWithUnit(value: string | number | undefined, unit: string) {
   const text = toCleanText(value);
   if (!text) {
-    return '--';
+    return t('common.no_value');
   }
   const lowerText = text.toLowerCase();
   const lowerUnit = unit.toLowerCase();
@@ -248,7 +250,7 @@ function formatWithUnit(value: string | number | undefined, unit: string) {
 function formatAperture(value: string | undefined) {
   const text = toCleanText(value);
   if (!text) {
-    return '--';
+    return t('common.no_value');
   }
   if (/^f\s*\//i.test(text)) {
     return text;
@@ -259,7 +261,7 @@ function formatAperture(value: string | undefined) {
 function formatIso(value: string | undefined) {
   const text = toCleanText(value);
   if (!text) {
-    return '--';
+    return t('common.no_value');
   }
   if (/^iso\s*/i.test(text)) {
     return text;
@@ -269,14 +271,14 @@ function formatIso(value: string | undefined) {
 
 function formatExposureMode(value?: number) {
   if (value === undefined || value === null) {
-    return '--';
+    return t('common.no_value');
   }
   const labels: Record<number, string> = {
-    0: 'Auto',
-    1: 'Manual',
-    2: 'Auto Bracket',
+    0: t('edit.exposure_mode.auto'),
+    1: t('edit.exposure_mode.manual'),
+    2: t('edit.exposure_mode.auto_bracket'),
   };
-  return labels[value] ?? `Unknown (${value})`;
+  return labels[value] ?? t('edit.exposure_mode.unknown', { value });
 }
 
 function getSubSecondDigits() {
@@ -290,7 +292,7 @@ function formatCaptureTime(photo: ExifInfo) {
   const subSecond = toCleanText(photo.sub_time).replace(/^\.+/, '');
   const offsetTime = toCleanText(photo.offset_time_original);
   if (!captureTime) {
-    return '--';
+    return t('common.no_value');
   }
 
   const digits = getSubSecondDigits();
@@ -562,10 +564,10 @@ async function handleBlur() {
     return;
   }
 
-  if (!await showConfirm('Save group name?', {
-    title: 'Confirm Rename',
+  if (!await showConfirm(t('edit.save_group_name'), {
+    title: t('edit.confirm_rename'),
     tone: 'warning',
-    confirmText: 'Save',
+    confirmText: t('edit.confirm_save'),
     cancelText: 'Cancel',
   })) {
     cancelRenaming();
@@ -587,7 +589,7 @@ function cancelRenaming() {
 function finishRenaming() {
   if (renamingGroupId.value === 'ungrouped') {
     console.warn("ui.edit.rename: rejected reason=ungrouped");
-    showAlert('Cannot rename ungrouped items.', {title: 'Invalid Operation', tone: 'warning'});
+    showAlert(t('edit.cannot_rename_ungrouped'), {title: t('edit.invalid_operation'), tone: 'warning'});
     return;
   }
 
@@ -603,8 +605,8 @@ function finishRenaming() {
 async function disbandGroup(groupId: string) {
   if (groupId === 'ungrouped') {
     console.warn("ui.edit.disband_group: rejected reason=ungrouped");
-    await showAlert('Cannot disband ungrouped items.', {
-      title: 'Invalid Operation',
+    await showAlert(t('edit.cannot_disband_ungrouped'), {
+      title: t('edit.invalid_operation'),
       tone: 'warning'
     });
     return;
@@ -613,15 +615,15 @@ async function disbandGroup(groupId: string) {
   const group = store.findGroup(groupId);
   if (!group) return;
 
-  if (await showConfirm(`Disband group "${group.name}"? Photos will be moved to ungrouped.`, {
-    title: 'Confirm Disband',
+  if (await showConfirm(t('edit.disband_confirm', { name: group.name }), {
+    title: t('edit.confirm_disband'),
     tone: 'warning',
-    confirmText: 'Disband',
+    confirmText: t('edit.confirm_disband_btn'),
     cancelText: 'Cancel',
   })) {
     console.info(`ui.edit.disband_group: confirmed group=${group.id} name=${group.name}`);
     if (!store.disbandGroup(groupId)) {
-      await showAlert('Failed to disband group.', {title: 'Operation Failed', tone: 'error'});
+      await showAlert(t('edit.disband_failed'), {title: t('edit.operation_failed'), tone: 'error'});
       return;
     }
     clearPhotoSelection();
@@ -633,15 +635,15 @@ async function disbandGroup(groupId: string) {
 async function createGroupFromSelected() {
   if (selectedPhotos.value.length === 0) {
     console.warn("ui.edit.create_group: rejected reason=no_selection");
-    await showAlert('Please select photos first.', {title: 'No Photos Selected', tone: 'warning'});
+    await showAlert(t('edit.select_photos_first'), {title: t('edit.no_photos_selected'), tone: 'warning'});
     return;
   }
-  const name = prompt('Group name:', 'New Group');
+  const name = prompt(t('edit.group_name_prompt'), t('edit.new_group_default'));
   if (name) {
     console.info(`ui.edit.create_group: confirmed name=${name} photos=${selectedPhotos.value.length}`);
     const newGroup = store.createGroup(name);
     if (!newGroup) {
-      await showAlert('Failed to create group.', {title: 'Operation Failed', tone: 'error'});
+      await showAlert(t('edit.create_group_failed'), {title: t('edit.operation_failed'), tone: 'error'});
       return;
     }
     store.movePhotoToGroup(selectedPhotos.value, newGroup.id);
@@ -654,11 +656,11 @@ async function createGroupFromSelected() {
 async function moveSelectedToGroup() {
   if (selectedPhotos.value.length === 0) {
     console.warn("ui.edit.move_photos: rejected reason=no_selection");
-    await showAlert('Please select photos first.', {title: 'No Photos Selected', tone: 'warning'});
+    await showAlert(t('edit.select_photos_first'), {title: t('edit.no_photos_selected'), tone: 'warning'});
     return;
   }
 
-  const targetGroupId = prompt('Target group ID:');
+  const targetGroupId = prompt(t('edit.target_group_id'));
   if (!targetGroupId) {
     console.info("ui.edit.move_photos: canceled");
     return;
@@ -667,7 +669,7 @@ async function moveSelectedToGroup() {
   const targetGroup = store.findGroup(targetGroupId);
   if (!targetGroup) {
     console.warn(`ui.edit.move_photos: rejected reason=group_not_found id=${targetGroupId}`);
-    await showAlert('Target group not found.', {title: 'Group Not Found', tone: 'error'});
+    await showAlert(t('edit.target_group_not_found'), {title: t('edit.group_not_found'), tone: 'error'});
     return;
   }
 
@@ -679,8 +681,8 @@ async function moveSelectedToGroup() {
 async function mergeSelectedGroups() {
   if (selectedGroupIds.value.length < 2) {
     console.warn("ui.edit.merge_groups: rejected reason=insufficient_selection");
-    await showAlert('Please select at least two groups.', {
-      title: 'Insufficient Selection',
+    await showAlert(t('edit.select_two_groups'), {
+      title: t('edit.insufficient_selection'),
       tone: 'warning'
     });
     return;
@@ -688,16 +690,16 @@ async function mergeSelectedGroups() {
 
   if (selectedGroupIds.value.includes('ungrouped')) {
     console.warn("ui.edit.merge_groups: rejected reason=includes_ungrouped");
-    await showAlert('Cannot merge ungrouped items.', {title: 'Invalid Operation', tone: 'warning'});
+    await showAlert(t('edit.cannot_merge_ungrouped'), {title: t('edit.invalid_operation'), tone: 'warning'});
     return;
   }
 
-  const name = prompt('New group name:', 'Merged Group');
+  const name = prompt(t('edit.new_group_name_prompt'), t('edit.merged_group_default'));
   if (name) {
     console.info(`ui.edit.merge_groups: confirmed name=${name} groups=${selectedGroupIds.value.length}`);
     let mergedGroup = store.mergeGroups(selectedGroupIds.value, name);
     if (!mergedGroup) {
-      await showAlert('Failed to merge groups.', {title: 'Operation Failed', tone: 'error'});
+      await showAlert(t('edit.merge_failed'), {title: t('edit.operation_failed'), tone: 'error'});
       return;
     }
   } else {
@@ -708,8 +710,8 @@ async function mergeSelectedGroups() {
 async function executeOrganize() {
   if (!store.outputDirectory) {
     console.warn("ui.edit.organize: rejected reason=missing_output_dir");
-    await showAlert('Please select an output directory first.', {
-      title: 'Missing Output Directory',
+    await showAlert(t('edit.missing_output_dir'), {
+      title: t('edit.missing_output_title'),
       tone: 'warning'
     });
     await router.push('/');
@@ -718,19 +720,17 @@ async function executeOrganize() {
 
   if (store.groupsNumber === 0) {
     console.warn("ui.edit.organize: rejected reason=no_groups");
-    await showAlert('No groups available to organize.', {title: 'No Groups', tone: 'warning'});
+    await showAlert(t('edit.no_groups'), {title: t('edit.no_groups_title'), tone: 'warning'});
     return;
   }
 
   if (
       !await showConfirm(
-          `Organize ${store.groupsNumber} groups? ${
-              store.copyMode ? 'Files will be copied to output directory.' : 'Files will be moved to output directory.'
-          }`,
+          t('edit.organize_confirm', { count: store.groupsNumber, mode: store.copyMode ? t('edit.organize_copy') : t('edit.organize_move') }),
           {
-            title: 'Confirm Organization',
+            title: t('edit.confirm_organization'),
             tone: 'warning',
-            confirmText: 'Organize',
+            confirmText: t('edit.confirm_organize'),
             cancelText: 'Cancel',
             closeOnOverlay: false,
           }
@@ -751,11 +751,11 @@ async function executeOrganize() {
         store.copyMode,
         store.overwrite);
     console.info("ui.edit.organize: complete");
-    await showAlert('Organization complete.', {title: 'Complete', tone: 'success'});
+    await showAlert(t('edit.organization_complete'), {title: t('edit.complete'), tone: 'success'});
   } catch (error) {
     console.error(`ui.edit.organize: failed err=${formatError(error)}`);
-    await showAlert('Organization failed: ' + (error as Error).message, {
-      title: 'Failed',
+    await showAlert(t('edit.organization_failed', { message: (error as Error).message }), {
+      title: t('edit.failed'),
       tone: 'error'
     });
   } finally {
@@ -768,39 +768,39 @@ async function executeOrganize() {
   <div class="edit-page">
     <div class="page-header glass-navbar">
       <div class="header-left">
-        <h1>Edit Groups</h1>
-        <p>{{ store.groupsNumber }} groups, {{ store.photosNumber }} photos</p>
+        <h1>{{ t('edit.title') }}</h1>
+        <p>{{ t('edit.summary', { groups: store.groupsNumber, photos: store.photosNumber }) }}</p>
       </div>
       <div class="header-actions">
         <WinButton @click="$router.push('/')">
           <IconUndo :size="16"/>
-          Back
+          {{ t('edit.back') }}
         </WinButton>
         <WinButton variant="primary"
                    :disabled="store.isOrganizing"
                    @click="executeOrganize"
         >
           <IconSave :size="16"/>
-          {{ store.isOrganizing ? 'Saving...' : 'Save' }}
+          {{ store.isOrganizing ? t('edit.saving') : t('edit.save') }}
         </WinButton>
       </div>
     </div>
 
     <div class="page-content">
       <div class="sidebar glass-sidebar">
-        <WinCard title="Group Operations">
+        <WinCard :title="t('edit.group_operations')">
           <div class="action-group">
             <WinButton full-width
                        :disabled="selectedGroupIds.length < 2"
                        @click="mergeSelectedGroups"
             >
               <IconMerge :size="16"/>
-              Merge Selected Groups
+              {{ t('edit.merge_selected_groups') }}
             </WinButton>
           </div>
         </WinCard>
 
-        <WinCard title="Photo Operations">
+        <WinCard :title="t('edit.photo_operations')">
           <div class="action-group">
             <WinButton
                 full-width
@@ -808,7 +808,7 @@ async function executeOrganize() {
                 @click="createGroupFromSelected"
             >
               <IconPlus :size="16"/>
-              Create Group from Selection
+              {{ t('edit.create_group_from_selection') }}
             </WinButton>
             <WinButton
                 full-width
@@ -816,7 +816,7 @@ async function executeOrganize() {
                 @click="moveSelectedToGroup"
             >
               <IconMove :size="16"/>
-              Move Selection to Group
+              {{ t('edit.move_selection_to_group') }}
             </WinButton>
           </div>
         </WinCard>
@@ -868,14 +868,14 @@ async function executeOrganize() {
               <button v-if="group.id !== 'ungrouped'"
                       class="icon-btn"
                       @click.stop="startRenaming(group)"
-                      title="Rename"
+                      :title="t('edit.rename')"
               >
                 <IconEdit :size="14"/>
               </button>
               <button v-if="group.id !== 'ungrouped'"
                       class="icon-btn"
                       @click.stop="disbandGroup(group.id)"
-                      title="Disband"
+                      :title="t('edit.disband')"
               >
                 <IconTrash :size="14"/>
               </button>
@@ -956,7 +956,7 @@ async function executeOrganize() {
            @click.self="closePhotoDetail">
         <div class="photo-detail-dialog glass-dialog anim-scale-in" role="dialog" aria-modal="true">
           <div class="photo-detail-header">
-            <h3>Photo Details</h3>
+            <h3>{{ t('edit.photo_details') }}</h3>
             <WinButton variant="secondary" size="small" @click="closePhotoDetail">
               <IconClose :size="16"/>
             </WinButton>
@@ -969,53 +969,53 @@ async function executeOrganize() {
                    :alt="detailPhoto.file_name"
                    class="photo-detail-image"
               />
-              <div v-else-if="isDetailLoading" class="photo-detail-placeholder">Loading...</div>
-              <div v-else class="photo-detail-placeholder">No preview available</div>
+              <div v-else-if="isDetailLoading" class="photo-detail-placeholder">{{ t('edit.loading') }}</div>
+              <div v-else class="photo-detail-placeholder">{{ t('edit.no_preview') }}</div>
             </div>
 
             <div class="photo-detail-grid">
               <div class="detail-item">
-                <span>File Name</span><strong>{{ displayValue(detailPhoto.file_name) }}</strong>
+                <span>{{ t('edit.detail.file_name') }}</span><strong>{{ displayValue(detailPhoto.file_name) }}</strong>
               </div>
               <div class="detail-item">
-                <span>File Path</span><strong>{{ displayValue(detailPhoto.file_path) }}</strong>
+                <span>{{ t('edit.detail.file_path') }}</span><strong>{{ displayValue(detailPhoto.file_path) }}</strong>
               </div>
               <div class="detail-item">
-                <span>Capture Time</span><strong>{{ formatCaptureTime(detailPhoto) }}</strong>
+                <span>{{ t('edit.detail.capture_time') }}</span><strong>{{ formatCaptureTime(detailPhoto) }}</strong>
               </div>
               <div class="detail-item">
-                <span>Shutter Speed</span><strong>{{
+                <span>{{ t('edit.detail.shutter_speed') }}</span><strong>{{
                   formatWithUnit(detailPhoto.shutter_speed, 's')
                 }}</strong>
               </div>
               <div class="detail-item">
-                <span>Aperture</span><strong>{{ formatAperture(detailPhoto.aperture) }}</strong>
+                <span>{{ t('edit.detail.aperture') }}</span><strong>{{ formatAperture(detailPhoto.aperture) }}</strong>
               </div>
-              <div class="detail-item"><span>ISO</span><strong>{{
+              <div class="detail-item"><span>{{ t('edit.detail.iso') }}</span><strong>{{
                   formatIso(detailPhoto.iso)
                 }}</strong></div>
-              <div class="detail-item"><span>Exposure Comp.</span><strong>{{
+              <div class="detail-item"><span>{{ t('edit.detail.exposure_comp') }}</span><strong>{{
                   formatWithUnit(detailPhoto.exposure_compensation, 'EV')
                 }}</strong></div>
               <div class="detail-item">
-                <span>Exposure Mode</span><strong>{{
+                <span>{{ t('edit.detail.exposure_mode') }}</span><strong>{{
                   formatExposureMode(detailPhoto.exposure_mode)
                 }}</strong>
               </div>
               <div class="detail-item">
-                <span>Focal Length</span><strong>{{
+                <span>{{ t('edit.detail.focal_length') }}</span><strong>{{
                   formatWithUnit(detailPhoto.focal_length, 'mm')
                 }}</strong></div>
               <div class="detail-item">
-                <span>Focus Distance</span><strong>{{
+                <span>{{ t('edit.detail.focus_distance') }}</span><strong>{{
                   formatWithUnit(detailPhoto.focus_distance, 'm')
                 }}</strong>
               </div>
               <div class="detail-item">
-                <span>Camera Make</span><strong>{{ displayValue(detailPhoto.camera_make) }}</strong>
+                <span>{{ t('edit.detail.camera_make') }}</span><strong>{{ displayValue(detailPhoto.camera_make) }}</strong>
               </div>
               <div class="detail-item">
-                <span>Camera Model</span><strong>{{
+                <span>{{ t('edit.detail.camera_model') }}</span><strong>{{
                   displayValue(detailPhoto.camera_model)
                 }}</strong>
               </div>

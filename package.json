@@ -14,9 +14,10 @@
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "@tauri-apps/plugin-log": "^2.8.0",
     "@tauri-apps/plugin-opener": "^2",
+    "typescript": "~6.0.2",
     "vue": "^3.5.32",
-    "vue-router": "^5.0.4",
-    "typescript": "~6.0.2"
+    "vue-i18n": "^11.4.4",
+    "vue-router": "^5.0.4"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

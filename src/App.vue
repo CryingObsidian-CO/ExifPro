@@ -3,6 +3,7 @@ import {useRouter, useRoute} from 'vue-router';
 import {store} from "./store/store.ts";
 import WinDialogHost from "./component/WinDialogHost.vue";
 import {onMounted} from 'vue';
+import {useI18n} from 'vue-i18n';
 import {useTauri} from './composables/tauri';
 import {useDialog} from './composables/dialog';
 import {formatError} from "./composables/logger";
@@ -13,14 +14,15 @@ import IconMoon from "./component/icons/IconMoon.vue";
 import IconMonitor from "./component/icons/IconMonitor.vue";
 import IconBrand from "./component/icons/IconBrand.vue";
 
+const { t } = useI18n();
 const router = useRouter();
 const route = useRoute();
 const tauriImpl = useTauri();
 const {showAlert} = useDialog();
 
 const navItems = [
-  {path: '/', name: 'Home', component: IconHome},
-  {path: '/settings', name: 'Settings', component: IconSettings},
+  {path: '/', name: t('app.nav.home'), component: IconHome},
+  {path: '/settings', name: t('app.nav.settings'), component: IconSettings},
 ];
 
 const isEditPage = () => route?.path === '/edit';
@@ -39,11 +41,11 @@ const themeIcon = () => {
 const themeLabel = () => {
   switch (store.theme) {
     case 'light':
-      return 'Light';
+      return t('app.theme.light');
     case 'dark':
-      return 'Dark';
+      return t('app.theme.dark');
     default:
-      return 'System';
+      return t('app.theme.system');
   }
 };
 
@@ -60,8 +62,8 @@ onMounted(async () => {
     } catch (error) {
       console.error(`ui.app.config: load failed err=${formatError(error)}`);
       store.config = await tauriImpl.resetConfig();
-      await showAlert('Configuration file read failed. Restored to default settings.', {
-        title: 'Configuration Reset',
+      await showAlert(t('app.config.load_failed'), {
+        title: t('app.config.config_reset'),
         tone: 'warning'
       });
     }
@@ -98,7 +100,7 @@ onMounted(async () => {
       <div class="nav-theme">
         <button class="theme-toggle glass-item"
                 @click="cycleTheme"
-                :title="'Theme: ' + themeLabel()"
+                :title="t('app.theme.title', { theme: themeLabel() })"
         >
           <component :is="themeIcon()" :size="18"/>
         </button>
