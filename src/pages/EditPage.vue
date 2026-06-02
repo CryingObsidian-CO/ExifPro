@@ -1215,7 +1215,7 @@ async function executeOrganize() {
 }
 
 .win-btn-close:hover {
-  color: var(--color-error);
+  color: var(--color-danger);
 }
 
 .page-content {

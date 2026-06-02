@@ -2,7 +2,7 @@
 import {useRouter, useRoute} from 'vue-router';
 import {store} from "./store/store.ts";
 import WinDialogHost from "./component/WinDialogHost.vue";
-import {onMounted} from 'vue';
+import {onMounted, computed} from 'vue';
 import {useI18n} from 'vue-i18n';
 import {useTauri} from './composables/tauri';
 import {useDialog} from './composables/dialog';
@@ -24,10 +24,10 @@ const route = useRoute();
 const tauriImpl = useTauri();
 const {showAlert} = useDialog();
 
-const navItems = [
+const navItems = computed(() => [
   {path: '/', name: t('app.nav.home'), component: IconHome},
   {path: '/settings', name: t('app.nav.settings'), component: IconSettings},
-];
+]);
 
 const isEditPage = () => route?.path === '/edit';
 
@@ -239,7 +239,7 @@ onMounted(async () => {
 }
 
 .win-btn-close:hover {
-  color: var(--color-error);
+  color: var(--color-danger);
 }
 
 .nav-item:focus-visible,
