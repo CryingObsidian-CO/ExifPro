@@ -14,6 +14,11 @@
     "config": {
       "load_failed": "配置文件读取失败，已恢复为默认设置。",
       "config_reset": "配置重置"
+    },
+    "window": {
+      "minimize": "最小化",
+      "maximize": "最大化",
+      "close": "关闭"
     }
   },
   "home": {

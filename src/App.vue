@@ -13,8 +13,12 @@ import IconSun from "./component/icons/IconSun.vue";
 import IconMoon from "./component/icons/IconMoon.vue";
 import IconMonitor from "./component/icons/IconMonitor.vue";
 import IconBrand from "./component/icons/IconBrand.vue";
+import IconMinimize from "./component/icons/IconMinimize.vue";
+import IconMaximize from "./component/icons/IconMaximize.vue";
+import IconClose from "./component/icons/IconClose.vue";
+import {getCurrentWindow} from '@tauri-apps/api/window';
 
-const { t } = useI18n();
+const {t} = useI18n();
 const router = useRouter();
 const route = useRoute();
 const tauriImpl = useTauri();
@@ -53,6 +57,20 @@ const cycleTheme = () => {
   store.theme = store.theme === 'light' ? 'dark' : store.theme === 'dark' ? 'system' : 'light';
 };
 
+const appWindow = getCurrentWindow();
+
+const handleMinimize = () => {
+  appWindow.minimize();
+};
+
+const handleMaximize = () => {
+  appWindow.toggleMaximize();
+};
+
+const handleClose = () => {
+  appWindow.close();
+};
+
 onMounted(async () => {
   if (!store.config) {
     console.info("ui.app.config: load start");
@@ -79,7 +97,7 @@ onMounted(async () => {
 
 <template>
   <div class="app">
-    <div v-if="!isEditPage()" class="nav-bar glass-navbar">
+    <div v-if="!isEditPage()" class="nav-bar glass-navbar" data-tauri-drag-region>
       <div class="nav-brand">
         <IconBrand class="brand-logo"/>
         <span class="brand-name">ExifPro</span>
@@ -103,6 +121,27 @@ onMounted(async () => {
                 :title="t('app.theme.title', { theme: themeLabel() })"
         >
           <component :is="themeIcon()" :size="18"/>
+        </button>
+      </div>
+
+      <div class="nav-window-controls">
+        <button class="win-btn glass-item"
+                @click="handleMinimize"
+                :title="t('app.window.minimize')"
+        >
+          <IconMinimize :size="16"/>
+        </button>
+        <button class="win-btn glass-item"
+                @click="handleMaximize"
+                :title="t('app.window.maximize')"
+        >
+          <IconMaximize :size="16"/>
+        </button>
+        <button class="win-btn win-btn-close glass-item"
+                @click="handleClose"
+                :title="t('app.window.close')"
+        >
+          <IconClose :size="19"/>
         </button>
       </div>
     </div>
@@ -184,8 +223,28 @@ onMounted(async () => {
   justify-content: center;
 }
 
+.nav-window-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--prim-space-1);
+  margin-left: var(--prim-space-2);
+}
+
+.win-btn {
+  padding: 6px var(--prim-space-2);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.win-btn-close:hover {
+  color: var(--color-error);
+}
+
 .nav-item:focus-visible,
-.theme-toggle:focus-visible {
+.theme-toggle:focus-visible,
+.win-btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--color-border-focus);
 }
