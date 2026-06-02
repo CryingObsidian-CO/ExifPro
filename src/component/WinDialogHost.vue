@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed} from "vue";
+import {computed, ref, watch, nextTick} from "vue";
 import WinButton from "./WinButton.vue";
 import {useDialogState} from "../composables/dialog.ts";
 import IconInfo from "./icons/IconInfo.vue";
@@ -8,6 +8,75 @@ import IconWarning from "./icons/IconWarning.vue";
 import IconError from "./icons/IconError.vue";
 
 const {dialogState, confirmDialog, cancelDialog, closeByOverlay} = useDialogState();
+
+const dialogPanelRef = ref<HTMLElement | null>(null);
+let lastFocusedElement: HTMLElement | null = null;
+
+function getFocusableElements(): HTMLElement[] {
+  const panel = dialogPanelRef.value;
+  if (!panel) return [];
+  const selectors = [
+    'button:not([disabled])',
+    'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+  ];
+  const elements = panel.querySelectorAll<HTMLElement>(selectors.join(','));
+  return Array.from(elements).filter((el) => {
+    const style = getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden' && el.offsetParent !== null;
+  });
+}
+
+function handleDialogKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Tab') return;
+
+  const focusable = getFocusableElements();
+  if (focusable.length === 0) return;
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+
+  if (event.shiftKey) {
+    if (active === first || !panelContainsActive()) {
+      event.preventDefault();
+      last.focus();
+    }
+  } else {
+    if (active === last || !panelContainsActive()) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+}
+
+function panelContainsActive(): boolean {
+  const panel = dialogPanelRef.value;
+  if (!panel) return false;
+  return panel.contains(document.activeElement);
+}
+
+watch(() => dialogState.visible, async (visible) => {
+  if (visible) {
+    lastFocusedElement = document.activeElement as HTMLElement | null;
+    await nextTick();
+    const focusable = getFocusableElements();
+    if (focusable.length > 0) {
+      const isDestructive = dialogState.tone === 'error' || dialogState.tone === 'warning';
+      const targetIndex = isDestructive ? 0 : focusable.length - 1;
+      focusable[targetIndex].focus();
+    } else {
+      dialogPanelRef.value?.focus();
+    }
+  } else {
+    if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+      lastFocusedElement.focus();
+    }
+    lastFocusedElement = null;
+  }
+});
 
 const toneIcon = computed(() => {
   switch (dialogState.tone) {
@@ -29,7 +98,12 @@ const confirmVariant = computed(() => (dialogState.tone === "error" ? "danger" :
   <Teleport to="body">
     <div v-if="dialogState.visible" class="dialog-overlay glass-overlay"
          @click.self="closeByOverlay">
-      <div class="dialog-panel glass-dialog anim-scale-in" role="dialog" aria-modal="true">
+      <div class="dialog-panel glass-dialog anim-scale-in"
+           role="dialog"
+           aria-modal="true"
+           ref="dialogPanelRef"
+           tabindex="-1"
+           @keydown="handleDialogKeydown">
         <div class="dialog-header">
           <div class="dialog-icon" :class="`tone-${dialogState.tone}`">
             <component :is="toneIcon" :size="20"/>

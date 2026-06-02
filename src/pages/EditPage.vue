@@ -25,7 +25,7 @@ import IconPlugin from "../component/icons/IconPlugin.vue";
 const router = useRouter();
 const tauriImpl = useTauri();
 const {showAlert, showConfirm} = useDialog();
-const { t } = useI18n();
+const {t} = useI18n();
 
 const selectedGroupIds = ref<string[]>([]);
 const selectedPhotos = ref<ExifInfo[]>([]);
@@ -37,6 +37,8 @@ const newGroupName = ref('');
 
 const mainContentRef = ref<HTMLElement | null>(null);
 const photosGridRef = ref<HTMLElement | null>(null);
+const detailDialogRef = ref<HTMLElement | null>(null);
+let lastFocusedBeforeDetail: HTMLElement | null = null;
 const selectionBox = ref({
   visible: false,
   left: 0,
@@ -278,7 +280,7 @@ function formatExposureMode(value?: number) {
     1: t('edit.exposure_mode.manual'),
     2: t('edit.exposure_mode.auto_bracket'),
   };
-  return labels[value] ?? t('edit.exposure_mode.unknown', { value });
+  return labels[value] ?? t('edit.exposure_mode.unknown', {value});
 }
 
 function getSubSecondDigits() {
@@ -304,9 +306,14 @@ function formatCaptureTime(photo: ExifInfo) {
 }
 
 function openPhotoDetail(photo: ExifInfo) {
+  lastFocusedBeforeDetail = document.activeElement as HTMLElement | null;
   detailPhoto.value = photo;
   detailThumbnail.value = null;
   loadDetailThumbnail(photo.file_path);
+  nextTick(() => {
+    const closeBtn = detailDialogRef.value?.querySelector<HTMLElement>('button');
+    closeBtn?.focus();
+  });
 }
 
 async function loadDetailThumbnail(filePath: string) {
@@ -329,6 +336,46 @@ async function loadDetailThumbnail(filePath: string) {
 function closePhotoDetail() {
   detailPhoto.value = null;
   detailThumbnail.value = null;
+  if (lastFocusedBeforeDetail && typeof lastFocusedBeforeDetail.focus === 'function') {
+    lastFocusedBeforeDetail.focus();
+  }
+  lastFocusedBeforeDetail = null;
+}
+
+function handleDetailKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Tab') return;
+
+  const dialog = detailDialogRef.value;
+  if (!dialog) return;
+
+  const selectors = [
+    'button:not([disabled])',
+    'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+  ];
+  const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(selectors.join(','))).filter((el) => {
+    const style = getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden' && el.offsetParent !== null;
+  });
+  if (focusable.length === 0) return;
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+
+  if (event.shiftKey) {
+    if (active === first || !dialog.contains(active)) {
+      event.preventDefault();
+      last.focus();
+    }
+  } else {
+    if (active === last || !dialog.contains(active)) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 }
 
 function handleWindowKeydown(event: KeyboardEvent) {
@@ -350,10 +397,8 @@ function getRangeSelection(targetKey: string) {
   return keys.slice(left, right + 1);
 }
 
-function handlePhotoClick(photo: ExifInfo, event: MouseEvent) {
+function selectPhoto(photo: ExifInfo, isToggle: boolean, isRange: boolean) {
   const key = photo.file_path;
-  const isToggle = event.ctrlKey || event.metaKey;
-  const isRange = event.shiftKey;
 
   if (isRange) {
     const rangeKeys = getRangeSelection(key);
@@ -376,6 +421,23 @@ function handlePhotoClick(photo: ExifInfo, event: MouseEvent) {
   }
   applyPhotoSelection([key]);
   lastAnchorPhotoKey.value = key;
+}
+
+function handlePhotoClick(photo: ExifInfo, event: MouseEvent) {
+  const isToggle = event.ctrlKey || event.metaKey;
+  const isRange = event.shiftKey;
+  selectPhoto(photo, isToggle, isRange);
+
+  // 点击时也将焦点移到该图片，确保键盘导航从正确位置开始
+  const target = event.currentTarget as HTMLElement;
+  target?.focus();
+}
+
+function handlePhotoKeyDown(photo: ExifInfo, event: KeyboardEvent) {
+  // NOTE 对于因为系统级快捷键导致的阻挡问题 (ctrl + space) ，可以通过按下其他按键解决，如 (ctrl + alt + space)
+  const isToggle = event.ctrlKey || event.metaKey;
+  const isRange = event.shiftKey;
+  selectPhoto(photo, isToggle, isRange);
 }
 
 function rectanglesIntersect(a: DOMRect, b: DOMRect) {
@@ -589,7 +651,10 @@ function cancelRenaming() {
 function finishRenaming() {
   if (renamingGroupId.value === 'ungrouped') {
     console.warn("ui.edit.rename: rejected reason=ungrouped");
-    showAlert(t('edit.cannot_rename_ungrouped'), {title: t('edit.invalid_operation'), tone: 'warning'});
+    showAlert(t('edit.cannot_rename_ungrouped'), {
+      title: t('edit.invalid_operation'),
+      tone: 'warning'
+    });
     return;
   }
 
@@ -615,7 +680,7 @@ async function disbandGroup(groupId: string) {
   const group = store.findGroup(groupId);
   if (!group) return;
 
-  if (await showConfirm(t('edit.disband_confirm', { name: group.name }), {
+  if (await showConfirm(t('edit.disband_confirm', {name: group.name}), {
     title: t('edit.confirm_disband'),
     tone: 'warning',
     confirmText: t('edit.confirm_disband_btn'),
@@ -635,7 +700,10 @@ async function disbandGroup(groupId: string) {
 async function createGroupFromSelected() {
   if (selectedPhotos.value.length === 0) {
     console.warn("ui.edit.create_group: rejected reason=no_selection");
-    await showAlert(t('edit.select_photos_first'), {title: t('edit.no_photos_selected'), tone: 'warning'});
+    await showAlert(t('edit.select_photos_first'), {
+      title: t('edit.no_photos_selected'),
+      tone: 'warning'
+    });
     return;
   }
   const name = prompt(t('edit.group_name_prompt'), t('edit.new_group_default'));
@@ -643,7 +711,10 @@ async function createGroupFromSelected() {
     console.info(`ui.edit.create_group: confirmed name=${name} photos=${selectedPhotos.value.length}`);
     const newGroup = store.createGroup(name);
     if (!newGroup) {
-      await showAlert(t('edit.create_group_failed'), {title: t('edit.operation_failed'), tone: 'error'});
+      await showAlert(t('edit.create_group_failed'), {
+        title: t('edit.operation_failed'),
+        tone: 'error'
+      });
       return;
     }
     store.movePhotoToGroup(selectedPhotos.value, newGroup.id);
@@ -656,7 +727,10 @@ async function createGroupFromSelected() {
 async function moveSelectedToGroup() {
   if (selectedPhotos.value.length === 0) {
     console.warn("ui.edit.move_photos: rejected reason=no_selection");
-    await showAlert(t('edit.select_photos_first'), {title: t('edit.no_photos_selected'), tone: 'warning'});
+    await showAlert(t('edit.select_photos_first'), {
+      title: t('edit.no_photos_selected'),
+      tone: 'warning'
+    });
     return;
   }
 
@@ -669,7 +743,10 @@ async function moveSelectedToGroup() {
   const targetGroup = store.findGroup(targetGroupId);
   if (!targetGroup) {
     console.warn(`ui.edit.move_photos: rejected reason=group_not_found id=${targetGroupId}`);
-    await showAlert(t('edit.target_group_not_found'), {title: t('edit.group_not_found'), tone: 'error'});
+    await showAlert(t('edit.target_group_not_found'), {
+      title: t('edit.group_not_found'),
+      tone: 'error'
+    });
     return;
   }
 
@@ -690,7 +767,10 @@ async function mergeSelectedGroups() {
 
   if (selectedGroupIds.value.includes('ungrouped')) {
     console.warn("ui.edit.merge_groups: rejected reason=includes_ungrouped");
-    await showAlert(t('edit.cannot_merge_ungrouped'), {title: t('edit.invalid_operation'), tone: 'warning'});
+    await showAlert(t('edit.cannot_merge_ungrouped'), {
+      title: t('edit.invalid_operation'),
+      tone: 'warning'
+    });
     return;
   }
 
@@ -726,7 +806,10 @@ async function executeOrganize() {
 
   if (
       !await showConfirm(
-          t('edit.organize_confirm', { count: store.groupsNumber, mode: store.copyMode ? t('edit.organize_copy') : t('edit.organize_move') }),
+          t('edit.organize_confirm', {
+            count: store.groupsNumber,
+            mode: store.copyMode ? t('edit.organize_copy') : t('edit.organize_move')
+          }),
           {
             title: t('edit.confirm_organization'),
             tone: 'warning',
@@ -754,7 +837,7 @@ async function executeOrganize() {
     await showAlert(t('edit.organization_complete'), {title: t('edit.complete'), tone: 'success'});
   } catch (error) {
     console.error(`ui.edit.organize: failed err=${formatError(error)}`);
-    await showAlert(t('edit.organization_failed', { message: (error as Error).message }), {
+    await showAlert(t('edit.organization_failed', {message: (error as Error).message}), {
       title: t('edit.failed'),
       tone: 'error'
     });
@@ -769,7 +852,7 @@ async function executeOrganize() {
     <div class="page-header glass-navbar">
       <div class="header-left">
         <h1>{{ t('edit.title') }}</h1>
-        <p>{{ t('edit.summary', { groups: store.groupsNumber, photos: store.photosNumber }) }}</p>
+        <p>{{ t('edit.summary', {groups: store.groupsNumber, photos: store.photosNumber}) }}</p>
       </div>
       <div class="header-actions">
         <WinButton @click="$router.push('/')">
@@ -911,6 +994,7 @@ async function executeOrganize() {
                   @click="handlePhotoClick(photo, $event)"
                   @dblclick.stop="openPhotoDetail(photo)"
                   @keydown.enter.prevent="openPhotoDetail(photo)"
+                  @keydown.space.prevent="handlePhotoKeyDown(photo, $event)"
                   @dragstart.prevent
                   tabindex="0"
               >
@@ -954,7 +1038,11 @@ async function executeOrganize() {
 
       <div v-if="detailPhoto" class="photo-detail-overlay glass-overlay"
            @click.self="closePhotoDetail">
-        <div class="photo-detail-dialog glass-dialog anim-scale-in" role="dialog" aria-modal="true">
+        <div class="photo-detail-dialog glass-dialog anim-scale-in"
+             role="dialog"
+             aria-modal="true"
+             ref="detailDialogRef"
+             @keydown="handleDetailKeydown">
           <div class="photo-detail-header">
             <h3>{{ t('edit.photo_details') }}</h3>
             <WinButton variant="secondary" size="small" @click="closePhotoDetail">
@@ -969,19 +1057,28 @@ async function executeOrganize() {
                    :alt="detailPhoto.file_name"
                    class="photo-detail-image"
               />
-              <div v-else-if="isDetailLoading" class="photo-detail-placeholder">{{ t('edit.loading') }}</div>
+              <div v-else-if="isDetailLoading" class="photo-detail-placeholder">{{
+                  t('edit.loading')
+                }}
+              </div>
               <div v-else class="photo-detail-placeholder">{{ t('edit.no_preview') }}</div>
             </div>
 
             <div class="photo-detail-grid">
               <div class="detail-item">
-                <span>{{ t('edit.detail.file_name') }}</span><strong>{{ displayValue(detailPhoto.file_name) }}</strong>
+                <span>{{
+                    t('edit.detail.file_name')
+                  }}</span><strong>{{ displayValue(detailPhoto.file_name) }}</strong>
               </div>
               <div class="detail-item">
-                <span>{{ t('edit.detail.file_path') }}</span><strong>{{ displayValue(detailPhoto.file_path) }}</strong>
+                <span>{{
+                    t('edit.detail.file_path')
+                  }}</span><strong>{{ displayValue(detailPhoto.file_path) }}</strong>
               </div>
               <div class="detail-item">
-                <span>{{ t('edit.detail.capture_time') }}</span><strong>{{ formatCaptureTime(detailPhoto) }}</strong>
+                <span>{{
+                    t('edit.detail.capture_time')
+                  }}</span><strong>{{ formatCaptureTime(detailPhoto) }}</strong>
               </div>
               <div class="detail-item">
                 <span>{{ t('edit.detail.shutter_speed') }}</span><strong>{{
@@ -989,7 +1086,9 @@ async function executeOrganize() {
                 }}</strong>
               </div>
               <div class="detail-item">
-                <span>{{ t('edit.detail.aperture') }}</span><strong>{{ formatAperture(detailPhoto.aperture) }}</strong>
+                <span>{{
+                    t('edit.detail.aperture')
+                  }}</span><strong>{{ formatAperture(detailPhoto.aperture) }}</strong>
               </div>
               <div class="detail-item"><span>{{ t('edit.detail.iso') }}</span><strong>{{
                   formatIso(detailPhoto.iso)
@@ -1012,7 +1111,9 @@ async function executeOrganize() {
                 }}</strong>
               </div>
               <div class="detail-item">
-                <span>{{ t('edit.detail.camera_make') }}</span><strong>{{ displayValue(detailPhoto.camera_make) }}</strong>
+                <span>{{
+                    t('edit.detail.camera_make')
+                  }}</span><strong>{{ displayValue(detailPhoto.camera_make) }}</strong>
               </div>
               <div class="detail-item">
                 <span>{{ t('edit.detail.camera_model') }}</span><strong>{{
@@ -1228,12 +1329,19 @@ async function executeOrganize() {
 
 .photo-thumb:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--color-border-focus);
+  box-shadow: 0 0 0 3px var(--color-border-focus), 0 0 12px rgba(var(--prim-cyan-400-rgb), 0.3);
 }
 
 .photo-thumb.selected {
-  border-color: var(--color-brand);
-  box-shadow: 0 0 0 1px var(--color-brand);
+  border-color: var(--prim-success-400);
+  background-color: rgba(var(--prim-success-400-rgb), 0.12);
+  box-shadow: inset 0 0 0 1px var(--prim-success-400);
+}
+
+.photo-thumb.selected:focus-visible {
+  box-shadow: 0 0 0 3px var(--color-border-focus),
+  0 0 12px rgba(var(--prim-cyan-400-rgb), 0.3),
+  inset 0 0 0 1px var(--prim-success-400);
 }
 
 .selection-box {
