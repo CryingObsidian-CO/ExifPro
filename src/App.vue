@@ -120,7 +120,7 @@ onMounted(async () => {
                 @click="cycleTheme"
                 :title="t('app.theme.title', { theme: themeLabel() })"
         >
-          <component :is="themeIcon()" :size="18"/>
+          <component :is="themeIcon()" :size="24"/>
         </button>
       </div>
 
@@ -129,13 +129,13 @@ onMounted(async () => {
                 @click="handleMinimize"
                 :title="t('app.window.minimize')"
         >
-          <IconMinimize :size="16"/>
+          <IconMinimize :size="24"/>
         </button>
         <button class="win-btn glass-item"
                 @click="handleMaximize"
                 :title="t('app.window.maximize')"
         >
-          <IconMaximize :size="16"/>
+          <IconMaximize :size="24"/>
         </button>
         <button class="win-btn win-btn-close glass-item"
                 @click="handleClose"

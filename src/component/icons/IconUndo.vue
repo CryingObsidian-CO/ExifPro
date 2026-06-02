@@ -13,7 +13,7 @@ defineProps<{ size?: number }>();
       stroke-linecap="round"
       stroke-linejoin="round"
   >
-    <polyline points="15 10 10 15 15 20"/>
-    <path d="M4 4v7a4 4 0 0 0 4 4h12"/>
+    <path d="M20 19 A12 12 0 0 0 7 7"/>
+    <polyline points="10 4 7 7 10 10"/>
   </svg>
 </template>

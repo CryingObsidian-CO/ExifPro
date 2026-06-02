@@ -61,7 +61,7 @@
     "preview_max_mb": "预览最大大小 (MB)",
     "preview_max_mb_tooltip": "单张图片的最大预览大小 (MB)。超过此大小的图片将不生成预览。设为 0 可禁用预览。目前仅适用于常见位图格式，暂不支持 RAW 预览。",
     "sub_second_digits": "亚秒位数",
-    "sub_second_digits_tooltip": "拍摄时间中显示的亚秒位数。设为 0 可隐藏亚秒。",
+    "sub_second_digits_tooltip": "拍摄时间中显示的亚秒位数 (0-9)。设为 0 可隐藏亚秒。",
     "aeb_settings": "AEB 设置",
     "aeb_badge": "AEB",
     "aeb_max_span": "最大时间跨度 (秒)",

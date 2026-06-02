@@ -19,13 +19,30 @@ import IconMerge from "../component/icons/IconMerge.vue";
 import IconEdit from "../component/icons/IconEdit.vue";
 import IconTrash from "../component/icons/IconTrash.vue";
 import IconClose from "../component/icons/IconClose.vue";
+import IconMinimize from "../component/icons/IconMinimize.vue";
+import IconMaximize from "../component/icons/IconMaximize.vue";
 import IconImage from "../component/icons/IconImage.vue";
 import IconPlugin from "../component/icons/IconPlugin.vue";
+import {getCurrentWindow} from '@tauri-apps/api/window';
 
 const router = useRouter();
 const tauriImpl = useTauri();
 const {showAlert, showConfirm} = useDialog();
 const {t} = useI18n();
+
+const appWindow = getCurrentWindow();
+
+const handleMinimize = () => {
+  appWindow.minimize();
+};
+
+const handleMaximize = () => {
+  appWindow.toggleMaximize();
+};
+
+const handleClose = () => {
+  appWindow.close();
+};
 
 const selectedGroupIds = ref<string[]>([]);
 const selectedPhotos = ref<ExifInfo[]>([]);
@@ -630,7 +647,7 @@ async function handleBlur() {
     title: t('edit.confirm_rename'),
     tone: 'warning',
     confirmText: t('edit.confirm_save'),
-    cancelText: 'Cancel',
+    cancelText: t('common.cancel'),
   })) {
     cancelRenaming();
     return;
@@ -849,7 +866,7 @@ async function executeOrganize() {
 
 <template>
   <div class="edit-page">
-    <div class="page-header glass-navbar">
+    <div class="page-header glass-navbar" data-tauri-drag-region>
       <div class="header-left">
         <h1>{{ t('edit.title') }}</h1>
         <p>{{ t('edit.summary', {groups: store.groupsNumber, photos: store.photosNumber}) }}</p>
@@ -866,6 +883,26 @@ async function executeOrganize() {
           <IconSave :size="16"/>
           {{ store.isOrganizing ? t('edit.saving') : t('edit.save') }}
         </WinButton>
+      </div>
+      <div class="nav-window-controls">
+        <button class="win-btn glass-item"
+                @click="handleMinimize"
+                :title="t('app.window.minimize')"
+        >
+          <IconMinimize :size="24"/>
+        </button>
+        <button class="win-btn glass-item"
+                @click="handleMaximize"
+                :title="t('app.window.maximize')"
+        >
+          <IconMaximize :size="24"/>
+        </button>
+        <button class="win-btn win-btn-close glass-item"
+                @click="handleClose"
+                :title="t('app.window.close')"
+        >
+          <IconClose :size="24"/>
+        </button>
       </div>
     </div>
 
@@ -1160,6 +1197,25 @@ async function executeOrganize() {
 .header-actions {
   display: flex;
   gap: var(--prim-space-2);
+}
+
+.nav-window-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--prim-space-1);
+  margin-left: var(--prim-space-2);
+}
+
+.win-btn {
+  padding: 6px var(--prim-space-2);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.win-btn-close:hover {
+  color: var(--color-error);
 }
 
 .page-content {

@@ -61,7 +61,7 @@
     "preview_max_mb": "Preview Max Size (MB)",
     "preview_max_mb_tooltip": "Maximum preview size (MB) for individual images. Images exceeding this size will not generate previews. Set to 0 to disable previews. Currently only applies to common bitmap formats; RAW previews are not yet supported.",
     "sub_second_digits": "Sub-Second Digits",
-    "sub_second_digits_tooltip": "Number of sub-second digits displayed in capture time. Set to 0 to hide sub-seconds.",
+    "sub_second_digits_tooltip": "Number of sub-second digits displayed in capture time (0-9). Set to 0 to hide sub-seconds.",
     "aeb_settings": "AEB Settings",
     "aeb_badge": "AEB",
     "aeb_max_span": "Max Span (s)",

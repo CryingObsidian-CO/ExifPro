@@ -10,12 +10,12 @@ import {useDialog} from "../composables/dialog.ts";
 import {formatError} from "../composables/logger";
 import IconFolder from "../component/icons/IconFolder.vue";
 import IconUpload from "../component/icons/IconUpload.vue";
-import { useI18n } from 'vue-i18n';
+import {useI18n} from 'vue-i18n';
 
 const router = useRouter();
 const tauriImpl = useTauri();
 const {showAlert} = useDialog();
-const { t } = useI18n();
+const {t} = useI18n();
 
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error && error.message) {
@@ -87,7 +87,10 @@ const startAnalysis = async () => {
   } catch (error) {
     const message = getErrorMessage(error);
     console.error(`ui.home.start_analysis: failed err=${formatError(error)}`);
-    await showAlert(t('home.analysis_failed', { message }), {title: t('home.analysis_failed_title'), tone: 'error'});
+    await showAlert(t('home.analysis_failed', {message}), {
+      title: t('home.analysis_failed_title'),
+      tone: 'error'
+    });
   } finally {
     store.isAnalyzing = false;
   }

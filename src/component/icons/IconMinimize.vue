@@ -1,7 +1,6 @@
 <script setup lang="ts">
 defineProps<{ size?: number }>();
 </script>
-
 <template>
   <svg
       :width="size || 24"
@@ -13,6 +12,6 @@ defineProps<{ size?: number }>();
       stroke-linecap="round"
       stroke-linejoin="round"
   >
-    <line x1="5" y1="12" x2="19" y2="12"/>
+    <line x1="6.5" y1="12" x2="17.5" y2="12"/>
   </svg>
 </template>
