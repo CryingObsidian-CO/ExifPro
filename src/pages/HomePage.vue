@@ -252,7 +252,7 @@ const outputDirectory = computed({
 }
 
 .options-row {
-  margin-top: var(--prim-space-4);
+  margin-top: var(--prim-space-5);
 }
 
 .options-group {

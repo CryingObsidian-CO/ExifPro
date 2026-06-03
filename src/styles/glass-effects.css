@@ -7,7 +7,6 @@
 .glass-surface {
   background: var(--color-glass-bg);
   backdrop-filter: blur(var(--prim-glass-blur-md));
-  -webkit-backdrop-filter: blur(var(--prim-glass-blur-md));
   border: 1px solid var(--color-glass-border);
   box-shadow: 0 1px 4px var(--color-glass-shadow);
 }
@@ -16,7 +15,6 @@
 .glass-surface-raised {
   background: var(--color-glass-bg);
   backdrop-filter: blur(var(--prim-glass-blur-lg));
-  -webkit-backdrop-filter: blur(var(--prim-glass-blur-lg));
   border: 1px solid var(--color-glass-border);
   box-shadow: var(--prim-shadow-lg), 0 0 0 1px var(--color-glass-border);
 }
@@ -25,7 +23,6 @@
 .glass-surface-elevated {
   background: var(--color-glass-bg-hover);
   backdrop-filter: blur(var(--prim-glass-blur-xl));
-  -webkit-backdrop-filter: blur(var(--prim-glass-blur-xl));
   border: 1px solid var(--color-glass-border);
   box-shadow: var(--prim-shadow-xl);
 }
@@ -34,7 +31,6 @@
 .glass-navbar {
   background: var(--navbar-bg);
   backdrop-filter: blur(var(--prim-glass-blur-md));
-  -webkit-backdrop-filter: blur(var(--prim-glass-blur-md));
   border-bottom: 1px solid var(--navbar-border);
 }
 
@@ -42,7 +38,6 @@
 .glass-sidebar {
   background: var(--sidebar-bg);
   backdrop-filter: blur(var(--prim-glass-blur-md));
-  -webkit-backdrop-filter: blur(var(--prim-glass-blur-md));
   border-right: 1px solid var(--sidebar-border);
 }
 
@@ -50,14 +45,12 @@
 .glass-overlay {
   background: var(--color-bg-overlay);
   backdrop-filter: blur(var(--prim-glass-blur-sm));
-  -webkit-backdrop-filter: blur(var(--prim-glass-blur-sm));
 }
 
 /* ---- Glass input ---- */
 .glass-input {
   background: var(--input-bg);
   backdrop-filter: blur(var(--prim-glass-blur-sm));
-  -webkit-backdrop-filter: blur(var(--prim-glass-blur-sm));
   border: 1px solid var(--input-border);
   color: var(--input-text);
   transition: all var(--prim-duration-fast) var(--prim-ease-out);
@@ -78,7 +71,6 @@
 .glass-btn {
   background: var(--btn-secondary-bg);
   backdrop-filter: blur(var(--prim-glass-blur-sm));
-  -webkit-backdrop-filter: blur(var(--prim-glass-blur-sm));
   border: 1px solid var(--btn-secondary-border);
   color: var(--btn-secondary-text);
   transition: all var(--prim-duration-fast) var(--prim-ease-out);
@@ -98,7 +90,6 @@
 .glass-card {
   background: var(--card-bg);
   backdrop-filter: blur(var(--prim-glass-blur-md));
-  -webkit-backdrop-filter: blur(var(--prim-glass-blur-md));
   border: 1px solid var(--card-border);
   box-shadow: var(--card-shadow);
   border-radius: var(--prim-radius-lg);
@@ -113,7 +104,6 @@
 .glass-dialog {
   background: var(--dialog-bg);
   backdrop-filter: blur(var(--prim-glass-blur-xl));
-  -webkit-backdrop-filter: blur(var(--prim-glass-blur-xl));
   border: 1px solid var(--dialog-border);
   box-shadow: var(--dialog-shadow);
   border-radius: var(--prim-radius-xl);

@@ -314,7 +314,7 @@ function currentLanguage(): SupportedLocale {
           <label class="setting-label">{{ t('settings.theme_label') }}</label>
           <div class="theme-options">
             <button
-                class="theme-option"
+                class="theme-option glass-surface"
                 :class="{ active: store.theme === 'light' }"
                 @click="setTheme('light')"
             >
@@ -322,7 +322,7 @@ function currentLanguage(): SupportedLocale {
               <span>{{ t('settings.theme.light') }}</span>
             </button>
             <button
-                class="theme-option"
+                class="theme-option glass-surface"
                 :class="{ active: store.theme === 'dark' }"
                 @click="setTheme('dark')"
             >
@@ -330,7 +330,7 @@ function currentLanguage(): SupportedLocale {
               <span>{{ t('settings.theme.dark') }}</span>
             </button>
             <button
-                class="theme-option"
+                class="theme-option glass-surface"
                 :class="{ active: store.theme === 'system' }"
                 @click="setTheme('system')"
             >
@@ -343,14 +343,14 @@ function currentLanguage(): SupportedLocale {
           <label class="setting-label">{{ t('settings.language_label') }}</label>
           <div class="theme-options">
             <button
-                class="theme-option"
+                class="theme-option glass-surface"
                 :class="{ active: currentLanguage() === 'en' }"
                 @click="changeLanguage('en')"
             >
               <span>English</span>
             </button>
             <button
-                class="theme-option"
+                class="theme-option glass-surface"
                 :class="{ active: currentLanguage() === 'zh' }"
                 @click="changeLanguage('zh')"
             >
@@ -621,7 +621,7 @@ function currentLanguage(): SupportedLocale {
             <p class="plugin-hint">{{ t('settings.plugin_hint') }}</p>
           </div>
           <div v-else class="plugin-list">
-            <div v-for="plugin in getSortedPlugins()" :key="plugin.manifest.id" class="plugin-item">
+            <div v-for="plugin in getSortedPlugins()" :key="plugin.manifest.id" class="plugin-item glass-surface">
               <div class="plugin-info">
                 <div class="plugin-header">
                   <span class="plugin-name">{{ plugin.manifest.name }}</span>
@@ -805,11 +805,7 @@ function currentLanguage(): SupportedLocale {
   align-items: center;
   gap: var(--prim-space-1);
   padding: var(--prim-space-3);
-  border: 1px solid var(--color-glass-border);
   border-radius: var(--prim-radius-md);
-  background: var(--color-glass-bg);
-  backdrop-filter: blur(var(--prim-glass-blur-sm));
-  -webkit-backdrop-filter: blur(var(--prim-glass-blur-sm));
   transition: all var(--prim-duration-fast) var(--prim-ease-out);
   color: var(--color-text-secondary);
   font-size: var(--prim-font-size-sm);
@@ -904,11 +900,7 @@ function currentLanguage(): SupportedLocale {
   justify-content: space-between;
   align-items: center;
   padding: var(--prim-space-3) var(--prim-space-4);
-  border: 1px solid var(--color-glass-border);
   border-radius: var(--prim-radius-md);
-  background: var(--color-glass-bg);
-  backdrop-filter: blur(var(--prim-glass-blur-sm));
-  -webkit-backdrop-filter: blur(var(--prim-glass-blur-sm));
 }
 
 .plugin-info {

@@ -1421,8 +1421,8 @@ async function executeOrganize() {
 }
 
 .photo-detail-dialog {
-  width: min(900px, 100%);
-  max-height: min(85vh, 820px);
+  width: min(80vw, 1000px);
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1453,22 +1453,29 @@ async function executeOrganize() {
   background: var(--color-glass-bg);
   border: 1px solid var(--color-glass-border);
   border-radius: var(--prim-radius-sm);
-  min-height: 280px;
+  min-height: 220px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  align-self: start;
 }
 
 .photo-detail-image {
   width: 100%;
-  height: 100%;
+  height: auto;
+  max-height: 65vh;
   object-fit: contain;
+  display: block;
 }
 
 .photo-detail-placeholder {
   color: var(--color-text-secondary);
   font-size: var(--prim-font-size-base);
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .photo-detail-grid {
@@ -1503,7 +1510,15 @@ async function executeOrganize() {
   }
 
   .photo-detail-preview {
-    min-height: 220px;
+    align-self: auto;
+  }
+
+  .photo-detail-image {
+    max-height: 55vh;
+  }
+
+  .photo-detail-placeholder {
+    min-height: 160px;
   }
 }
 
