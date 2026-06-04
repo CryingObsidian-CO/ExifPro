@@ -14,8 +14,6 @@ import type {ExifInfo, Group, GroupType} from '../types/photo';
 import {builtinPlugins} from './builtinPlugins';
 import {formatError} from "./logger";
 import {store} from "../store/store.ts";
-import ts from "typescript";
-
 // TODO 更好的单例控制，避免多个实例
 class PluginManagerImpl {
   private readonly tauri = useTauri();
@@ -159,6 +157,7 @@ class PluginManagerImpl {
     if (isTypeScript) {
       console.info("ui.plugin: found .ts file");
       try {
+        const ts = await import('typescript');
         const result = ts.transpileModule(code, {
           compilerOptions: {
             module: ts.ModuleKind.Preserve,

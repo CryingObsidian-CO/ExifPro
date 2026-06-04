@@ -2,22 +2,76 @@
 import {useRouter, useRoute} from 'vue-router';
 import {store} from "./store/store.ts";
 import WinDialogHost from "./component/WinDialogHost.vue";
-import { onMounted } from 'vue';
-import { useTauri } from './composables/tauri';
-import { useDialog } from './composables/dialog';
+import {onMounted, computed} from 'vue';
+import {useI18n} from 'vue-i18n';
+import {useTauri} from './composables/tauri';
+import {useDialog} from './composables/dialog';
 import {formatError} from "./composables/logger";
+import IconHome from "./component/icons/IconHome.vue";
+import IconSelection from "./component/icons/IconSelection.vue";
+import IconSettings from "./component/icons/IconSettings.vue";
+import IconSun from "./component/icons/IconSun.vue";
+import IconMoon from "./component/icons/IconMoon.vue";
+import IconMonitor from "./component/icons/IconMonitor.vue";
+import IconBrand from "./component/icons/IconBrand.vue";
+import IconMinimize from "./component/icons/IconMinimize.vue";
+import IconMaximize from "./component/icons/IconMaximize.vue";
+import IconClose from "./component/icons/IconClose.vue";
+import {getCurrentWindow} from '@tauri-apps/api/window';
 
+const {t} = useI18n();
 const router = useRouter();
 const route = useRoute();
 const tauriImpl = useTauri();
-const { showAlert } = useDialog();
+const {showAlert} = useDialog();
 
-const navItems = [
-  {path: '/', name: '首页', icon: '🏠'},
-  {path: '/settings', name: '设置', icon: '⚙️'},
-];
+const navItems = computed(() => [
+  {path: '/', name: t('app.nav.home'), component: IconHome},
+  {path: '/selection', name: t('app.nav.selection'), component: IconSelection},
+  {path: '/settings', name: t('app.nav.settings'), component: IconSettings},
+]);
 
 const isEditPage = () => route?.path === '/edit';
+
+const themeIcon = () => {
+  switch (store.theme) {
+    case 'light':
+      return IconSun;
+    case 'dark':
+      return IconMoon;
+    default:
+      return IconMonitor;
+  }
+};
+
+const themeLabel = () => {
+  switch (store.theme) {
+    case 'light':
+      return t('app.theme.light');
+    case 'dark':
+      return t('app.theme.dark');
+    default:
+      return t('app.theme.system');
+  }
+};
+
+const cycleTheme = () => {
+  store.theme = store.theme === 'light' ? 'dark' : store.theme === 'dark' ? 'system' : 'light';
+};
+
+const appWindow = getCurrentWindow();
+
+const handleMinimize = () => {
+  appWindow.minimize();
+};
+
+const handleMaximize = () => {
+  appWindow.toggleMaximize();
+};
+
+const handleClose = () => {
+  appWindow.close();
+};
 
 onMounted(async () => {
   if (!store.config) {
@@ -28,7 +82,10 @@ onMounted(async () => {
     } catch (error) {
       console.error(`ui.app.config: load failed err=${formatError(error)}`);
       store.config = await tauriImpl.resetConfig();
-      await showAlert('配置文件读取失败，已恢复为默认配置。', { title: '配置已重置', tone: 'warning' });
+      await showAlert(t('app.config.load_failed'), {
+        title: t('app.config.config_reset'),
+        tone: 'warning'
+      });
     }
   }
 
@@ -42,37 +99,58 @@ onMounted(async () => {
 
 <template>
   <div class="app">
-    <div v-if="!isEditPage()" class="nav-bar">
+    <div v-if="!isEditPage()" class="nav-bar glass-navbar" data-tauri-drag-region>
       <div class="nav-brand">
-        <span class="brand-icon">📸</span>
+        <IconBrand class="brand-logo"/>
         <span class="brand-name">ExifPro</span>
       </div>
       <nav class="nav-menu">
         <button v-for="item in navItems"
                 :key="item.path"
-                class="nav-item"
+                class="nav-item glass-item"
                 :class="{ active: route.path === item.path }"
                 @click="router.push(item.path)"
         >
-          <span class="nav-icon">{{ item.icon }}</span>
+          <component :is="item.component" :size="18"/>
           <span class="nav-text">{{ item.name }}</span>
         </button>
       </nav>
       <div class="nav-spacer"></div>
 
       <div class="nav-theme">
-        <button class="theme-toggle"
-                @click="store.theme = store.theme === 'light' ? 'dark' : store.theme === 'dark' ? 'system' : 'light'"
-                :title="'当前主题: ' + store.theme"
+        <button class="theme-toggle glass-item"
+                @click="cycleTheme"
+                :title="t('app.theme.title', { theme: themeLabel() })"
         >
-          {{ store.theme === 'light' ? '☀️' : store.theme === 'dark' ? '🌙' : '💻' }}
+          <component :is="themeIcon()" :size="24"/>
+        </button>
+      </div>
+
+      <div class="nav-window-controls">
+        <button class="win-btn glass-item"
+                @click="handleMinimize"
+                :title="t('app.window.minimize')"
+        >
+          <IconMinimize :size="24"/>
+        </button>
+        <button class="win-btn glass-item"
+                @click="handleMaximize"
+                :title="t('app.window.maximize')"
+        >
+          <IconMaximize :size="24"/>
+        </button>
+        <button class="win-btn win-btn-close glass-item"
+                @click="handleClose"
+                :title="t('app.window.close')"
+        >
+          <IconClose :size="19"/>
         </button>
       </div>
     </div>
     <div class="app-content">
       <router-view></router-view>
     </div>
-    <WinDialogHost />
+    <WinDialogHost/>
   </div>
 </template>
 
@@ -88,64 +166,51 @@ onMounted(async () => {
 .nav-bar {
   display: flex;
   align-items: center;
-  padding: 0 20px;
-  height: 50px;
-  background-color: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
+  padding: 0 var(--prim-space-4);
+  height: var(--navbar-height);
   flex-shrink: 0;
 }
 
 .nav-brand {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding-right: 24px;
+  gap: var(--prim-space-2);
+  padding-right: var(--prim-space-6);
 }
 
-.brand-icon {
-  font-size: 20px;
+.brand-logo {
+  color: var(--color-brand);
 }
 
 .brand-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--color-text);
+  font-size: var(--prim-font-size-lg);
+  font-weight: var(--prim-font-weight-semibold);
+  color: var(--color-text-primary);
+  letter-spacing: var(--prim-letter-spacing-tight);
 }
 
 .nav-menu {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--prim-space-1);
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: var(--border-radius);
-  background-color: transparent;
+  gap: var(--prim-space-2);
+  padding: 6px var(--prim-space-3);
   color: var(--color-text-secondary);
-  transition: all var(--transition-fast);
-}
-
-.nav-item:hover {
-  background-color: var(--color-bg-tertiary);
-  color: var(--color-text);
+  font-size: var(--prim-font-size-base);
 }
 
 .nav-item.active {
-  background-color: var(--color-accent-light);
-  color: var(--color-accent);
-}
-
-.nav-icon {
-  font-size: 16px;
+  color: var(--color-brand);
 }
 
 .nav-text {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--prim-font-size-base);
+  font-weight: var(--prim-font-weight-medium);
 }
 
 .nav-spacer {
@@ -153,15 +218,37 @@ onMounted(async () => {
 }
 
 .theme-toggle {
-  padding: 8px 12px;
-  border-radius: var(--border-radius);
-  background-color: transparent;
-  font-size: 18px;
-  transition: all var(--transition-fast);
+  padding: 6px var(--prim-space-2);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.theme-toggle:hover {
-  background-color: var(--color-bg-tertiary);
+.nav-window-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--prim-space-1);
+  margin-left: var(--prim-space-2);
+}
+
+.win-btn {
+  padding: 6px var(--prim-space-2);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.win-btn-close:hover {
+  color: var(--color-danger);
+}
+
+.nav-item:focus-visible,
+.theme-toggle:focus-visible,
+.win-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-border-focus);
 }
 
 .app-content {
