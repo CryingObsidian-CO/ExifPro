@@ -880,7 +880,7 @@ async function disbandGroup(groupId: string) {
     title: t('edit.confirm_disband'),
     tone: 'warning',
     confirmText: t('edit.confirm_disband_btn'),
-    cancelText: 'Cancel',
+    cancelText: t('common.cancel'),
   })) {
     console.info(`ui.edit.disband_group: confirmed group=${group.id} name=${group.name}`);
     if (!store.disbandGroup(groupId)) {
@@ -1010,7 +1010,7 @@ async function executeOrganize() {
             title: t('edit.confirm_organization'),
             tone: 'warning',
             confirmText: t('edit.confirm_organize'),
-            cancelText: 'Cancel',
+            cancelText: t('common.cancel'),
             closeOnOverlay: false,
           }
       )
@@ -1145,7 +1145,6 @@ async function executeOrganize() {
                        @blur="handleBlur"
                        @keyup.enter="finishRenaming"
                        @keyup.esc="cancelRenaming"
-                       ref="renameInput"
                        @focus="(e) => (e.target as HTMLInputElement).select()"
                        class="glass-input"
                 />
@@ -1191,10 +1190,10 @@ async function executeOrganize() {
           <div v-if="groupSelectionBox.visible"
                class="selection-box"
                :style="{
-                 left: `${selectionBox.left}px`,
-                 top: `${selectionBox.top}px`,
-                 width: `${selectionBox.width}px`,
-                 height: `${selectionBox.height}px`
+                 left: `${groupSelectionBox.left}px`,
+                 top: `${groupSelectionBox.top}px`,
+                 width: `${groupSelectionBox.width}px`,
+                 height: `${groupSelectionBox.height}px`
                }"
           />
         </div>
