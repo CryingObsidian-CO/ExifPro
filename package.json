@@ -7,13 +7,7 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:ui": "vitest --ui",
-    "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "test:rust": "cd src-tauri && cargo test",
-    "test:all": "vitest run && vitest run --config vitest.e2e.config.ts && cd src-tauri && cargo test"
+    "tauri": "tauri"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -27,12 +21,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2",
     "@vitejs/plugin-vue": "^6.0.5",
-    "@vitest/ui": "^4.1.7",
-    "@vue/test-utils": "^2.4.10",
-    "jsdom": "^29.1.1",
     "vite": "^8.0.7",
-    "vitest": "^4.1.7",
-    "vue-tsc": "^3.2.6",
-    "webdriverio": "^9.27.1"
+    "vue-tsc": "^3.2.6"
   }
 }

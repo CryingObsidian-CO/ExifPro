@@ -38,14 +38,14 @@ const checked = computed({
 .win-checkbox {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--prim-space-2);
   cursor: pointer;
   user-select: none;
   position: relative;
 }
 
 .win-checkbox.disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -56,34 +56,39 @@ const checked = computed({
 }
 
 .checkbox-box {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--color-border);
-  border-radius: var(--border-radius-sm);
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--color-border-default);
+  border-radius: var(--prim-radius-xs);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-fast);
+  transition: all var(--prim-duration-fast) var(--prim-ease-out);
   flex-shrink: 0;
+  background: var(--color-glass-bg);
 }
 
 .win-checkbox:not(.disabled):hover .checkbox-box {
-  border-color: var(--color-border-hover);
+  border-color: var(--color-border-strong);
+}
+
+.win-checkbox input:focus-visible + .checkbox-box {
+  box-shadow: 0 0 0 2px var(--color-border-focus);
 }
 
 .win-checkbox input:checked + .checkbox-box {
-  background-color: var(--color-accent);
-  border-color: var(--color-accent);
+  background: var(--color-brand);
+  border-color: var(--color-brand);
 }
 
 .checkbox-box svg {
   width: 12px;
   height: 12px;
-  color: white;
+  color: var(--color-text-inverse);
 }
 
 .checkbox-label {
-  color: var(--color-text);
-  font-size: 14px;
+  color: var(--color-text-primary);
+  font-size: var(--prim-font-size-base);
 }
 </style>

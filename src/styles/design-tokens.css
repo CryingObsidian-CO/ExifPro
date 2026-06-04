@@ -1,0 +1,455 @@
+/* ============================================================
+   ExifPro Design Tokens — Fluent 3 Glass Morphism System
+   Three-layer architecture: Primitive → Semantic → Component
+   ============================================================ */
+
+/* --------------------------------------------------------
+   LAYER 1: PRIMITIVE TOKENS (raw values)
+   -------------------------------------------------------- */
+
+:root {
+  /* ---- Brand Colors (low-saturation light cyan-blue) ---- */
+  --prim-cyan-50: #f0f7fa;
+  --prim-cyan-100: #dceef5;
+  --prim-cyan-200: #b8dded;
+  --prim-cyan-300: #85c8e2;
+  --prim-cyan-400: #5aafd4;
+  --prim-cyan-500: #3d99c4;
+  --prim-cyan-600: #2e7da5;
+  --prim-cyan-700: #286788;
+  --prim-cyan-800: #255771;
+  --prim-cyan-900: #23495e;
+
+  /* ---- Brand Colors — RGB channels (for rgba composition) ---- */
+  --prim-cyan-400-rgb: 90, 175, 212;
+  --prim-cyan-500-rgb: 61, 153, 196;
+
+  /* ---- Neutral scale (soft, warm-grey biased) ---- */
+  --prim-neutral-0: #ffffff;
+  --prim-neutral-50: #f8f9fa;
+  --prim-neutral-100: #f1f3f5;
+  --prim-neutral-200: #e9ecef;
+  --prim-neutral-300: #dee2e6;
+  --prim-neutral-400: #ced4da;
+  --prim-neutral-500: #adb5bd;
+  --prim-neutral-600: #868e96;
+  --prim-neutral-700: #495057;
+  --prim-neutral-800: #343a40;
+  --prim-neutral-900: #212529;
+
+  /* ---- Neutral scale — RGB channels ---- */
+  --prim-neutral-0-rgb: 255, 255, 255;
+  --prim-neutral-50-rgb: 248, 249, 250;
+
+  /* ---- Black / White — RGB channels ---- */
+  --prim-black-rgb: 0, 0, 0;
+  --prim-white-rgb: 255, 255, 255;
+
+  /* ---- Dark surface scale (for dark theme backgrounds) ---- */
+  --prim-dark-900: #1a1d20;
+  --prim-dark-800: #1e2125;
+  --prim-dark-700: #24272b;
+
+  /* ---- Dark surface scale — RGB channels ---- */
+  --prim-dark-900-rgb: 26, 29, 32;
+  --prim-dark-800-rgb: 30, 33, 37;
+  --prim-dark-700-rgb: 36, 39, 43;
+
+  /* ---- Dark text scale (for dark theme text) ---- */
+  --prim-dark-text-primary: #e8eaed;
+  --prim-dark-text-secondary: #9aa0a6;
+  --prim-dark-text-tertiary: #6e767d;
+  --prim-dark-text-disabled: #4e555b;
+
+  /* ---- Functional colors (low-saturation soft tones) ---- */
+  --prim-success-50: #edf7f0;
+  --prim-success-100: #d4ede0;
+  --prim-success-200: #a8dcc1;
+  --prim-success-300: #74c69d;
+  --prim-success-400: #52b788;
+  --prim-success-500: #40916c;
+  --prim-success-600: #2d6a4f;
+  --prim-success-700: #1b4332;
+
+  --prim-success-400-rgb: 82, 183, 136;
+
+  --prim-warning-50: #fef9ed;
+  --prim-warning-100: #fdedc8;
+  --prim-warning-200: #fad88c;
+  --prim-warning-300: #f6c453;
+  --prim-warning-400: #f0a830;
+  --prim-warning-500: #c78b1e;
+  --prim-warning-600: #9e6d16;
+  --prim-warning-700: #6e4c0f;
+
+  --prim-warning-400-rgb: 240, 168, 48;
+
+  --prim-danger-50: #fdf2f2;
+  --prim-danger-100: #f9dcdc;
+  --prim-danger-200: #f1b8b8;
+  --prim-danger-300: #e58b8b;
+  --prim-danger-400: #d65f5f;
+  --prim-danger-500: #b84545;
+  --prim-danger-600: #933636;
+  --prim-danger-700: #662626;
+
+  --prim-danger-400-rgb: 214, 95, 95;
+
+  /* ---- Plugin color ---- */
+  --prim-plugin: #8b7ec8;
+  --prim-plugin-light: #a89bd9;
+
+  --prim-plugin-rgb: 139, 126, 200;
+  --prim-plugin-light-rgb: 168, 155, 217;
+
+  /* ---- Spacing scale (4px base) ---- */
+  --prim-space-0: 0;
+  --prim-space-1: 4px;
+  --prim-space-2: 8px;
+  --prim-space-3: 12px;
+  --prim-space-4: 16px;
+  --prim-space-5: 20px;
+  --prim-space-6: 24px;
+  --prim-space-8: 32px;
+  --prim-space-10: 40px;
+  --prim-space-12: 48px;
+  --prim-space-16: 64px;
+  --prim-space-20: 80px;
+
+  /* ---- Typography scale ---- */
+  --prim-font-size-xs: 11px;
+  --prim-font-size-sm: 12px;
+  --prim-font-size-base: 13px;
+  --prim-font-size-md: 14px;
+  --prim-font-size-lg: 16px;
+  --prim-font-size-xl: 20px;
+  --prim-font-size-2xl: 24px;
+  --prim-font-size-3xl: 28px;
+  --prim-font-size-4xl: 36px;
+
+  --prim-font-weight-light: 300;
+  --prim-font-weight-normal: 400;
+  --prim-font-weight-medium: 500;
+  --prim-font-weight-semibold: 600;
+  --prim-font-weight-bold: 700;
+
+  --prim-line-height-tight: 1.25;
+  --prim-line-height-normal: 1.5;
+  --prim-line-height-relaxed: 1.65;
+
+  --prim-letter-spacing-tight: -0.01em;
+  --prim-letter-spacing-normal: 0;
+  --prim-letter-spacing-wide: 0.02em;
+
+  /* ---- Border radius scale ---- */
+  --prim-radius-none: 0;
+  --prim-radius-xs: 2px;
+  --prim-radius-sm: 4px;
+  --prim-radius-md: 6px;
+  --prim-radius-lg: 8px;
+  --prim-radius-xl: 12px;
+  --prim-radius-2xl: 16px;
+  --prim-radius-full: 9999px;
+
+  /* ---- Shadow scale ---- */
+  --prim-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --prim-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --prim-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --prim-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.06), 0 4px 6px rgba(0, 0, 0, 0.04);
+  --prim-shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.07), 0 8px 10px rgba(0, 0, 0, 0.04);
+
+  /* ---- Transition durations ---- */
+  --prim-duration-fast: 120ms;
+  --prim-duration-normal: 200ms;
+  --prim-duration-slow: 300ms;
+  --prim-duration-modal: 250ms;
+
+  /* ---- Easing curves (natural ease-out) ---- */
+  --prim-ease-out: cubic-bezier(0.0, 0.0, 0.2, 1.0);
+  --prim-ease-in: cubic-bezier(0.4, 0.0, 1.0, 1.0);
+  --prim-ease-in-out: cubic-bezier(0.4, 0.0, 0.2, 1.0);
+  --prim-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1.0);
+
+  /* ---- Z-index scale ---- */
+  --prim-z-base: 0;
+  --prim-z-dropdown: 100;
+  --prim-z-sticky: 200;
+  --prim-z-overlay: 500;
+  --prim-z-modal: 1000;
+  --prim-z-toast: 1500;
+  --prim-z-tooltip: 2000;
+
+  /* ---- Glass effect tokens ---- */
+  --prim-glass-blur-sm: 8px;
+  --prim-glass-blur-md: 12px;
+  --prim-glass-blur-lg: 20px;
+  --prim-glass-blur-xl: 32px;
+  --prim-glass-opacity-sm: 0.55;
+  --prim-glass-opacity-md: 0.65;
+  --prim-glass-opacity-lg: 0.75;
+  --prim-glass-border-opacity: 0.12;
+
+  /* ---- Opacity scale (for rgba composition) ---- */
+  --prim-opacity-4: 0.04;
+  --prim-opacity-5: 0.05;
+  --prim-opacity-6: 0.06;
+  --prim-opacity-8: 0.08;
+  --prim-opacity-10: 0.1;
+  --prim-opacity-12: 0.12;
+  --prim-opacity-15: 0.15;
+  --prim-opacity-18: 0.18;
+  --prim-opacity-20: 0.2;
+  --prim-opacity-25: 0.25;
+  --prim-opacity-40: 0.4;
+  --prim-opacity-45: 0.45;
+  --prim-opacity-50: 0.5;
+  --prim-opacity-62: 0.62;
+  --prim-opacity-74: 0.74;
+  --prim-opacity-82: 0.82;
+}
+
+/* --------------------------------------------------------
+   LAYER 2: SEMANTIC TOKENS (purpose-driven aliases)
+   -------------------------------------------------------- */
+
+/* Light theme (default) */
+[data-theme='light'],
+:root {
+  /* ---- Brand / Accent ---- */
+  --color-brand: var(--prim-cyan-500);
+  --color-brand-hover: var(--prim-cyan-600);
+  --color-brand-active: var(--prim-cyan-700);
+  --color-brand-light: var(--prim-cyan-100);
+  --color-brand-subtle: var(--prim-cyan-50);
+
+  /* ---- Surface backgrounds ---- */
+  --color-bg-app: var(--prim-neutral-50);
+  --color-bg-surface: rgba(var(--prim-neutral-0-rgb), var(--prim-glass-opacity-md));
+  --color-bg-surface-hover: rgba(var(--prim-neutral-0-rgb), var(--prim-glass-opacity-lg));
+  --color-bg-surface-alt: rgba(var(--prim-neutral-50-rgb), var(--prim-glass-opacity-md));
+  --color-bg-surface-raised: rgba(var(--prim-neutral-0-rgb), var(--prim-glass-opacity-lg));
+  --color-bg-overlay: rgba(var(--prim-black-rgb), var(--prim-opacity-15));
+
+  /* ---- Text hierarchy ---- */
+  --color-text-primary: var(--prim-neutral-800);
+  --color-text-secondary: var(--prim-neutral-600);
+  --color-text-tertiary: var(--prim-neutral-500);
+  --color-text-disabled: var(--prim-neutral-400);
+  --color-text-inverse: var(--prim-neutral-0);
+  --color-text-brand: var(--prim-cyan-600);
+
+  /* ---- Border ---- */
+  --color-border-subtle: rgba(var(--prim-black-rgb), var(--prim-opacity-6));
+  --color-border-default: rgba(var(--prim-black-rgb), var(--prim-opacity-8));
+  --color-border-strong: rgba(var(--prim-black-rgb), var(--prim-opacity-12));
+  --color-border-focus: var(--prim-cyan-400);
+
+  /* ---- Functional status ---- */
+  --color-success: var(--prim-success-500);
+  --color-success-light: var(--prim-success-50);
+  --color-success-border: var(--prim-success-200);
+  --color-warning: var(--prim-warning-500);
+  --color-warning-light: var(--prim-warning-50);
+  --color-warning-border: var(--prim-warning-200);
+  --color-danger: var(--prim-danger-500);
+  --color-danger-light: var(--prim-danger-50);
+  --color-danger-border: var(--prim-danger-200);
+  --color-info: var(--prim-cyan-500);
+  --color-info-light: var(--prim-cyan-50);
+  --color-info-border: var(--prim-cyan-200);
+
+  /* ---- Glass backdrop ---- */
+  --color-glass-bg: rgba(var(--prim-neutral-0-rgb), var(--prim-opacity-62));
+  --color-glass-bg-hover: rgba(var(--prim-neutral-0-rgb), var(--prim-opacity-74));
+  --color-glass-bg-active: rgba(var(--prim-neutral-0-rgb), var(--prim-opacity-82));
+  --color-glass-border: rgba(var(--prim-white-rgb), var(--prim-opacity-18));
+  --color-glass-shadow: rgba(var(--prim-black-rgb), var(--prim-opacity-4));
+
+  /* ---- Scrollbar ---- */
+  --color-scrollbar-thumb: rgba(var(--prim-black-rgb), var(--prim-opacity-12));
+  --color-scrollbar-thumb-hover: rgba(var(--prim-black-rgb), var(--prim-opacity-18));
+  --color-scrollbar-track: transparent;
+}
+
+/* Dark theme */
+[data-theme='dark'] {
+  /* ---- Brand / Accent ---- */
+  --color-brand: var(--prim-cyan-400);
+  --color-brand-hover: var(--prim-cyan-300);
+  --color-brand-active: var(--prim-cyan-200);
+  --color-brand-light: rgba(var(--prim-cyan-500-rgb), var(--prim-opacity-15));
+  --color-brand-subtle: rgba(var(--prim-cyan-500-rgb), var(--prim-opacity-8));
+
+  /* ---- Surface backgrounds ---- */
+  --color-bg-app: var(--prim-dark-900);
+  --color-bg-surface: rgba(var(--prim-dark-800-rgb), var(--prim-glass-opacity-md));
+  --color-bg-surface-hover: rgba(var(--prim-dark-800-rgb), var(--prim-glass-opacity-lg));
+  --color-bg-surface-alt: rgba(var(--prim-dark-700-rgb), var(--prim-glass-opacity-md));
+  --color-bg-surface-raised: rgba(var(--prim-dark-700-rgb), var(--prim-glass-opacity-lg));
+  --color-bg-overlay: rgba(var(--prim-black-rgb), var(--prim-opacity-45));
+
+  /* ---- Text hierarchy ---- */
+  --color-text-primary: var(--prim-dark-text-primary);
+  --color-text-secondary: var(--prim-dark-text-secondary);
+  --color-text-tertiary: var(--prim-dark-text-tertiary);
+  --color-text-disabled: var(--prim-dark-text-disabled);
+  --color-text-inverse: var(--prim-dark-900);
+  --color-text-brand: var(--prim-cyan-300);
+
+  /* ---- Border ---- */
+  --color-border-subtle: rgba(var(--prim-white-rgb), var(--prim-opacity-5));
+  --color-border-default: rgba(var(--prim-white-rgb), var(--prim-opacity-8));
+  --color-border-strong: rgba(var(--prim-white-rgb), var(--prim-opacity-12));
+  --color-border-focus: var(--prim-cyan-400);
+
+  /* ---- Functional status ---- */
+  --color-success: var(--prim-success-400);
+  --color-success-light: rgba(var(--prim-success-400-rgb), var(--prim-opacity-12));
+  --color-success-border: rgba(var(--prim-success-400-rgb), var(--prim-opacity-25));
+  --color-warning: var(--prim-warning-400);
+  --color-warning-light: rgba(var(--prim-warning-400-rgb), var(--prim-opacity-12));
+  --color-warning-border: rgba(var(--prim-warning-400-rgb), var(--prim-opacity-25));
+  --color-danger: var(--prim-danger-400);
+  --color-danger-light: rgba(var(--prim-danger-400-rgb), var(--prim-opacity-12));
+  --color-danger-border: rgba(var(--prim-danger-400-rgb), var(--prim-opacity-25));
+  --color-info: var(--prim-cyan-400);
+  --color-info-light: rgba(var(--prim-cyan-500-rgb), var(--prim-opacity-12));
+  --color-info-border: rgba(var(--prim-cyan-500-rgb), var(--prim-opacity-25));
+
+  /* ---- Glass backdrop ---- */
+  --color-glass-bg: rgba(var(--prim-dark-800-rgb), var(--prim-opacity-62));
+  --color-glass-bg-hover: rgba(var(--prim-dark-800-rgb), var(--prim-opacity-74));
+  --color-glass-bg-active: rgba(var(--prim-dark-800-rgb), var(--prim-opacity-82));
+  --color-glass-border: rgba(var(--prim-white-rgb), var(--prim-opacity-8));
+  --color-glass-shadow: rgba(var(--prim-black-rgb), var(--prim-opacity-20));
+
+  /* ---- Scrollbar ---- */
+  --color-scrollbar-thumb: rgba(var(--prim-white-rgb), var(--prim-opacity-12));
+  --color-scrollbar-thumb-hover: rgba(var(--prim-white-rgb), var(--prim-opacity-18));
+  --color-scrollbar-track: transparent;
+}
+
+/* --------------------------------------------------------
+   LAYER 3: COMPONENT TOKENS (component-specific)
+   -------------------------------------------------------- */
+
+[data-theme='light'],
+:root {
+  /* ---- Button ---- */
+  --btn-primary-bg: var(--color-brand);
+  --btn-primary-bg-hover: var(--color-brand-hover);
+  --btn-primary-bg-active: var(--color-brand-active);
+  --btn-primary-text: var(--prim-neutral-0);
+  --btn-secondary-bg: var(--color-glass-bg);
+  --btn-secondary-bg-hover: var(--color-glass-bg-hover);
+  --btn-secondary-border: var(--color-glass-border);
+  --btn-secondary-text: var(--color-text-primary);
+  --btn-ghost-bg-hover: var(--color-bg-surface-hover);
+  --btn-ghost-text: var(--color-text-secondary);
+  --btn-danger-bg: var(--color-danger);
+  --btn-danger-bg-hover: var(--prim-danger-600);
+  --btn-danger-text: var(--prim-neutral-0);
+  --btn-disabled-opacity: var(--prim-opacity-45);
+
+  /* ---- Card ---- */
+  --card-bg: var(--color-glass-bg);
+  --card-bg-hover: var(--color-glass-bg-hover);
+  --card-border: var(--color-glass-border);
+  --card-shadow: var(--prim-shadow-sm);
+  --card-header-border: var(--color-border-subtle);
+
+  /* ---- Input ---- */
+  --input-bg: var(--color-glass-bg);
+  --input-bg-focus: var(--color-glass-bg-hover);
+  --input-border: var(--color-border-default);
+  --input-border-focus: var(--color-border-focus);
+  --input-border-hover: var(--color-border-strong);
+  --input-text: var(--color-text-primary);
+  --input-placeholder: var(--color-text-tertiary);
+  --input-focus-ring: rgba(var(--prim-cyan-500-rgb), var(--prim-opacity-20));
+
+  /* ---- Dialog / Modal ---- */
+  --dialog-bg: var(--color-glass-bg);
+  --dialog-border: var(--color-glass-border);
+  --dialog-shadow: var(--prim-shadow-xl);
+  --dialog-overlay-bg: rgba(var(--prim-black-rgb), var(--prim-opacity-20));
+
+  /* ---- Sidebar ---- */
+  --sidebar-bg: var(--color-glass-bg);
+  --sidebar-border: var(--color-glass-border);
+  --sidebar-item-hover: var(--color-glass-bg-hover);
+  --sidebar-item-active: rgba(var(--prim-cyan-500-rgb), var(--prim-opacity-10));
+
+  /* ---- Navbar ---- */
+  --navbar-bg: var(--color-glass-bg);
+  --navbar-border: var(--color-glass-border);
+  --navbar-height: 48px;
+
+  /* ---- Group type indicators ---- */
+  --color-focus-bracketing: var(--prim-cyan-500);
+  --color-aeb: var(--prim-warning-400);
+  --color-burst: var(--prim-success-500);
+  --color-single: var(--prim-neutral-500);
+  --color-plugin: var(--prim-plugin);
+  --color-plugin-light: rgba(var(--prim-plugin-rgb), var(--prim-opacity-12));
+}
+
+[data-theme='dark'] {
+  /* ---- Button ---- */
+  --btn-primary-bg: var(--color-brand);
+  --btn-primary-bg-hover: var(--color-brand-hover);
+  --btn-primary-bg-active: var(--color-brand-active);
+  --btn-primary-text: var(--prim-neutral-900);
+  --btn-secondary-bg: var(--color-glass-bg);
+  --btn-secondary-bg-hover: var(--color-glass-bg-hover);
+  --btn-secondary-border: var(--color-glass-border);
+  --btn-secondary-text: var(--color-text-primary);
+  --btn-ghost-bg-hover: var(--color-bg-surface-hover);
+  --btn-ghost-text: var(--color-text-secondary);
+  --btn-danger-bg: var(--color-danger);
+  --btn-danger-bg-hover: var(--prim-danger-500);
+  --btn-danger-text: var(--prim-neutral-0);
+  --btn-disabled-opacity: var(--prim-opacity-40);
+
+  /* ---- Card ---- */
+  --card-bg: var(--color-glass-bg);
+  --card-bg-hover: var(--color-glass-bg-hover);
+  --card-border: var(--color-glass-border);
+  --card-shadow: var(--prim-shadow-sm);
+  --card-header-border: var(--color-border-subtle);
+
+  /* ---- Input ---- */
+  --input-bg: var(--color-glass-bg);
+  --input-bg-focus: var(--color-glass-bg-hover);
+  --input-border: var(--color-border-default);
+  --input-border-focus: var(--color-border-focus);
+  --input-border-hover: var(--color-border-strong);
+  --input-text: var(--color-text-primary);
+  --input-placeholder: var(--color-text-tertiary);
+  --input-focus-ring: rgba(var(--prim-cyan-500-rgb), var(--prim-opacity-25));
+
+  /* ---- Dialog / Modal ---- */
+  --dialog-bg: var(--color-glass-bg);
+  --dialog-border: var(--color-glass-border);
+  --dialog-shadow: var(--prim-shadow-xl);
+  --dialog-overlay-bg: rgba(var(--prim-black-rgb), var(--prim-opacity-50));
+
+  /* ---- Sidebar ---- */
+  --sidebar-bg: var(--color-glass-bg);
+  --sidebar-border: var(--color-glass-border);
+  --sidebar-item-hover: var(--color-glass-bg-hover);
+  --sidebar-item-active: rgba(var(--prim-cyan-500-rgb), var(--prim-opacity-15));
+
+  /* ---- Navbar ---- */
+  --navbar-bg: var(--color-glass-bg);
+  --navbar-border: var(--color-glass-border);
+  --navbar-height: 48px;
+
+  /* ---- Group type indicators ---- */
+  --color-focus-bracketing: var(--prim-cyan-400);
+  --color-aeb: var(--prim-warning-400);
+  --color-burst: var(--prim-success-400);
+  --color-single: var(--prim-neutral-400);
+  --color-plugin: var(--prim-plugin-light);
+  --color-plugin-light: rgba(var(--prim-plugin-light-rgb), var(--prim-opacity-12));
+}
