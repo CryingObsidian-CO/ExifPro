@@ -1,5 +1,10 @@
-import {describe, it, expect, beforeEach} from "vitest";
+import {describe, it, expect, beforeAll, beforeEach} from "vitest";
 import {useDialog, useDialogState} from "../../composables/dialog";
+import i18n from "../../i18n";
+
+beforeAll(() => {
+  i18n.global.locale.value = "zh";
+});
 
 beforeEach(async () => {
   const {dialogState, cancelDialog, closeByOverlay} = useDialogState();
@@ -124,18 +129,18 @@ describe("useDialog – showConfirm", () => {
     expect(result).toBe(false);
   });
 
-  it("resolves false on overlay click by default", async () => {
+  it("resolves false on overlay click when closeOnOverlay is true", async () => {
     const {showConfirm} = useDialog();
-    const {closeByOverlay} = useDialogState();
+    const {dialogState, closeByOverlay} = useDialogState();
 
-    const promise = showConfirm("Proceed?");
+    const promise = showConfirm("Proceed?", {closeOnOverlay: true});
     await Promise.resolve();
 
+    expect(dialogState.closeOnOverlay).toBe(true);
     closeByOverlay();
-    const {cancelDialog} = useDialogState();
-    cancelDialog();
     const result = await promise;
     expect(result).toBe(false);
+    expect(dialogState.visible).toBe(false);
   });
 
   it("accepts custom cancelText", async () => {

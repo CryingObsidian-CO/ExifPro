@@ -65,4 +65,26 @@ describe("WinButton", () => {
     });
     expect(wrapper.find("button").text()).toBe("Click Me");
   });
+
+  it("applies size-small class", () => {
+    const wrapper = mount(WinButton, {props: {size: "small"}});
+    expect(wrapper.find("button").classes()).toContain("size-small");
+  });
+
+  it("emits click event", async () => {
+    const wrapper = mount(WinButton);
+    await wrapper.find("button").trigger("click");
+    expect(wrapper.emitted("click")).toBeDefined();
+  });
+
+  it("does not emit click when disabled", async () => {
+    const wrapper = mount(WinButton, {props: {disabled: true}});
+    await wrapper.find("button").trigger("click");
+    expect(wrapper.emitted("click")).toBeUndefined();
+  });
+
+  it("does not set type attribute by default", () => {
+    const wrapper = mount(WinButton);
+    expect(wrapper.find("button").attributes("type")).toBeUndefined();
+  });
 });

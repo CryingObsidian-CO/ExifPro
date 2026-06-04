@@ -1,4 +1,4 @@
-import {describe, it, expect, beforeEach, vi} from "vitest";
+import {describe, it, expect, beforeEach, afterEach, vi} from "vitest";
 
 const {mockInvoke} = vi.hoisted(() => ({mockInvoke: vi.fn()}));
 vi.mock("@tauri-apps/api/core", () => ({invoke: mockInvoke}));
@@ -38,6 +38,13 @@ describe("initFrontendLogger", () => {
     mockInvoke.mockReset();
   });
 
+  it("is idempotent (early return when already initialized)", () => {
+    initFrontendLogger();
+    mockInvoke.mockClear();
+    initFrontendLogger();
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
   it("patches console methods and sends logs to invoke", async () => {
     initFrontendLogger();
     console.error("test error");
@@ -58,5 +65,78 @@ describe("initFrontendLogger", () => {
     initFrontendLogger();
     expect(() => console.warn("warn msg")).not.toThrow();
     await new Promise((r) => setTimeout(r, 10));
+  });
+
+  it("sends debug logs via invoke", async () => {
+    initFrontendLogger();
+    console.debug("debug msg");
+    await new Promise((r) => setTimeout(r, 10));
+
+    const debugCall = mockInvoke.mock.calls.find(
+        (c: any[]) => c[0] === "frontend_log_command" && c[1]?.level === "debug"
+    );
+    expect(debugCall).toBeDefined();
+    expect(debugCall![1].message).toContain("debug msg");
+  });
+
+  it("sends trace logs via invoke", async () => {
+    initFrontendLogger();
+    console.trace("trace msg");
+    await new Promise((r) => setTimeout(r, 10));
+
+    const traceCall = mockInvoke.mock.calls.find(
+        (c: any[]) => c[0] === "frontend_log_command" && c[1]?.level === "trace"
+    );
+    expect(traceCall).toBeDefined();
+    expect(traceCall![1].message).toContain("trace msg");
+  });
+});
+
+describe("initFrontendLogger window events", () => {
+  beforeEach(() => {
+    mockInvoke.mockReset();
+  });
+
+  afterEach(() => {
+    // remove event listeners added by initFrontendLogger
+    // this is a best-effort cleanup since we can't remove specific listeners easily
+  });
+
+  it("listens to window error events", async () => {
+    initFrontendLogger();
+    mockInvoke.mockClear();
+
+    window.dispatchEvent(new ErrorEvent("error", {
+      message: "test error",
+      filename: "test.js",
+      lineno: 10,
+      colno: 5,
+    }));
+    await new Promise((r) => setTimeout(r, 10));
+
+    const errorCall = mockInvoke.mock.calls.find(
+        (c: any[]) => c[0] === "frontend_log_command" && c[1]?.level === "error"
+    );
+    expect(errorCall).toBeDefined();
+    expect(errorCall![1].message).toContain("test error");
+    expect(errorCall![1].message).toContain("test.js");
+  });
+
+  it("listens to unhandledrejection events", async () => {
+    initFrontendLogger();
+    mockInvoke.mockClear();
+
+    const _promise = new Promise(() => {});
+    window.dispatchEvent(new PromiseRejectionEvent("unhandledrejection", {
+      promise: _promise,
+      reason: new Error("async failure"),
+    }));
+    await new Promise((r) => setTimeout(r, 10));
+
+    const rejectionCall = mockInvoke.mock.calls.find(
+        (c: any[]) => c[0] === "frontend_log_command" && c[1]?.level === "error"
+    );
+    expect(rejectionCall).toBeDefined();
+    expect(rejectionCall![1].message).toContain("async failure");
   });
 });
