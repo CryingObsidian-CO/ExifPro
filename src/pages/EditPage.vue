@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import {store} from "../store/store.ts";
 import WinButton from "../component/WinButton.vue";
+import WinDialogPanel from "../component/WinDialogPanel.vue";
+import WinInput from "../component/WinInput.vue";
 import {useRouter} from "vue-router";
 import {useI18n} from 'vue-i18n';
 import {useTauri} from "../composables/tauri.ts";
@@ -49,14 +51,30 @@ const selectedPhotos = ref<ExifInfo[]>([]);
 const selectedPhotoKeys = ref<string[]>([]);
 const detailPhoto = ref<ExifInfo | null>(null);
 const lastAnchorPhotoKey = ref<string | null>(null);
+const lastAnchorGroupId = ref<string | null>(null);
 const renamingGroupId = ref<string | null>(null);
 const newGroupName = ref('');
+const showMoveDialog = ref(false);
+const targetGroupId = ref('');
+const showCreateDialog = ref(false);
+const createGroupName = ref('');
+const showMergeDialog = ref(false);
+const mergeGroupName = ref('');
 
 const mainContentRef = ref<HTMLElement | null>(null);
 const photosGridRef = ref<HTMLElement | null>(null);
+const groupListRef = ref<HTMLElement | null>(null);
 const detailDialogRef = ref<HTMLElement | null>(null);
 let lastFocusedBeforeDetail: HTMLElement | null = null;
 const selectionBox = ref({
+  visible: false,
+  left: 0,
+  top: 0,
+  width: 0,
+  height: 0,
+});
+
+const groupSelectionBox = ref({
   visible: false,
   left: 0,
   top: 0,
@@ -74,6 +92,17 @@ type DragSelectState = {
 };
 
 const dragSelectState = ref<DragSelectState | null>(null);
+
+type GroupDragSelectState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  additive: boolean;
+  baseSelection: Set<string>;
+  dragging: boolean;
+};
+
+const groupDragSelectState = ref<GroupDragSelectState | null>(null);
 
 const thumbnailCache = reactive<Record<string, string | null>>({});
 const loadingSet = reactive<Set<string>>(new Set());
@@ -190,13 +219,49 @@ async function handlePluginImageAction(action: ImageActionDeclaration, photo: Ex
   }
 }
 
-function toggleGroupSelection(groupId: string) {
-  const index = selectedGroupIds.value.indexOf(groupId);
-  if (index === -1) {
-    selectedGroupIds.value.push(groupId);
-  } else {
-    selectedGroupIds.value.splice(index, 1);
+function applyGroupSelection(ids: Iterable<string>) {
+  selectedGroupIds.value = Array.from(new Set(ids));
+}
+
+function isGroupSelected(groupId: string) {
+  return selectedGroupIds.value.includes(groupId);
+}
+
+function getGroupRangeSelection(targetId: string) {
+  const ids = store.groups.map(g => g.id);
+  const anchorId = lastAnchorGroupId.value ?? targetId;
+  const start = ids.indexOf(anchorId);
+  const end = ids.indexOf(targetId);
+  if (start === -1 || end === -1) {
+    return [targetId];
   }
+  const [left, right] = start <= end ? [start, end] : [end, start];
+  return ids.slice(left, right + 1);
+}
+
+function selectGroup(groupId: string, isToggle: boolean, isRange: boolean) {
+  if (isRange) {
+    const rangeIds = getGroupRangeSelection(groupId);
+    if (isToggle) {
+      const merged = new Set([...selectedGroupIds.value, ...rangeIds]);
+      applyGroupSelection(merged);
+    } else {
+      applyGroupSelection(rangeIds);
+    }
+    lastAnchorGroupId.value = groupId;
+    return;
+  }
+
+  if (isToggle) {
+    const next = new Set(selectedGroupIds.value);
+    next.has(groupId) ? next.delete(groupId) : next.add(groupId);
+    applyGroupSelection(next);
+    lastAnchorGroupId.value = groupId;
+    return;
+  }
+
+  applyGroupSelection([groupId]);
+  lastAnchorGroupId.value = groupId;
 }
 
 function getPhotoCatalog() {
@@ -399,6 +464,15 @@ function handleWindowKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && detailPhoto.value) {
     closePhotoDetail();
   }
+  if (event.key === 'Escape' && showMoveDialog.value) {
+    showMoveDialog.value = false;
+  }
+  if (event.key === 'Escape' && showCreateDialog.value) {
+    showCreateDialog.value = false;
+  }
+  if (event.key === 'Escape' && showMergeDialog.value) {
+    showMergeDialog.value = false;
+  }
 }
 
 function getRangeSelection(targetKey: string) {
@@ -589,11 +663,116 @@ function handleMainContentPointerCancel(event: PointerEvent) {
   finishDragSelection(event.pointerId);
 }
 
+function getIntersectedGroupIds(selectionRect: DOMRect) {
+  const root = groupListRef.value;
+  if (!root) return [];
+  const elements = root.querySelectorAll<HTMLElement>('.group-item[data-group-id]');
+  const ids: string[] = [];
+  for (const el of elements) {
+    const id = el.dataset.groupId;
+    if (!id) continue;
+    if (rectanglesIntersect(selectionRect, el.getBoundingClientRect())) {
+      ids.push(id);
+    }
+  }
+  return ids;
+}
+
+function updateGroupSelectionBox(clientX: number, clientY: number) {
+  const container = groupListRef.value;
+  const state = groupDragSelectState.value;
+  if (!container || !state) return;
+
+  const containerRect = container.getBoundingClientRect();
+  const left = Math.min(state.startX, clientX);
+  const right = Math.max(state.startX, clientX);
+  const top = Math.min(state.startY, clientY);
+  const bottom = Math.max(state.startY, clientY);
+
+  groupSelectionBox.value = {
+    visible: true,
+    left: left - containerRect.left + container.scrollLeft,
+    top: top - containerRect.top + container.scrollTop,
+    width: right - left,
+    height: bottom - top,
+  };
+}
+
+function handleGroupListPointerDown(event: PointerEvent) {
+  if (event.button !== 0) return;
+  if ((event.target as HTMLElement)?.closest('.group-item') ||
+      (event.target as HTMLElement)?.closest('.icon-btn')) return;
+
+  const container = groupListRef.value;
+  if (!container) return;
+
+  groupDragSelectState.value = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    additive: event.ctrlKey || event.metaKey,
+    baseSelection: new Set(selectedGroupIds.value),
+    dragging: false,
+  };
+  container.setPointerCapture(event.pointerId);
+}
+
+function handleGroupListPointerMove(event: PointerEvent) {
+  const state = groupDragSelectState.value;
+  if (!state || event.pointerId !== state.pointerId) return;
+
+  const dx = event.clientX - state.startX;
+  const dy = event.clientY - state.startY;
+  if (!state.dragging && Math.hypot(dx, dy) < 4) return;
+
+  state.dragging = true;
+  updateGroupSelectionBox(event.clientX, event.clientY);
+
+  const selectionRect = new DOMRect(
+      Math.min(state.startX, event.clientX),
+      Math.min(state.startY, event.clientY),
+      Math.abs(event.clientX - state.startX),
+      Math.abs(event.clientY - state.startY)
+  );
+  const intersected = getIntersectedGroupIds(selectionRect);
+  const selection = state.additive
+      ? new Set([...state.baseSelection, ...intersected])
+      : intersected;
+  applyGroupSelection(selection);
+}
+
+function finishGroupDragSelection(pointerId: number) {
+  const state = groupDragSelectState.value;
+  if (!state || state.pointerId !== pointerId) return;
+
+  if (state.dragging && selectedGroupIds.value.length > 0) {
+    lastAnchorGroupId.value = selectedGroupIds.value[selectedGroupIds.value.length - 1];
+  }
+
+  const container = groupListRef.value;
+  if (container?.hasPointerCapture(pointerId)) {
+    container.releasePointerCapture(pointerId);
+  }
+  groupDragSelectState.value = null;
+  groupSelectionBox.value.visible = false;
+}
+
+function handleGroupListPointerUp(event: PointerEvent) {
+  finishGroupDragSelection(event.pointerId);
+}
+
+function handleGroupListPointerCancel(event: PointerEvent) {
+  finishGroupDragSelection(event.pointerId);
+}
+
 watch(() => store.groups.length, () => {
   const groupIds = new Set(store.groups.map((group) => group.id));
   const filtered = selectedGroupIds.value.filter((id) => groupIds.has(id));
   if (filtered.length !== selectedGroupIds.value.length) {
     selectedGroupIds.value = filtered;
+  }
+  if (lastAnchorGroupId.value && !groupIds.has(lastAnchorGroupId.value)) {
+    lastAnchorGroupId.value = null;
   }
   if (renamingGroupId.value && !groupIds.has(renamingGroupId.value)) {
     renamingGroupId.value = null;
@@ -723,22 +902,27 @@ async function createGroupFromSelected() {
     });
     return;
   }
-  const name = prompt(t('edit.group_name_prompt'), t('edit.new_group_default'));
-  if (name) {
-    console.info(`ui.edit.create_group: confirmed name=${name} photos=${selectedPhotos.value.length}`);
-    const newGroup = store.createGroup(name);
-    if (!newGroup) {
-      await showAlert(t('edit.create_group_failed'), {
-        title: t('edit.operation_failed'),
-        tone: 'error'
-      });
-      return;
-    }
-    store.movePhotoToGroup(selectedPhotos.value, newGroup.id);
-    clearPhotoSelection();
-  } else {
-    console.info("ui.edit.create_group: canceled");
+
+  createGroupName.value = t('edit.new_group_default');
+  showCreateDialog.value = true;
+}
+
+function confirmCreateGroup() {
+  const name = createGroupName.value.trim();
+  if (!name) return;
+
+  console.info(`ui.edit.create_group: confirmed name=${name} photos=${selectedPhotos.value.length}`);
+  const newGroup = store.createGroup(name);
+  if (!newGroup) {
+    showAlert(t('edit.create_group_failed'), {
+      title: t('edit.operation_failed'),
+      tone: 'error'
+    });
+    return;
   }
+  store.movePhotoToGroup(selectedPhotos.value, newGroup.id);
+  clearPhotoSelection();
+  showCreateDialog.value = false;
 }
 
 async function moveSelectedToGroup() {
@@ -751,25 +935,16 @@ async function moveSelectedToGroup() {
     return;
   }
 
-  const targetGroupId = prompt(t('edit.target_group_id'));
-  if (!targetGroupId) {
-    console.info("ui.edit.move_photos: canceled");
-    return;
-  }
+  targetGroupId.value = '';
+  showMoveDialog.value = true;
+}
 
-  const targetGroup = store.findGroup(targetGroupId);
-  if (!targetGroup) {
-    console.warn(`ui.edit.move_photos: rejected reason=group_not_found id=${targetGroupId}`);
-    await showAlert(t('edit.target_group_not_found'), {
-      title: t('edit.group_not_found'),
-      tone: 'error'
-    });
-    return;
-  }
-
-  console.info(`ui.edit.move_photos: start photos=${selectedPhotos.value.length} target=${targetGroupId}`);
-  store.movePhotoToGroup(selectedPhotos.value, targetGroupId);
+function confirmMoveToGroup() {
+  if (!targetGroupId.value) return;
+  console.info(`ui.edit.move_photos: start photos=${selectedPhotos.value.length} target=${targetGroupId.value}`);
+  store.movePhotoToGroup(selectedPhotos.value, targetGroupId.value);
   clearPhotoSelection();
+  showMoveDialog.value = false;
 }
 
 async function mergeSelectedGroups() {
@@ -791,17 +966,21 @@ async function mergeSelectedGroups() {
     return;
   }
 
-  const name = prompt(t('edit.new_group_name_prompt'), t('edit.merged_group_default'));
-  if (name) {
-    console.info(`ui.edit.merge_groups: confirmed name=${name} groups=${selectedGroupIds.value.length}`);
-    let mergedGroup = store.mergeGroups(selectedGroupIds.value, name);
-    if (!mergedGroup) {
-      await showAlert(t('edit.merge_failed'), {title: t('edit.operation_failed'), tone: 'error'});
-      return;
-    }
-  } else {
-    console.info("ui.edit.merge_groups: canceled");
+  mergeGroupName.value = t('edit.merged_group_default');
+  showMergeDialog.value = true;
+}
+
+function confirmMergeGroups() {
+  const name = mergeGroupName.value.trim();
+  if (!name) return;
+
+  console.info(`ui.edit.merge_groups: confirmed name=${name} groups=${selectedGroupIds.value.length}`);
+  const mergedGroup = store.mergeGroups(selectedGroupIds.value, name);
+  if (!mergedGroup) {
+    showAlert(t('edit.merge_failed'), {title: t('edit.operation_failed'), tone: 'error'});
+    return;
   }
+  showMergeDialog.value = false;
 }
 
 async function executeOrganize() {
@@ -941,15 +1120,23 @@ async function executeOrganize() {
           </div>
         </WinCard>
 
-        <div class="group-list glass-scrollbar">
+        <div class="group-list glass-scrollbar"
+             ref="groupListRef"
+             @pointerdown="handleGroupListPointerDown"
+             @pointermove="handleGroupListPointerMove"
+             @pointerup="handleGroupListPointerUp"
+             @pointercancel="handleGroupListPointerCancel"
+             @selectstart.prevent
+        >
           <div v-for="group in store.groups"
                :key="group.id"
                class="group-item glass-item"
-               :class="{ selected: selectedGroupIds.includes(group.id) }"
-               @click="toggleGroupSelection(group.id)"
+               :class="{ selected: isGroupSelected(group.id) }"
+               :data-group-id="group.id"
+               @click="selectGroup(group.id, $event.ctrlKey || $event.metaKey, $event.shiftKey)"
                tabindex="0"
-               @keydown.enter.prevent="toggleGroupSelection(group.id)"
-               @keydown.space.prevent="toggleGroupSelection(group.id)"
+               @keydown.enter.prevent="selectGroup(group.id, $event.ctrlKey || $event.metaKey, $event.shiftKey)"
+               @keydown.space.prevent="selectGroup(group.id, $event.ctrlKey || $event.metaKey, $event.shiftKey)"
           >
             <div class="group-header">
               <div v-if="renamingGroupId === group.id" class="rename-input">
@@ -1001,6 +1188,15 @@ async function executeOrganize() {
               </button>
             </div>
           </div>
+          <div v-if="groupSelectionBox.visible"
+               class="selection-box"
+               :style="{
+                 left: `${selectionBox.left}px`,
+                 top: `${selectionBox.top}px`,
+                 width: `${selectionBox.width}px`,
+                 height: `${selectionBox.height}px`
+               }"
+          />
         </div>
       </div>
       <div class="main-content glass-scrollbar"
@@ -1161,6 +1357,78 @@ async function executeOrganize() {
           </div>
         </div>
       </div>
+
+      <WinDialogPanel
+          :visible="showMoveDialog"
+          :title="t('edit.move_selection_to_group')"
+          @close="showMoveDialog = false"
+      >
+        <p class="move-group-hint">{{ t('edit.select_target_group') }}</p>
+        <div class="move-group-list">
+          <div v-for="group in store.groups"
+               :key="group.id"
+               class="move-group-item"
+               :class="{ selected: targetGroupId === group.id }"
+               @click="targetGroupId = group.id"
+               tabindex="0"
+               @keydown.enter.prevent="targetGroupId = group.id"
+               @keydown.space.prevent="targetGroupId = group.id"
+          >
+            <span class="move-group-indicator"
+                  :style="{ backgroundColor: getGroupTypeColor(group.group_type) }"
+            />
+            <div class="move-group-info">
+              <span class="move-group-name">{{ group.name }}</span>
+              <span class="move-group-type">{{ getGroupTypeLabel(group.group_type) }}</span>
+            </div>
+            <span class="move-group-count">{{ group.photos.length }}</span>
+          </div>
+        </div>
+        <template #actions>
+          <WinButton variant="secondary" @click="showMoveDialog = false">
+            {{ t('common.cancel') }}
+          </WinButton>
+          <WinButton variant="primary" :disabled="!targetGroupId" @click="confirmMoveToGroup">
+            {{ t('edit.confirm_move') }}
+          </WinButton>
+        </template>
+      </WinDialogPanel>
+
+      <WinDialogPanel
+          :visible="showCreateDialog"
+          :title="t('edit.create_group_from_selection')"
+          @close="showCreateDialog = false"
+      >
+        <label class="create-group-label">{{ t('edit.group_name_prompt') }}</label>
+        <WinInput v-model="createGroupName" class="create-group-input"/>
+        <template #actions>
+          <WinButton variant="secondary" @click="showCreateDialog = false">
+            {{ t('common.cancel') }}
+          </WinButton>
+          <WinButton variant="primary" :disabled="!createGroupName.trim()"
+                     @click="confirmCreateGroup">
+            {{ t('edit.confirm_create') }}
+          </WinButton>
+        </template>
+      </WinDialogPanel>
+
+      <WinDialogPanel
+          :visible="showMergeDialog"
+          :title="t('edit.merge_selected_groups')"
+          @close="showMergeDialog = false"
+      >
+        <label class="create-group-label">{{ t('edit.new_group_name_prompt') }}</label>
+        <WinInput v-model="mergeGroupName" class="create-group-input"/>
+        <template #actions>
+          <WinButton variant="secondary" @click="showMergeDialog = false">
+            {{ t('common.cancel') }}
+          </WinButton>
+          <WinButton variant="primary" :disabled="!mergeGroupName.trim()"
+                     @click="confirmMergeGroups">
+            {{ t('edit.confirm_merge') }}
+          </WinButton>
+        </template>
+      </WinDialogPanel>
     </div>
   </div>
 </template>
@@ -1241,6 +1509,7 @@ async function executeOrganize() {
   flex: 1;
   overflow-y: auto;
   padding: var(--prim-space-3);
+  position: relative;
 }
 
 .group-item {
@@ -1564,5 +1833,80 @@ async function executeOrganize() {
 
 .photo-actions .icon-btn {
   padding: 3px 5px;
+}
+
+/* Dialog group list (shared by move & other group pickers) */
+.move-group-hint {
+  color: var(--color-text-secondary);
+  font-size: var(--prim-font-size-base);
+  margin-bottom: var(--prim-space-3);
+}
+
+.move-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.move-group-item {
+  display: flex;
+  align-items: center;
+  gap: var(--prim-space-3);
+  padding: var(--prim-space-2) var(--prim-space-3);
+  border-radius: var(--prim-radius-md);
+  cursor: pointer;
+  transition: background var(--prim-duration-fast) var(--prim-ease-out);
+}
+
+.move-group-item:hover {
+  background: var(--color-glass-bg-hover);
+}
+
+.move-group-item.selected {
+  background: var(--sidebar-item-active);
+  outline: 1px solid var(--color-border-focus);
+}
+
+.move-group-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--prim-radius-full);
+  flex-shrink: 0;
+}
+
+.move-group-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.move-group-name {
+  font-size: var(--prim-font-size-base);
+  font-weight: var(--prim-font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.move-group-type {
+  font-size: var(--prim-font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.move-group-count {
+  font-size: var(--prim-font-size-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.create-group-label {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: var(--prim-font-size-base);
+  margin-bottom: var(--prim-space-2);
+}
+
+.create-group-input {
+  margin-bottom: var(--prim-space-2);
 }
 </style>

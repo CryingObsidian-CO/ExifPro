@@ -2,6 +2,7 @@
   "app": {
     "nav": {
       "home": "首页",
+      "selection": "选片",
       "settings": "设置"
     },
     "brand": "ExifPro",
@@ -183,9 +184,10 @@
     "group_name_prompt": "分组名称:",
     "new_group_default": "新建分组",
     "create_group_failed": "创建分组失败。",
-    "target_group_id": "目标分组 ID:",
-    "target_group_not_found": "未找到目标分组。",
-    "group_not_found": "分组未找到",
+    "select_target_group": "选择目标分组",
+    "confirm_move": "确认移动",
+    "confirm_create": "确认创建",
+    "confirm_merge": "确认合并",
     "select_two_groups": "请至少选择两个分组。",
     "insufficient_selection": "选择不足",
     "cannot_merge_ungrouped": "无法合并未分组项目。",
@@ -205,6 +207,23 @@
     "complete": "完成",
     "organization_failed": "整理失败: {message}",
     "failed": "失败"
+  },
+  "selection": {
+    "title": "选片",
+    "subtitle": "选择照片目录，筛选需要的照片",
+    "source_dir": "源目录",
+    "source_dir_placeholder": "选择照片目录...",
+    "browse": "浏览",
+    "include_subdirs": "包含子目录",
+    "action": "操作",
+    "start_selection": "开始选片",
+    "selecting": "选片中...",
+    "no_dir": "请选择有效的照片目录。",
+    "invalid_dir": "无效目录",
+    "complete": "选片完成。",
+    "complete_title": "完成",
+    "failed": "选片失败，请重试。",
+    "failed_title": "选片失败"
   },
   "common": {
     "confirm": "确定",

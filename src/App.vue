@@ -8,6 +8,7 @@ import {useTauri} from './composables/tauri';
 import {useDialog} from './composables/dialog';
 import {formatError} from "./composables/logger";
 import IconHome from "./component/icons/IconHome.vue";
+import IconSelection from "./component/icons/IconSelection.vue";
 import IconSettings from "./component/icons/IconSettings.vue";
 import IconSun from "./component/icons/IconSun.vue";
 import IconMoon from "./component/icons/IconMoon.vue";
@@ -26,6 +27,7 @@ const {showAlert} = useDialog();
 
 const navItems = computed(() => [
   {path: '/', name: t('app.nav.home'), component: IconHome},
+  {path: '/selection', name: t('app.nav.selection'), component: IconSelection},
   {path: '/settings', name: t('app.nav.settings'), component: IconSettings},
 ]);
 
