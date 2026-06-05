@@ -182,3 +182,95 @@ fn get_config_path() -> Result<PathBuf, String> {
     log::debug!("config.path: resolved path={}", config_path.display());
     Ok(config_path)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    static CONFIG_MUTEX: Mutex<()> = Mutex::new(());
+
+    fn clean_config() {
+        if let Ok(p) = get_config_path() {
+            let _ = std::fs::remove_file(&p);
+        }
+    }
+
+    #[test]
+    fn test_get_config_path_success() {
+        let path = get_config_path();
+        assert!(path.is_ok());
+        let path = path.unwrap();
+        assert!(path.ends_with("config.json"));
+    }
+
+    #[test]
+    fn test_config_save_and_load_roundtrip() {
+        let _lock = CONFIG_MUTEX.lock().unwrap();
+        clean_config();
+
+        let mut config = Config::default();
+        config.preview_max_mb = 42;
+        config.sub_second_digits = 5;
+        config.naming_rules.aeb_prefix = "CustomAEB_".to_string();
+
+        let save_result = config.save();
+        assert!(save_result.is_ok());
+
+        let loaded = Config::load();
+        assert!(loaded.is_ok());
+        let loaded = loaded.unwrap();
+        assert_eq!(loaded.preview_max_mb, 42);
+        assert_eq!(loaded.sub_second_digits, 5);
+        assert_eq!(loaded.naming_rules.aeb_prefix, "CustomAEB_");
+
+        clean_config();
+    }
+
+    #[test]
+    fn test_config_load_invalid_json() {
+        let _lock = CONFIG_MUTEX.lock().unwrap();
+        clean_config();
+
+        let path = get_config_path().unwrap();
+        std::fs::write(&path, "not valid json {").unwrap();
+
+        let result = Config::load();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("parse"));
+
+        clean_config();
+    }
+
+    #[test]
+    fn test_config_load_from_saved_file() {
+        let _lock = CONFIG_MUTEX.lock().unwrap();
+        clean_config();
+
+        let config = Config::default();
+        config.save().unwrap();
+
+        let loaded = Config::load();
+        assert!(loaded.is_ok());
+        let loaded = loaded.unwrap();
+        assert_eq!(loaded.preview_max_mb, config.preview_max_mb);
+        assert_eq!(loaded.sub_second_digits, config.sub_second_digits);
+
+        clean_config();
+    }
+
+    #[test]
+    fn test_config_save_creates_parent_directory() {
+        let _lock = CONFIG_MUTEX.lock().unwrap();
+        clean_config();
+
+        let config = Config::default();
+        let result = config.save();
+        assert!(result.is_ok());
+
+        let cfg_path = get_config_path().unwrap();
+        assert!(cfg_path.exists());
+
+        clean_config();
+    }
+}

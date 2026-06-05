@@ -7,7 +7,7 @@ pub mod plugin;
 use crate::config::Config;
 use crate::exif::{get_thumbnail_data, parse_exif, ExifInfo};
 use crate::file_ops::{create_dirs_if_not_exist, safe_copy, safe_move, scan_directory};
-use crate::grouping::{group_photos, Group};
+use crate::grouping::{group_photos, Group, GroupType};
 use crate::plugin::loader::PluginLoader;
 use crate::plugin::manifest::PluginInfo;
 use serde::{Deserialize, Serialize};
@@ -440,6 +440,44 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    use std::sync::Mutex;
+
+    static CONFIG_MUTEX: Mutex<()> = Mutex::new(());
+
+    struct TestDir {
+        path: PathBuf,
+    }
+
+    impl TestDir {
+        fn new() -> Self {
+            let base = std::env::temp_dir();
+            let ts = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let path = base.join(format!("lib_test_{}", ts));
+            std::fs::create_dir_all(&path).unwrap();
+            TestDir { path }
+        }
+
+        fn path(&self) -> &Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+
+    fn clean_config() {
+        let exe = std::env::current_exe().unwrap();
+        if let Some(parent) = exe.parent() {
+            let _ = std::fs::remove_file(parent.join("config.json"));
+        }
+    }
 
     #[test]
     fn test_ensure_valid_plugin_id_valid() {
@@ -555,7 +593,6 @@ mod tests {
 
     #[test]
     fn test_plugin_data_root_valid() {
-        // creates dirs as side effect (acceptable in test)
         let result = plugin_data_root("my-plugin");
         assert!(result.is_ok());
         let path = result.unwrap();
@@ -588,5 +625,354 @@ mod tests {
         assert_eq!(parsed.exit_code, 0);
         assert_eq!(parsed.stdout, "hello");
         assert_eq!(parsed.stderr, "");
+    }
+
+    // --- Command Tests ---
+
+    #[tokio::test]
+    async fn test_scan_directory_command_basic() {
+        let dir = TestDir::new();
+        std::fs::write(dir.path().join("a.jpg"), b"fake").unwrap();
+        std::fs::write(dir.path().join("b.png"), b"fake").unwrap();
+        std::fs::write(dir.path().join("c.txt"), b"ignore").unwrap();
+
+        let result = scan_directory_command(dir.path().to_string_lossy().to_string(), false).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_scan_directory_command_nonexistent() {
+        let result = scan_directory_command(
+            "C:\\ definitely_not_exists_xyz".to_string(),
+            false,
+        )
+        .await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to scan directory"));
+    }
+
+    #[tokio::test]
+    async fn test_get_thumbnail_command_invalid_level() {
+        let result = get_thumbnail_command("some_path.jpg".to_string(), "bad".to_string()).await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_thumbnail_command_nonexistent_file() {
+        let result = get_thumbnail_command(
+            "C:\\ definitely_not_exists.jpg".to_string(),
+            "high".to_string(),
+        )
+        .await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_group_photos_command_default_config() {
+        let photos = vec![ExifInfo {
+            file_path: "/a.jpg".to_string(),
+            file_name: "a.jpg".to_string(),
+            capture_time: Some("2024:01:15 10:30:00".to_string()),
+            sub_time: Some("000000".to_string()),
+            offset_time_original: None,
+            shutter_speed: None,
+            aperture: None,
+            iso: None,
+            exposure_compensation: None,
+            exposure_mode: None,
+            focal_length: None,
+            focus_distance: None,
+            camera_make: None,
+            camera_model: None,
+        }];
+        let result = group_photos_command(photos, None).await;
+        assert!(result.is_ok());
+        let groups = result.unwrap();
+        assert_eq!(groups.len(), 1); // single photo goes to ungrouped
+    }
+
+    #[tokio::test]
+    async fn test_group_photos_command_with_config() {
+        let photos = vec![];
+        let config = Config::default();
+        let result = group_photos_command(photos, Some(config)).await;
+        assert!(result.is_ok());
+        let groups = result.unwrap();
+        assert_eq!(groups.len(), 1); // only ungrouped
+    }
+
+    #[tokio::test]
+    async fn test_save_config_command() {
+        let _lock = CONFIG_MUTEX.lock().unwrap();
+        clean_config();
+
+        let config = Config::default();
+        let result = save_config_command(config).await;
+        assert!(result.is_ok());
+
+        // Verify file was created
+        let loaded = Config::load().unwrap();
+        assert_eq!(loaded.preview_max_mb, 8);
+
+        clean_config();
+    }
+
+    #[tokio::test]
+    async fn test_load_config_command() {
+        let _lock = CONFIG_MUTEX.lock().unwrap();
+        clean_config();
+
+        let result = load_config_command().await;
+        assert!(result.is_ok());
+        let config = result.unwrap();
+        assert_eq!(config.preview_max_mb, 8);
+
+        clean_config();
+    }
+
+    #[tokio::test]
+    async fn test_organize_files_command_copy() {
+        let src_dir = TestDir::new();
+        let dst_dir = TestDir::new();
+        let src_file = src_dir.path().join("photo.jpg");
+        std::fs::write(&src_file, b"data").unwrap();
+
+        let photo = ExifInfo {
+            file_path: src_file.to_string_lossy().to_string(),
+            file_name: "photo.jpg".to_string(),
+            capture_time: None,
+            sub_time: None,
+            offset_time_original: None,
+            shutter_speed: None,
+            aperture: None,
+            iso: None,
+            exposure_compensation: None,
+            exposure_mode: None,
+            focal_length: None,
+            focus_distance: None,
+            camera_make: None,
+            camera_model: None,
+        };
+        let group = Group {
+            name: "test_group".to_string(),
+            group_type: GroupType::Single,
+            photos: vec![photo],
+            id: "g1".to_string(),
+        };
+
+        let result = organize_files_command(
+            vec![group],
+            dst_dir.path().to_string_lossy().to_string(),
+            true,
+            false,
+        )
+        .await;
+        assert!(result.is_ok());
+        assert!(dst_dir.path().join("test_group").join("photo.jpg").exists());
+    }
+
+    #[tokio::test]
+    async fn test_organize_files_command_move() {
+        let src_dir = TestDir::new();
+        let dst_dir = TestDir::new();
+        let src_file = src_dir.path().join("move_me.jpg");
+        std::fs::write(&src_file, b"data").unwrap();
+
+        let photo = ExifInfo {
+            file_path: src_file.to_string_lossy().to_string(),
+            file_name: "move_me.jpg".to_string(),
+            capture_time: None,
+            sub_time: None,
+            offset_time_original: None,
+            shutter_speed: None,
+            aperture: None,
+            iso: None,
+            exposure_compensation: None,
+            exposure_mode: None,
+            focal_length: None,
+            focus_distance: None,
+            camera_make: None,
+            camera_model: None,
+        };
+        let group = Group {
+            name: "moved".to_string(),
+            group_type: GroupType::Single,
+            photos: vec![photo],
+            id: "g1".to_string(),
+        };
+
+        let result = organize_files_command(
+            vec![group],
+            dst_dir.path().to_string_lossy().to_string(),
+            false,
+            false,
+        )
+        .await;
+        assert!(result.is_ok());
+        assert!(dst_dir.path().join("moved").join("move_me.jpg").exists());
+        assert!(!src_file.exists());
+    }
+
+    #[tokio::test]
+    async fn test_list_plugins_command() {
+        let result = list_plugins_command().await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_read_plugin_file_command() {
+        let dir = TestDir::new();
+        let zip_path = dir.path().join("plugin.zip");
+
+        {
+            let file = std::fs::File::create(&zip_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+            zip.start_file("hello.txt", options).unwrap();
+            zip.write_all(b"Hello, World!").unwrap();
+            zip.finish().unwrap();
+        }
+
+        let result =
+            read_plugin_file_command(zip_path.to_string_lossy().to_string(), "hello.txt".to_string())
+                .await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "Hello, World!");
+    }
+
+    #[tokio::test]
+    async fn test_read_plugin_binary_command() {
+        let dir = TestDir::new();
+        let zip_path = dir.path().join("binary.zip");
+
+        {
+            let file = std::fs::File::create(&zip_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+            zip.start_file("data.bin", options).unwrap();
+            zip.write_all(&[0x00, 0x01, 0xFF]).unwrap();
+            zip.finish().unwrap();
+        }
+
+        let result = read_plugin_binary_command(
+            zip_path.to_string_lossy().to_string(),
+            "data.bin".to_string(),
+        )
+        .await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), vec![0x00, 0x01, 0xFF]);
+    }
+
+    #[tokio::test]
+    async fn test_enable_disable_plugin_command() {
+        let _lock = CONFIG_MUTEX.lock().unwrap();
+        clean_config();
+
+        let result = enable_plugin_command("test-plugin".to_string()).await;
+        assert!(result.is_ok());
+
+        // verify it persisted
+        let config = Config::load().unwrap();
+        assert!(config.enabled_plugins.contains(&"test-plugin".to_string()));
+
+        let result = disable_plugin_command("test-plugin".to_string()).await;
+        assert!(result.is_ok());
+
+        let config = Config::load().unwrap();
+        assert!(!config.enabled_plugins.contains(&"test-plugin".to_string()));
+
+        clean_config();
+    }
+
+    #[tokio::test]
+    async fn test_enable_plugin_command_already_enabled() {
+        let _lock = CONFIG_MUTEX.lock().unwrap();
+        clean_config();
+
+        enable_plugin_command("dup-plugin".to_string()).await.unwrap();
+        let result = enable_plugin_command("dup-plugin".to_string()).await;
+        assert!(result.is_ok());
+
+        let config = Config::load().unwrap();
+        assert_eq!(
+            config
+                .enabled_plugins
+                .iter()
+                .filter(|id| *id == "dup-plugin")
+                .count(),
+            1
+        );
+
+        clean_config();
+    }
+
+    #[tokio::test]
+    async fn test_get_plugin_config_command() {
+        let _lock = CONFIG_MUTEX.lock().unwrap();
+        clean_config();
+
+        let result = get_plugin_config_command("my-plugin".to_string()).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), serde_json::Value::Null);
+
+        clean_config();
+    }
+
+    #[tokio::test]
+    async fn test_set_and_get_plugin_config_command() {
+        let _lock = CONFIG_MUTEX.lock().unwrap();
+        clean_config();
+
+        let value = serde_json::json!({"key": "value"});
+        let result =
+            set_plugin_config_command("my-plugin".to_string(), value.clone()).await;
+        assert!(result.is_ok());
+
+        let fetched = get_plugin_config_command("my-plugin".to_string()).await;
+        assert!(fetched.is_ok());
+        assert_eq!(fetched.unwrap(), value);
+
+        clean_config();
+    }
+
+    #[tokio::test]
+    async fn test_plugin_file_op_command_read_nonexistent() {
+        let result = plugin_file_op_command(
+            "test-plugin".to_string(),
+            "read".to_string(),
+            "nonexistent.txt".to_string(),
+            None,
+        )
+        .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_plugin_file_op_command_mkdir() {
+        let dir = TestDir::new();
+        let sub_path = dir.path().join("new_dir");
+        let result = plugin_file_op_command(
+            "test-plugin".to_string(),
+            "mkdir".to_string(),
+            sub_path.to_string_lossy().to_string(),
+            None,
+        )
+        .await;
+        // Should fail because resolve_plugin_path prefixes with plugin_data/test-plugin/
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_plugin_file_op_command_unknown_operation() {
+        let result = plugin_file_op_command(
+            "test-plugin".to_string(),
+            "unknown".to_string(),
+            "file.txt".to_string(),
+            None,
+        )
+        .await;
+        assert!(result.is_err());
     }
 }
