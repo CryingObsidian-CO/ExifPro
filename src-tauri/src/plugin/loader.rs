@@ -274,6 +274,9 @@ impl PluginLoader {
         if file_name.trim().is_empty() {
             return Err("Zip entry path must not be empty".to_string());
         }
+        if file_name.contains('\\') {
+            return Err("Absolute zip entry paths are not allowed".to_string());
+        }
         let path = Path::new(file_name);
         if path.is_absolute() {
             return Err("Absolute zip entry paths are not allowed".to_string());

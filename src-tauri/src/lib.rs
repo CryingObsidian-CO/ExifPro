@@ -17,6 +17,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri_plugin_log::{log, Target, TargetKind};
 
 fn ensure_valid_plugin_id(plugin_id: &str) -> Result<(), String> {
+    if plugin_id.contains('\\') {
+        return Err("Plugin id must not contain path separators".to_string());
+    }
     let mut components = Path::new(plugin_id).components();
     let first = components
         .next()
@@ -45,6 +48,9 @@ fn plugin_data_root(plugin_id: &str) -> Result<PathBuf, String> {
 fn resolve_plugin_path(plugin_id: &str, path: &str) -> Result<PathBuf, String> {
     if path.trim().is_empty() {
         return Err("Path must not be empty".to_string());
+    }
+    if path.contains('\\') {
+        return Err("Absolute paths are not allowed".to_string());
     }
     let rel_path = Path::new(path);
     if rel_path.is_absolute() {
@@ -544,8 +550,16 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_plugin_path_absolute() {
+    fn test_resolve_plugin_path_absolute_windows() {
         let result = resolve_plugin_path("test-plugin", "C:\\windows\\system32");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Absolute"));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_resolve_plugin_path_absolute_unix() {
+        let result = resolve_plugin_path("test-plugin", "/etc/passwd");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Absolute"));
     }
