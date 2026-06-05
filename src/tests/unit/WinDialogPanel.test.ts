@@ -1,4 +1,4 @@
-import {describe, it, expect, afterEach, vi} from "vitest";
+import {describe, it, expect, afterEach} from "vitest";
 import {mount, VueWrapper} from "@vue/test-utils";
 import {nextTick} from "vue";
 import WinDialogPanel from "../../component/WinDialogPanel.vue";

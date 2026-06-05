@@ -1,11 +1,10 @@
 pub mod utils;
 
-use exifpro_lib::file_ops::{create_dirs_if_not_exist, safe_copy, safe_move};
+use exifpro_lib::file_ops::{create_dirs_if_not_exist, safe_copy, safe_move, scan_directory};
 use std::fs;
 use std::path::{Path, PathBuf};
 use utils::temp_dir::SimpleTempDir;
 
-// 复用辅助函数，减少样板代码
 fn make_test_file(dir: &SimpleTempDir, name: &str, content: &[u8]) -> PathBuf {
     let p = dir.path().join(name);
     fs::write(&p, content).unwrap();
@@ -136,4 +135,69 @@ fn test_safe_move_nonexistent_source() {
     let dest = dir.path().join("nowhere.txt");
 
     assert!(safe_move(&src, &dest, false).is_err());
+}
+
+#[tokio::test]
+async fn test_scan_directory_non_recursive() {
+    let dir = SimpleTempDir::new().unwrap();
+    fs::write(dir.path().join("a.jpg"), b"img1").unwrap();
+    fs::write(dir.path().join("b.png"), b"img2").unwrap();
+    fs::write(dir.path().join("readme.txt"), b"text").unwrap();
+
+    let result = scan_directory(dir.path(), false).await;
+    assert!(result.is_ok());
+    let paths = result.unwrap();
+    assert_eq!(paths.len(), 2, "should find 2 image files only");
+    assert!(paths.iter().any(|p| p.ends_with("a.jpg")));
+    assert!(paths.iter().any(|p| p.ends_with("b.png")));
+}
+
+#[tokio::test]
+async fn test_scan_directory_recursive() {
+    let dir = SimpleTempDir::new().unwrap();
+    let sub = dir.path().join("sub");
+    fs::create_dir_all(&sub).unwrap();
+    fs::write(dir.path().join("root.jpg"), b"root").unwrap();
+    fs::write(sub.join("deep.jpeg"), b"deep").unwrap();
+    fs::write(sub.join("note.txt"), b"skip").unwrap();
+
+    let result = scan_directory(dir.path(), true).await;
+    assert!(result.is_ok());
+    let paths = result.unwrap();
+    assert_eq!(paths.len(), 2, "recursive mode should find 2 image files");
+    assert!(paths.iter().any(|p| p.ends_with("root.jpg")));
+    assert!(paths.iter().any(|p| p.ends_with("deep.jpeg")));
+}
+
+#[tokio::test]
+async fn test_scan_directory_empty() {
+    let dir = SimpleTempDir::new().unwrap();
+    let result = scan_directory(dir.path(), false).await;
+    assert!(result.is_ok());
+    assert!(result.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn test_scan_directory_nonexistent() {
+    let result = scan_directory(Path::new("C:\\ definitely_not_exists_xyz"), false).await;
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_scan_directory_recursive_all_image_types() {
+    let dir = SimpleTempDir::new().unwrap();
+    for ext in &["jpg", "jpeg", "png", "gif", "bmp", "tif", "tiff", "webp"] {
+        fs::write(dir.path().join(format!("img.{}", ext)), b"img").unwrap();
+    }
+    for ext in &[
+        "arw", "cr2", "dng", "nef", "raf", "rw2", "orf", "heic", "heif",
+    ] {
+        fs::write(dir.path().join(format!("raw.{}", ext)), b"raw").unwrap();
+    }
+    fs::write(dir.path().join("doc.pdf"), b"doc").unwrap();
+
+    let result = scan_directory(dir.path(), false).await;
+    assert!(result.is_ok());
+    let paths = result.unwrap();
+    assert_eq!(paths.len(), 17, "should find 17 supported image files");
 }

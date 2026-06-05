@@ -436,3 +436,157 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ensure_valid_plugin_id_valid() {
+        assert!(ensure_valid_plugin_id("my-plugin").is_ok());
+    }
+
+    #[test]
+    fn test_ensure_valid_plugin_id_empty() {
+        let result = ensure_valid_plugin_id("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ensure_valid_plugin_id_path_separator() {
+        let result = ensure_valid_plugin_id("a/b");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("path separators"));
+    }
+
+    #[test]
+    fn test_ensure_valid_plugin_id_backslash() {
+        let result = ensure_valid_plugin_id("a\\b");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("path separators"));
+    }
+
+    #[test]
+    fn test_ensure_valid_plugin_id_dot_component() {
+        let result = ensure_valid_plugin_id(".");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("invalid path components"));
+    }
+
+    #[test]
+    fn test_ensure_valid_plugin_id_dotdot() {
+        let result = ensure_valid_plugin_id("..");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_plugin_path_valid() {
+        let result = resolve_plugin_path("test-plugin", "sub/file.txt");
+        assert!(result.is_ok());
+        let path = result.unwrap();
+        assert!(path.ends_with("plugin_data/test-plugin/sub/file.txt"));
+    }
+
+    #[test]
+    fn test_resolve_plugin_path_empty_plugin_id() {
+        let result = resolve_plugin_path("", "file.txt");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_plugin_path_empty_path() {
+        let result = resolve_plugin_path("test-plugin", "");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_plugin_path_whitespace_path() {
+        let result = resolve_plugin_path("test-plugin", "  ");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_plugin_path_absolute() {
+        let result = resolve_plugin_path("test-plugin", "C:\\windows\\system32");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Absolute"));
+    }
+
+    #[test]
+    fn test_resolve_plugin_path_traversal() {
+        let result = resolve_plugin_path("test-plugin", "../escape.txt");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("traversal"));
+    }
+
+    #[test]
+    fn test_resolve_plugin_path_deep_traversal() {
+        let result = resolve_plugin_path("test-plugin", "sub/../../escape.txt");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_plugin_path_plugin_id_with_separator() {
+        let result = resolve_plugin_path("a/b", "file.txt");
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_reset_config_command() {
+        let config = reset_config_command().await;
+        assert_eq!(config.preview_max_mb, 8);
+        assert_eq!(config.sub_second_digits, 3);
+    }
+
+    #[tokio::test]
+    async fn test_frontend_log_command_invalid_level() {
+        let result = frontend_log_command("invalid".to_string(), "msg".to_string(), None).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Unknown log level"));
+    }
+
+    #[tokio::test]
+    async fn test_frontend_log_command_valid_levels() {
+        for level in &["error", "warn", "info", "debug", "trace"] {
+            let result = frontend_log_command((*level).to_string(), "test".to_string(), None).await;
+            assert!(result.is_ok(), "level={} should be ok", level);
+        }
+    }
+
+    #[test]
+    fn test_plugin_data_root_valid() {
+        // creates dirs as side effect (acceptable in test)
+        let result = plugin_data_root("my-plugin");
+        assert!(result.is_ok());
+        let path = result.unwrap();
+        assert!(
+            path.ends_with("plugin_data\\my-plugin") || path.ends_with("plugin_data/my-plugin")
+        );
+    }
+
+    #[test]
+    fn test_plugin_data_root_invalid_plugin_id() {
+        let result = plugin_data_root("../escape");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_plugin_data_root_empty_id() {
+        let result = plugin_data_root("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_script_result_serde() {
+        let sr = ScriptResult {
+            exit_code: 0,
+            stdout: "hello".to_string(),
+            stderr: "".to_string(),
+        };
+        let json = serde_json::to_string(&sr).expect("serialize");
+        let parsed: ScriptResult = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.exit_code, 0);
+        assert_eq!(parsed.stdout, "hello");
+        assert_eq!(parsed.stderr, "");
+    }
+}

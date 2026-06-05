@@ -288,6 +288,293 @@ pub fn parse_exif(file_path: &Path) -> Result<ExifInfo, Error> {
     Ok(exif_info)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detect_mime_type_jpeg() {
+        let data = [0xFF, 0xD8, 0xFF, 0xDB, 0x00];
+        assert_eq!(detect_mime_type(&data), "image/jpeg");
+    }
+
+    #[test]
+    fn test_detect_mime_type_png() {
+        let data = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00];
+        assert_eq!(detect_mime_type(&data), "image/png");
+    }
+
+    #[test]
+    fn test_detect_mime_type_gif() {
+        let data = [0x47, 0x49, 0x46, 0x38];
+        assert_eq!(detect_mime_type(&data), "image/gif");
+    }
+
+    #[test]
+    fn test_detect_mime_type_webp() {
+        let mut data = Vec::from(b"RIFF");
+        data.extend_from_slice(&[0x00; 4]);
+        data.extend_from_slice(b"WEBP");
+        assert_eq!(detect_mime_type(&data), "image/webp");
+    }
+
+    #[test]
+    fn test_detect_mime_type_fallback() {
+        assert_eq!(detect_mime_type(b"unknown"), "image/jpeg");
+    }
+
+    #[test]
+    fn test_detect_mime_type_empty() {
+        assert_eq!(detect_mime_type(&[]), "image/jpeg");
+    }
+
+    #[test]
+    fn test_normalize_sub_time_none() {
+        assert_eq!(normalize_sub_time(None, 6), None);
+    }
+
+    #[test]
+    fn test_normalize_sub_time_pad_short() {
+        assert_eq!(
+            normalize_sub_time(Some("123".to_string()), 6),
+            Some("123000".to_string())
+        );
+    }
+
+    #[test]
+    fn test_normalize_sub_time_truncate_long() {
+        assert_eq!(
+            normalize_sub_time(Some("1234567".to_string()), 6),
+            Some("123456".to_string())
+        );
+    }
+
+    #[test]
+    fn test_normalize_sub_time_exact_length() {
+        assert_eq!(
+            normalize_sub_time(Some("123456".to_string()), 6),
+            Some("123456".to_string())
+        );
+    }
+
+    #[test]
+    fn test_normalize_sub_time_filter_non_digit() {
+        assert_eq!(
+            normalize_sub_time(Some("ab12cd34".to_string()), 6),
+            Some("123400".to_string())
+        );
+    }
+
+    #[test]
+    fn test_normalize_sub_time_empty_after_filter() {
+        assert_eq!(normalize_sub_time(Some("abc".to_string()), 6), None);
+    }
+
+    #[test]
+    fn test_normalize_sub_time_custom_digits() {
+        assert_eq!(
+            normalize_sub_time(Some("99".to_string()), 3),
+            Some("990".to_string())
+        );
+    }
+
+    #[test]
+    fn test_to_clean_text_none() {
+        assert_eq!(to_clean_text(None), None);
+    }
+
+    #[test]
+    fn test_to_clean_text_trim_double_quotes() {
+        assert_eq!(
+            to_clean_text(Some("\"SONY\"".to_string())),
+            Some("SONY".to_string())
+        );
+    }
+
+    #[test]
+    fn test_to_clean_text_trim_single_quotes() {
+        assert_eq!(
+            to_clean_text(Some("'Model'".to_string())),
+            Some("Model".to_string())
+        );
+    }
+
+    #[test]
+    fn test_to_clean_text_no_quotes() {
+        assert_eq!(
+            to_clean_text(Some("hello".to_string())),
+            Some("hello".to_string())
+        );
+    }
+
+    #[test]
+    fn test_to_clean_text_trim_whitespace() {
+        assert_eq!(
+            to_clean_text(Some("  spaced  ".to_string())),
+            Some("spaced".to_string())
+        );
+    }
+
+    #[test]
+    fn test_to_clean_text_quotes_and_spaces() {
+        assert_eq!(
+            to_clean_text(Some("  \"quoted\"  ".to_string())),
+            Some("\"quoted\"".to_string())
+        );
+    }
+
+    #[test]
+    fn test_to_clean_text_empty_string() {
+        assert_eq!(to_clean_text(Some("".to_string())), Some("".to_string()));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_jpg() {
+        assert!(is_previewable_extension(Path::new("photo.jpg")));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_jpeg() {
+        assert!(is_previewable_extension(Path::new("photo.jpeg")));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_uppercase() {
+        assert!(is_previewable_extension(Path::new("photo.JPG")));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_png() {
+        assert!(is_previewable_extension(Path::new("photo.png")));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_gif() {
+        assert!(is_previewable_extension(Path::new("photo.gif")));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_bmp() {
+        assert!(is_previewable_extension(Path::new("photo.bmp")));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_tiff() {
+        assert!(is_previewable_extension(Path::new("photo.tiff")));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_webp() {
+        assert!(is_previewable_extension(Path::new("photo.webp")));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_heic() {
+        assert!(is_previewable_extension(Path::new("photo.heic")));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_heif() {
+        assert!(is_previewable_extension(Path::new("photo.heif")));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_non_previewable() {
+        assert!(!is_previewable_extension(Path::new("document.pdf")));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_no_extension() {
+        assert!(!is_previewable_extension(Path::new("Makefile")));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_cr2_raw() {
+        assert!(!is_previewable_extension(Path::new("photo.cr2")));
+    }
+
+    #[test]
+    fn test_is_previewable_extension_arw_raw() {
+        assert!(!is_previewable_extension(Path::new("photo.arw")));
+    }
+
+    struct TestDir(std::path::PathBuf);
+
+    impl TestDir {
+        fn new() -> Self {
+            let base = std::env::temp_dir();
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let path = base.join(format!("exif_unit_{}", ts));
+            fs::create_dir_all(&path).unwrap();
+            TestDir(path)
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+
+        fn create_file(&self, name: &str, data: &[u8]) -> std::path::PathBuf {
+            let p = self.path().join(name);
+            fs::write(&p, data).unwrap();
+            p
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn test_get_thumbnail_data_real_file_large() {
+        let dir = TestDir::new();
+        let path = dir.create_file("test.jpg", &[0xFF, 0xD8, 0xFF, 0xDB, 0x00]);
+        let result = get_thumbnail_data(&path, "large", 1024 * 1024);
+        assert!(result.is_some());
+        let data = result.unwrap();
+        assert!(data.starts_with("data:image/jpeg;base64,"));
+    }
+
+    #[test]
+    fn test_get_thumbnail_data_real_file_small() {
+        let dir = TestDir::new();
+        let path = dir.create_file("test.png", b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0DIHDR");
+        let result = get_thumbnail_data(&path, "small", 1024 * 1024);
+        assert!(result.is_some());
+        let data = result.unwrap();
+        assert!(data.starts_with("data:image/png;base64,"));
+    }
+
+    #[test]
+    fn test_get_thumbnail_data_file_too_large_for_preview() {
+        let dir = TestDir::new();
+        let data: Vec<u8> = (0..100u8).collect();
+        let path = dir.create_file("large.jpg", &data);
+        let result = get_thumbnail_data(&path, "small", 50);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_thumbnail_data_non_previewable_ext() {
+        let dir = TestDir::new();
+        let path = dir.create_file("document.pdf", b"%PDF-1.4");
+        let result = get_thumbnail_data(&path, "large", 1024 * 1024);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_file_preview_max_preview_zero() {
+        let dir = TestDir::new();
+        let path = dir.create_file("test.jpg", &[0xFF, 0xD8, 0xFF]);
+        let result = get_thumbnail_data(&path, "small", 0);
+        assert!(result.is_none());
+    }
+}
+
 pub fn get_thumbnail_data(file_path: &Path, level: &str, max_preview_bytes: u64) -> Option<String> {
     let file = File::open(file_path).ok()?;
     let mut buf_reader = BufReader::new(file);

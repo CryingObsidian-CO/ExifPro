@@ -1,8 +1,6 @@
 use exifpro_lib::exif::ExifInfo;
 use std::path::Path;
 
-// NOTE 未测试 parse_exif() 函数
-
 fn create_exif_info(
     file_path: &str,
     file_name: &str,
@@ -131,4 +129,73 @@ fn test_get_thumbnail_data_small_fallback_chain() {
     // 不存在的文件
     let thumb = get_thumbnail_data(Path::new("fake.jpg"), "small", 1024 * 1024);
     assert!(thumb.is_none());
+}
+
+#[test]
+fn test_get_thumbnail_data_max_preview_zero() {
+    use exifpro_lib::exif::get_thumbnail_data;
+    use std::path::Path;
+
+    // max_preview_bytes = 0 -> 直接返回 None
+    let thumb = get_thumbnail_data(Path::new("fake.jpg"), "small", 0);
+    assert!(thumb.is_none());
+}
+
+#[test]
+fn test_parse_exif_nonexistent_file() {
+    use exifpro_lib::exif::parse_exif;
+    use std::path::Path;
+
+    let result = parse_exif(Path::new("nonexistent_file_xyz.jpg"));
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_parse_exif_non_image_file() {
+    use exifpro_lib::exif::parse_exif;
+    use std::fs;
+    use std::path::Path;
+
+    // 创建临时非图片文件
+    let tmp = std::env::temp_dir().join(format!(
+        "exif_test_{}.txt",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    fs::write(&tmp, b"this is not an image").unwrap();
+
+    let result = parse_exif(Path::new(&tmp));
+    assert!(result.is_err());
+
+    let _ = fs::remove_file(&tmp);
+}
+
+#[test]
+fn test_exif_info_new_with_unicode() {
+    use exifpro_lib::exif::ExifInfo;
+    use std::path::Path;
+
+    let info = ExifInfo::new(Path::new("/test/照片.jpg"));
+    assert_eq!(info.file_name, "照片.jpg");
+    assert_eq!(info.file_path, "/test/照片.jpg");
+}
+
+#[test]
+fn test_exif_info_new_root_path() {
+    use exifpro_lib::exif::ExifInfo;
+    use std::path::Path;
+
+    let info = ExifInfo::new(Path::new("/root.jpg"));
+    assert_eq!(info.file_name, "root.jpg");
+}
+
+#[test]
+fn test_exif_info_new_no_extension() {
+    use exifpro_lib::exif::ExifInfo;
+    use std::path::Path;
+
+    let info = ExifInfo::new(Path::new("/test/Makefile"));
+    assert_eq!(info.file_name, "Makefile");
 }

@@ -11,11 +11,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:coverage": "vitest run --coverage",
     "test:coverage:ui": "vitest --ui --coverage",
     "test:rust": "cd src-tauri && cargo test",
-    "test:all": "vitest run && vitest run --config vitest.e2e.config.ts && cd src-tauri && cargo test"
+    "test:all": "vitest run --coverage && cd src-tauri && cargo test"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -37,7 +36,6 @@
     "rollup-plugin-visualizer": "^7.0.1",
     "vite": "^8.0.7",
     "vitest": "^4.1.7",
-    "vue-tsc": "^3.2.6",
-    "webdriverio": "^9.27.1"
+    "vue-tsc": "^3.2.6"
   }
 }
