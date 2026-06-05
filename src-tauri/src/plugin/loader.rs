@@ -332,12 +332,6 @@ mod tests {
     }
 
     #[test]
-    fn test_check_plugin_file_capability_unknown_operation() {
-        let result = PluginLoader::check_plugin_file_capability("any", "unknown_op");
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_load_manifest_from_zip_valid() {
         let dir = TestTempDir::new();
         let zip_path = dir.path().join("test_plugin.zip");

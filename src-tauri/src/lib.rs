@@ -642,11 +642,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_scan_directory_command_nonexistent() {
-        let result = scan_directory_command(
-            "C:\\ definitely_not_exists_xyz".to_string(),
-            false,
-        )
-        .await;
+        let result =
+            scan_directory_command("C:\\ definitely_not_exists_xyz".to_string(), false).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Failed to scan directory"));
     }
@@ -835,9 +832,11 @@ mod tests {
             zip.finish().unwrap();
         }
 
-        let result =
-            read_plugin_file_command(zip_path.to_string_lossy().to_string(), "hello.txt".to_string())
-                .await;
+        let result = read_plugin_file_command(
+            zip_path.to_string_lossy().to_string(),
+            "hello.txt".to_string(),
+        )
+        .await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "Hello, World!");
     }
@@ -891,7 +890,9 @@ mod tests {
         let _lock = CONFIG_MUTEX.lock().unwrap();
         clean_config();
 
-        enable_plugin_command("dup-plugin".to_string()).await.unwrap();
+        enable_plugin_command("dup-plugin".to_string())
+            .await
+            .unwrap();
         let result = enable_plugin_command("dup-plugin".to_string()).await;
         assert!(result.is_ok());
 
@@ -926,8 +927,7 @@ mod tests {
         clean_config();
 
         let value = serde_json::json!({"key": "value"});
-        let result =
-            set_plugin_config_command("my-plugin".to_string(), value.clone()).await;
+        let result = set_plugin_config_command("my-plugin".to_string(), value.clone()).await;
         assert!(result.is_ok());
 
         let fetched = get_plugin_config_command("my-plugin".to_string()).await;
@@ -960,7 +960,6 @@ mod tests {
             None,
         )
         .await;
-        // Should fail because resolve_plugin_path prefixes with plugin_data/test-plugin/
         assert!(result.is_err());
     }
 
