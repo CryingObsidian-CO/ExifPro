@@ -274,6 +274,9 @@ impl PluginLoader {
         if file_name.trim().is_empty() {
             return Err("Zip entry path must not be empty".to_string());
         }
+        if file_name.contains('\\') {
+            return Err("Absolute zip entry paths are not allowed".to_string());
+        }
         let path = Path::new(file_name);
         if path.is_absolute() {
             return Err("Absolute zip entry paths are not allowed".to_string());
@@ -285,5 +288,221 @@ impl PluginLoader {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    struct TestTempDir(std::path::PathBuf);
+
+    impl TestTempDir {
+        fn new() -> Self {
+            let base = std::env::temp_dir();
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let path = base.join(format!("loader_test_{}", ts));
+            std::fs::create_dir_all(&path).unwrap();
+            TestTempDir(path)
+        }
+
+        fn path(&self) -> &std::path::Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TestTempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn test_discover_builtin_plugins() {
+        let plugins = PluginLoader::discover_builtin_plugins();
+        assert!(plugins.is_empty());
+    }
+
+    #[test]
+    fn test_check_plugin_file_capability_not_found() {
+        let result = PluginLoader::check_plugin_file_capability("nonexistent", "read");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn test_load_manifest_from_zip_valid() {
+        let dir = TestTempDir::new();
+        let zip_path = dir.path().join("test_plugin.zip");
+
+        {
+            let file = std::fs::File::create(&zip_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+
+            zip.start_file("manifest.json", options).unwrap();
+            zip.write_all(
+                br#"{
+                    "id": "test-plugin",
+                    "version": "1.0.0",
+                    "name": "Test Plugin",
+                    "api_version": 2,
+                    "entry_point": "index.ts",
+                    "capabilities": {}
+                }"#,
+            )
+            .unwrap();
+            zip.finish().unwrap();
+        }
+
+        let manifest = PluginLoader::load_manifest_from_zip(&zip_path).unwrap();
+        assert_eq!(manifest.id, "test-plugin");
+        assert_eq!(manifest.version, "1.0.0");
+        assert_eq!(manifest.name, "Test Plugin");
+        assert_eq!(manifest.entry_point, "index.ts");
+    }
+
+    #[test]
+    fn test_load_manifest_from_zip_nonexistent() {
+        let result = PluginLoader::load_manifest_from_zip(std::path::Path::new(
+            "C:\\ definitely_not_exists.zip",
+        ));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_manifest_from_zip_missing_manifest() {
+        let dir = TestTempDir::new();
+        let zip_path = dir.path().join("empty.zip");
+
+        {
+            let file = std::fs::File::create(&zip_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+
+            zip.start_file("other.txt", options).unwrap();
+            zip.write_all(b"not a manifest").unwrap();
+            zip.finish().unwrap();
+        }
+
+        let result = PluginLoader::load_manifest_from_zip(&zip_path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("manifest.json not found"));
+    }
+
+    #[test]
+    fn test_read_file_from_zip_valid() {
+        let dir = TestTempDir::new();
+        let zip_path = dir.path().join("data.zip");
+
+        {
+            let file = std::fs::File::create(&zip_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+
+            zip.start_file("hello.txt", options).unwrap();
+            zip.write_all(b"Hello, World!").unwrap();
+            zip.finish().unwrap();
+        }
+
+        let data = PluginLoader::read_file_from_zip(&zip_path, "hello.txt").unwrap();
+        assert_eq!(data, b"Hello, World!");
+    }
+
+    #[test]
+    fn test_read_file_from_zip_nonexistent_file() {
+        let dir = TestTempDir::new();
+        let zip_path = dir.path().join("data.zip");
+
+        {
+            let file = std::fs::File::create(&zip_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+            zip.start_file("real.txt", options).unwrap();
+            zip.write_all(b"data").unwrap();
+            zip.finish().unwrap();
+        }
+
+        let result = PluginLoader::read_file_from_zip(&zip_path, "missing.txt");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_manifest_from_zip_too_small_api_version() {
+        let dir = TestTempDir::new();
+        let zip_path = dir.path().join("bad_api.zip");
+
+        {
+            let file = std::fs::File::create(&zip_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+
+            zip.start_file("manifest.json", options).unwrap();
+            zip.write_all(
+                br#"{
+                    "id": "old-plugin",
+                    "version": "0.5.0",
+                    "name": "Old Plugin",
+                    "api_version": 1,
+                    "entry_point": "index.ts",
+                    "capabilities": {}
+                }"#,
+            )
+            .unwrap();
+            zip.finish().unwrap();
+        }
+
+        let result = PluginLoader::load_manifest_from_zip(&zip_path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("api_version"));
+    }
+
+    #[test]
+    fn test_validate_zip_entry_path_valid() {
+        assert!(PluginLoader::validate_zip_entry_path("foo/bar.ts").is_ok());
+    }
+
+    #[test]
+    fn test_validate_zip_entry_path_empty() {
+        assert!(PluginLoader::validate_zip_entry_path("").is_err());
+    }
+
+    #[test]
+    fn test_validate_zip_entry_path_whitespace() {
+        assert!(PluginLoader::validate_zip_entry_path("   ").is_err());
+    }
+
+    #[test]
+    fn test_validate_zip_entry_path_absolute_windows() {
+        assert!(PluginLoader::validate_zip_entry_path("C:\\foo.ts").is_err());
+    }
+
+    #[test]
+    fn test_validate_zip_entry_path_absolute_unix() {
+        assert!(PluginLoader::validate_zip_entry_path("/etc/passwd").is_err());
+    }
+
+    #[test]
+    fn test_validate_zip_entry_path_traversal() {
+        assert!(PluginLoader::validate_zip_entry_path("../escape.ts").is_err());
+    }
+
+    #[test]
+    fn test_validate_zip_entry_path_deep_traversal() {
+        assert!(PluginLoader::validate_zip_entry_path("sub/../../escape.ts").is_err());
+    }
+
+    #[test]
+    fn test_validate_zip_entry_path_single_file() {
+        assert!(PluginLoader::validate_zip_entry_path("manifest.json").is_ok());
+    }
+
+    #[test]
+    fn test_validate_zip_entry_path_nested() {
+        assert!(PluginLoader::validate_zip_entry_path("sub/dir/file.ts").is_ok());
     }
 }
