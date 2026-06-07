@@ -166,7 +166,7 @@ jobs:
 
       - name: Setup GPG commit signing
         id: gpg
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@v7
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
@@ -176,7 +176,7 @@ jobs:
           git_committer_email: ExifPro[bot]@users.noreply.github.com
 
       - name: Commit and push version bump
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: 'chore: bump version to ${{ needs.bump.outputs.new_version }} [skip ci]'
           commit_user_name: ExifPro[bot]
