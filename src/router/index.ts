@@ -7,6 +7,11 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import("../pages/HomePage.vue"),
   },
   {
+    path: '/selection',
+    name: 'Selection',
+    component: () => import('../pages/SelectionPage.vue'),
+  },
+  {
     path: '/edit',
     name: 'Edit',
     component: () => import('../pages/EditPage.vue'),

@@ -1,4 +1,5 @@
 import {reactive, readonly} from "vue";
+import i18n from "../i18n";
 
 export type DialogTone = "info" | "success" | "warning" | "error";
 export type DialogMode = "alert" | "confirm";
@@ -22,14 +23,16 @@ interface DialogState {
   closeOnOverlay: boolean;
 }
 
+const {t} = i18n.global;
+
 const dialogState = reactive<DialogState>({
   visible: false,
   mode: "alert",
-  title: "提示",
+  title: t('common.tip'),
   message: "",
   tone: "info",
-  confirmText: "确定",
-  cancelText: "取消",
+  confirmText: t('common.confirm'),
+  cancelText: t('common.cancel'),
   closeOnOverlay: true,
 });
 
@@ -51,9 +54,9 @@ function openDialog(mode: DialogMode, message: string, options?: DialogOptions):
   dialogState.mode = mode;
   dialogState.message = message;
   dialogState.tone = options?.tone || "info";
-  dialogState.title = options?.title || (mode === "confirm" ? "请确认" : "提示");
-  dialogState.confirmText = options?.confirmText || "确定";
-  dialogState.cancelText = options?.cancelText || "取消";
+  dialogState.title = options?.title || (mode === "confirm" ? t('common.please_confirm') : t('common.tip'));
+  dialogState.confirmText = options?.confirmText || t('common.confirm');
+  dialogState.cancelText = options?.cancelText || t('common.cancel');
   dialogState.closeOnOverlay = options?.closeOnOverlay ?? mode === "alert";
   dialogState.visible = true;
 

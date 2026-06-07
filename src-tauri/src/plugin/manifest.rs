@@ -1,8 +1,9 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tauri_plugin_log::log;
 
-pub const CURRENT_API_VERSION: u32 = 1;
+pub const CURRENT_API_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginManifest {
@@ -23,15 +24,21 @@ pub struct PluginManifest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginCapabilities {
     #[serde(default)]
+    pub exif_enhancement: bool,
+    #[serde(default)]
     pub grouping: bool,
     #[serde(default)]
     pub merging: bool,
     #[serde(default)]
-    pub exif_enhancement: bool,
-    #[serde(default)]
     pub ui_extensions: bool,
     #[serde(default)]
-    pub custom_group_types: Vec<String>,
+    pub file_read: bool,
+    #[serde(default)]
+    pub file_write: bool,
+    #[serde(default)]
+    pub directory_create: bool,
+    #[serde(default)]
+    pub custom_capabilities: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,24 +62,68 @@ pub struct PluginInfo {
 
 impl PluginManifest {
     pub fn validate(&self) -> Result<(), String> {
+        log::debug!(
+            "plugin.manifest.validate: start id={} version={} api_version={}",
+            self.id,
+            self.version,
+            self.api_version
+        );
         if self.id.is_empty() {
+            log::error!("plugin.manifest.validate: failed reason=empty_id");
             return Err("Plugin id cannot be empty".to_string());
         }
         if self.version.is_empty() {
+            log::error!(
+                "plugin.manifest.validate: failed reason=empty_version id={}",
+                self.id
+            );
             return Err("Plugin version cannot be empty".to_string());
         }
         if self.name.is_empty() {
+            log::error!(
+                "plugin.manifest.validate: failed reason=empty_name id={}",
+                self.id
+            );
             return Err("Plugin name cannot be empty".to_string());
         }
         if self.entry_point.is_empty() {
+            log::error!(
+                "plugin.manifest.validate: failed reason=empty_entry_point id={}",
+                self.id
+            );
             return Err("Plugin entry_point cannot be empty".to_string());
         }
         if self.api_version != CURRENT_API_VERSION {
+            log::error!(
+                "plugin.manifest.validate: failed reason=api_version_mismatch id={} expected={} got={}",
+                self.id,
+                CURRENT_API_VERSION,
+                self.api_version
+            );
             return Err(format!(
                 "Incompatible api_version: expected {}, got {}",
                 CURRENT_API_VERSION, self.api_version
             ));
         }
+        log::info!(
+            "plugin.manifest.validate: complete id={} version={}",
+            self.id,
+            self.version
+        );
         Ok(())
+    }
+}
+
+impl PluginCapabilities {
+    pub fn has_file_read(&self) -> bool {
+        self.file_read
+    }
+
+    pub fn has_file_write(&self) -> bool {
+        self.file_write
+    }
+
+    pub fn has_directory_create(&self) -> bool {
+        self.directory_create
     }
 }

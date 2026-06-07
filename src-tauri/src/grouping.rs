@@ -4,8 +4,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
+use tauri_plugin_log::log;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub enum GroupType {
     FocusBracketing,
     AEB,
@@ -47,6 +48,7 @@ fn is_unlimited(value: f64) -> bool {
 }
 
 pub async fn group_photos(photos: Vec<ExifInfo>, config: Config) -> Result<Vec<Group>, String> {
+    log::info!("grouping: start photos={}", photos.len());
     tauri::async_runtime::spawn_blocking(move || group_photos_sync(photos, &config))
         .await
         .map_err(|err| format!("Failed to join grouping task: {}", err))
@@ -61,6 +63,10 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
     let focus_min_count = config.focus_bracket_settings.min_count.max(2);
     let aeb_min_count = config.aeb_settings.min_count.max(2);
     let burst_min_count = config.burst_settings.min_count.max(2);
+
+    if focus_enabled {
+        log::debug!("grouping.focus_bracketing: enabled=true");
+    }
 
     let mut ungrouped_photos = Vec::new();
 
@@ -80,6 +86,12 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
                         name: generate_group_name(&GroupType::FocusBracketing, photo_group, config),
                         photos: photo_group.to_vec(),
                     };
+                    log::debug!(
+                        "grouping.focus_bracketing: group_found photos={} index_start={} index_end={}",
+                        group.photos.len(),
+                        i,
+                        i + j - 1
+                    );
                     groups.push(group);
                     for k in i..i + j {
                         used[k] = true;
@@ -104,6 +116,12 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
                     name: generate_group_name(&GroupType::AEB, aeb_group, config),
                     photos: aeb_group.to_vec(),
                 };
+                log::debug!(
+                    "grouping.aeb: group_found photos={} index_start={} index_end={}",
+                    group.photos.len(),
+                    i,
+                    i + j - 1
+                );
                 groups.push(group);
                 for k in i..i + j {
                     used[k] = true;
@@ -127,6 +145,12 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
                     name: generate_group_name(&GroupType::Burst, burst_group, config),
                     photos: burst_group.to_vec(),
                 };
+                log::debug!(
+                    "grouping.burst: group_found photos={} index_start={} index_end={}",
+                    group.photos.len(),
+                    i,
+                    i + j - 1
+                );
                 groups.push(group);
                 for k in i..i + j {
                     used[k] = true;
@@ -145,6 +169,10 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
         used[i] = true;
     }
 
+    log::debug!("grouping: ungrouped photos={}", ungrouped_photos.len());
+
+    let ungrouped_count = ungrouped_photos.len();
+
     let ungrouped_group = Group {
         id: "ungrouped".to_string(),
         group_type: GroupType::Single,
@@ -153,6 +181,26 @@ fn group_photos_sync(mut photos: Vec<ExifInfo>, config: &Config) -> Vec<Group> {
     };
     groups.push(ungrouped_group);
 
+    let focus_count = groups
+        .iter()
+        .filter(|g| matches!(g.group_type, GroupType::FocusBracketing))
+        .count();
+    let aeb_count = groups
+        .iter()
+        .filter(|g| matches!(g.group_type, GroupType::AEB))
+        .count();
+    let burst_count = groups
+        .iter()
+        .filter(|g| matches!(g.group_type, GroupType::Burst))
+        .count();
+    log::info!(
+        "grouping: complete focus={} aeb={} burst={} ungrouped={} total_groups={}",
+        focus_count,
+        aeb_count,
+        burst_count,
+        ungrouped_count,
+        groups.len()
+    );
     groups
 }
 
@@ -177,12 +225,19 @@ fn parse_focus_distance(focus_distance: &str) -> Option<f64> {
         .replace("in", "")
         .trim()
         .to_string();
-    cleaned.parse::<f64>().ok()
+    let result = cleaned.parse::<f64>().ok();
+    if result.is_none() {
+        log::warn!(
+            "grouping.focus_distance: parse_failed value={}",
+            focus_distance
+        );
+    }
+    result
 }
 
 fn parse_capture_time(time_info: &ExifInfo) -> Option<DateTime<Utc>> {
     let capture = time_info.capture_time.as_deref().unwrap_or("");
-    let sub = time_info.sub_time.as_deref().unwrap_or("999");
+    let sub = time_info.sub_time.as_deref().unwrap_or("999999");
     let offset = time_info
         .offset_time_original
         .as_deref()
@@ -190,11 +245,12 @@ fn parse_capture_time(time_info: &ExifInfo) -> Option<DateTime<Utc>> {
     let time_str = format!("{}.{} {}", capture, sub, offset);
 
     // TODO 处理时区转换
-    if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y:%m:%d %H:%M:%S.%3f %z") {
+    if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y:%m:%d %H:%M:%S.%6f %z") {
         Some(dt.with_timezone(&Utc))
-    } else if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y-%m-%d %H:%M:%S.%3f %z") {
+    } else if let Ok(dt) = DateTime::parse_from_str(time_str.as_str(), "%Y-%m-%d %H:%M:%S.%6f %z") {
         Some(dt.with_timezone(&Utc))
     } else {
+        log::warn!("grouping.capture_time: parse_failed value={}", time_str);
         None
     }
 }
@@ -263,11 +319,17 @@ fn is_monotonic(vec: &[Option<f64>]) -> bool {
 fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
     // 是否小于最小数量
     if groups.len() < config.focus_bracket_settings.min_count {
+        log::debug!(
+            "grouping.focus_bracketing: rejected reason=min_count actual={} required={}",
+            groups.len(),
+            config.focus_bracket_settings.min_count
+        );
         return false;
     }
 
     //是否存在自动曝光模式
     if groups.iter().any(|p| p.exposure_mode == Some(2)) {
+        log::debug!("grouping.focus_bracketing: rejected reason=auto_bracket_exposure_mode");
         return false;
     }
 
@@ -278,6 +340,11 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
     if !is_unlimited(config.focus_bracket_settings.max_span) {
         if let Some(time_span) = time_diff_seconds(last, first) {
             if time_span > config.focus_bracket_settings.max_span {
+                log::debug!(
+                    "grouping.focus_bracketing: rejected reason=time_span time_span={:.3} max_span={:.3}",
+                    time_span,
+                    config.focus_bracket_settings.max_span
+                );
                 return false;
             }
         }
@@ -293,11 +360,21 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
                 if !is_unlimited(config.focus_bracket_settings.min_consecutive_interval)
                     && interval < config.focus_bracket_settings.min_consecutive_interval
                 {
+                    log::debug!(
+                        "grouping.focus_bracketing: rejected reason=interval_too_short interval={:.3} min_consecutive={:.3}",
+                        interval,
+                        config.focus_bracket_settings.min_consecutive_interval
+                    );
                     return false;
                 }
                 if !is_unlimited(config.focus_bracket_settings.max_consecutive_interval)
                     && interval > config.focus_bracket_settings.max_consecutive_interval
                 {
+                    log::debug!(
+                        "grouping.focus_bracketing: rejected reason=interval_too_long interval={:.3} max_consecutive={:.3}",
+                        interval,
+                        config.focus_bracket_settings.max_consecutive_interval
+                    );
                     return false;
                 }
             }
@@ -318,6 +395,14 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
         .all(|w| w[0].focal_length == w[1].focal_length);
 
     if !same_shutter || !same_aperture || !same_iso || !same_ev || !same_focal {
+        log::debug!(
+            "grouping.focus_bracketing: rejected reason=params_differ shutter={} aperture={} iso={} ev={} focal={}",
+            same_shutter,
+            same_aperture,
+            same_iso,
+            same_ev,
+            same_focal
+        );
         return false;
     }
 
@@ -331,12 +416,26 @@ fn is_focus_bracketing(groups: &[ExifInfo], config: &Config) -> bool {
         })
         .collect();
 
-    is_monotonic(&focus_distances)
+    if !is_monotonic(&focus_distances) {
+        log::debug!("grouping.focus_bracketing: rejected reason=focus_distance_not_monotonic");
+        return false;
+    }
+
+    log::debug!(
+        "grouping.focus_bracketing: accepted photos={}",
+        groups.len()
+    );
+    true
 }
 
 fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
     // 是否小于最小数量
     if groups.len() < config.aeb_settings.min_count {
+        log::debug!(
+            "grouping.aeb: rejected reason=min_count actual={} required={}",
+            groups.len(),
+            config.aeb_settings.min_count
+        );
         return false;
     }
 
@@ -347,6 +446,11 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
     if !is_unlimited(config.aeb_settings.max_span) {
         if let Some(time_span) = time_diff_seconds(last, first) {
             if time_span > config.aeb_settings.max_span {
+                log::debug!(
+                    "grouping.aeb: rejected reason=time_span time_span={:.3} max_span={:.3}",
+                    time_span,
+                    config.aeb_settings.max_span
+                );
                 return false;
             }
         }
@@ -362,11 +466,21 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
                 if !is_unlimited(config.aeb_settings.min_consecutive_interval)
                     && interval < config.aeb_settings.min_consecutive_interval
                 {
+                    log::debug!(
+                        "grouping.aeb: rejected reason=interval_too_short interval={:.3} min_consecutive={:.3}",
+                        interval,
+                        config.aeb_settings.min_consecutive_interval
+                    );
                     return false;
                 }
                 if !is_unlimited(config.aeb_settings.max_consecutive_interval)
                     && interval > config.aeb_settings.max_consecutive_interval
                 {
+                    log::debug!(
+                        "grouping.aeb: rejected reason=interval_too_long interval={:.3} max_consecutive={:.3}",
+                        interval,
+                        config.aeb_settings.max_consecutive_interval
+                    );
                     return false;
                 }
             }
@@ -378,6 +492,7 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
         .windows(2)
         .all(|w| w[0].focal_length == w[1].focal_length);
     if !same_focal {
+        log::debug!("grouping.aeb: rejected reason=focal_length_differs");
         return false;
     }
 
@@ -386,7 +501,7 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
     if config.aeb_settings.auto_bracket_only {
         let all_auto_bracket = groups.iter().all(|p| p.exposure_mode == Some(2));
         if !all_auto_bracket {
-            println!("001?");
+            log::debug!("grouping.aeb: rejected reason=auto_bracket_required");
             return false;
         }
     }
@@ -401,9 +516,14 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
         })
         .collect();
     let Some(ev_values) = ev_values else {
+        log::debug!("grouping.aeb: rejected reason=missing_ev_values");
         return false;
     };
     if !is_symmetric_ev_bracket(&ev_values) {
+        log::debug!(
+            "grouping.aeb: rejected reason=ev_not_symmetric values={:?}",
+            ev_values
+        );
         return false;
     }
 
@@ -414,12 +534,23 @@ fn is_aeb(groups: &[ExifInfo], config: &Config) -> bool {
             || w[0].iso != w[1].iso
     });
 
-    param_different
+    if !param_different {
+        log::debug!("grouping.aeb: rejected reason=exposure_params_identical");
+        return false;
+    }
+
+    log::debug!("grouping.aeb: accepted photos={}", groups.len());
+    true
 }
 
 fn is_burst(groups: &[ExifInfo], config: &Config) -> bool {
     // 是否小于最小数量
     if groups.len() < config.burst_settings.min_count {
+        log::debug!(
+            "grouping.burst: rejected reason=min_count actual={} required={}",
+            groups.len(),
+            config.burst_settings.min_count
+        );
         return false;
     }
 
@@ -433,11 +564,21 @@ fn is_burst(groups: &[ExifInfo], config: &Config) -> bool {
                 if !is_unlimited(config.burst_settings.min_consecutive_interval)
                     && interval < config.burst_settings.min_consecutive_interval
                 {
+                    log::debug!(
+                        "grouping.burst: rejected reason=interval_too_short interval={:.3} min_consecutive={:.3}",
+                        interval,
+                        config.burst_settings.min_consecutive_interval
+                    );
                     return false;
                 }
                 if !is_unlimited(config.burst_settings.max_consecutive_interval)
                     && interval > config.burst_settings.max_consecutive_interval
                 {
+                    log::debug!(
+                        "grouping.burst: rejected reason=interval_too_long interval={:.3} max_consecutive={:.3}",
+                        interval,
+                        config.burst_settings.max_consecutive_interval
+                    );
                     return false;
                 }
             }
@@ -453,5 +594,1111 @@ fn is_burst(groups: &[ExifInfo], config: &Config) -> bool {
             && w[0].focal_length == w[1].focal_length
             && w[0].focus_distance == w[1].focus_distance
     });
-    same_params
+
+    if !same_params {
+        log::debug!("grouping.burst: rejected reason=params_differ");
+        return false;
+    }
+
+    log::debug!("grouping.burst: accepted photos={}", groups.len());
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Datelike;
+    use chrono::Timelike;
+
+    #[test]
+    fn test_is_unlimited_negative() {
+        assert!(is_unlimited(-1.0));
+    }
+
+    #[test]
+    fn test_is_unlimited_zero() {
+        assert!(!is_unlimited(0.0));
+    }
+
+    #[test]
+    fn test_is_unlimited_positive() {
+        assert!(!is_unlimited(1.0));
+    }
+
+    #[test]
+    fn test_is_symmetric_ev_bracket_odd_count() {
+        assert!(is_symmetric_ev_bracket(&[-2.0, 0.0, 2.0]));
+    }
+
+    #[test]
+    fn test_is_symmetric_ev_bracket_even_count() {
+        assert!(is_symmetric_ev_bracket(&[-3.0, -1.0, 1.0, 3.0]));
+    }
+
+    #[test]
+    fn test_is_symmetric_ev_bracket_center_not_zero() {
+        assert!(is_symmetric_ev_bracket(&[0.0, 1.0, 2.0]));
+    }
+
+    #[test]
+    fn test_is_symmetric_ev_bracket_asymmetric() {
+        assert!(!is_symmetric_ev_bracket(&[-1.0, 0.0, 3.0]));
+    }
+
+    #[test]
+    fn test_is_symmetric_ev_bracket_too_few() {
+        assert!(!is_symmetric_ev_bracket(&[0.0, 1.0]));
+    }
+
+    #[test]
+    fn test_is_symmetric_ev_bracket_all_same() {
+        assert!(!is_symmetric_ev_bracket(&[1.0, 1.0, 1.0]));
+    }
+
+    #[test]
+    fn test_is_symmetric_ev_bracket_asymmetric_odd() {
+        assert!(!is_symmetric_ev_bracket(&[-2.0, 0.0, 3.0]));
+    }
+
+    #[test]
+    fn test_is_symmetric_ev_bracket_asymmetric_even() {
+        assert!(!is_symmetric_ev_bracket(&[-2.0, -1.0, 1.0, 3.0]));
+    }
+
+    #[test]
+    fn test_is_symmetric_ev_bracket_unsorted_input() {
+        assert!(is_symmetric_ev_bracket(&[2.0, -2.0, 0.0]));
+    }
+
+    #[test]
+    fn test_is_symmetric_ev_bracket_five_values() {
+        assert!(is_symmetric_ev_bracket(&[-4.0, -2.0, 0.0, 2.0, 4.0]));
+    }
+
+    #[test]
+    fn test_is_monotonic_increasing() {
+        assert!(is_monotonic(&[Some(1.0), Some(2.0), Some(3.0)]));
+    }
+
+    #[test]
+    fn test_is_monotonic_decreasing() {
+        assert!(is_monotonic(&[Some(3.0), Some(2.0), Some(1.0)]));
+    }
+
+    #[test]
+    fn test_is_monotonic_non_monotonic() {
+        assert!(!is_monotonic(&[Some(1.0), Some(3.0), Some(2.0)]));
+    }
+
+    #[test]
+    fn test_is_monotonic_few_elements() {
+        assert!(is_monotonic(&[Some(1.0)]));
+        assert!(is_monotonic(&[]));
+    }
+
+    #[test]
+    fn test_is_monotonic_with_none() {
+        assert!(is_monotonic(&[None, Some(1.0), Some(2.0)]));
+    }
+
+    #[test]
+    fn test_is_monotonic_all_none() {
+        assert!(is_monotonic(&[None, None, None]));
+    }
+
+    #[test]
+    fn test_is_monotonic_none_break_increasing() {
+        assert!(is_monotonic(&[Some(1.0), None, Some(3.0), Some(4.0)]));
+    }
+
+    #[test]
+    fn test_is_monotonic_flat() {
+        assert!(is_monotonic(&[Some(2.0), Some(2.0), Some(2.0)]));
+    }
+
+    #[test]
+    fn test_parse_focus_distance_with_m() {
+        assert_eq!(parse_focus_distance("3.5m"), Some(3.5));
+    }
+
+    #[test]
+    fn test_parse_focus_distance_no_unit() {
+        assert_eq!(parse_focus_distance("2.8"), Some(2.8));
+    }
+
+    #[test]
+    fn test_parse_focus_distance_invalid() {
+        assert_eq!(parse_focus_distance("infinity"), None);
+    }
+
+    #[test]
+    fn test_parse_focus_distance_with_in() {
+        assert_eq!(parse_focus_distance("10 in"), Some(10.0));
+    }
+
+    #[test]
+    fn test_parse_focus_distance_negative() {
+        assert_eq!(parse_focus_distance("-1.0"), Some(-1.0));
+    }
+
+    #[test]
+    fn test_parse_exposure_value_with_ev() {
+        assert_eq!(parse_exposure_value("-1.0 EV"), Some(-1.0));
+    }
+
+    #[test]
+    fn test_parse_exposure_value_no_ev() {
+        assert_eq!(parse_exposure_value("0.5"), Some(0.5));
+    }
+
+    #[test]
+    fn test_parse_exposure_value_invalid() {
+        assert_eq!(parse_exposure_value("N/A"), None);
+    }
+
+    #[test]
+    fn test_parse_exposure_value_positive_ev() {
+        assert_eq!(parse_exposure_value("+2.0 EV"), Some(2.0));
+    }
+
+    #[test]
+    fn test_parse_exposure_value_zero() {
+        assert_eq!(parse_exposure_value("0 EV"), Some(0.0));
+    }
+
+    fn make_time_info(
+        capture_time: Option<&str>,
+        sub_time: Option<&str>,
+        offset: Option<&str>,
+    ) -> ExifInfo {
+        ExifInfo {
+            file_path: "/test/p.jpg".to_string(),
+            file_name: "p.jpg".to_string(),
+            capture_time: capture_time.map(|s| s.to_string()),
+            sub_time: sub_time.map(|s| s.to_string()),
+            offset_time_original: offset.map(|s| s.to_string()),
+            shutter_speed: None,
+            aperture: None,
+            iso: None,
+            exposure_compensation: None,
+            exposure_mode: None,
+            focal_length: None,
+            focus_distance: None,
+            camera_make: None,
+            camera_model: None,
+        }
+    }
+
+    #[test]
+    fn test_parse_capture_time_valid_colon_format() {
+        let info = make_time_info(Some("2024:01:15 10:30:00"), Some("123456"), Some("+08:00"));
+        let dt = parse_capture_time(&info);
+        assert!(dt.is_some());
+        let dt = dt.unwrap();
+        assert_eq!(dt.year(), 2024);
+        assert_eq!(dt.month(), 1);
+        assert_eq!(dt.day(), 15);
+        assert_eq!(dt.hour(), 2); // 10:30 UTC+8 = 02:30 UTC
+        assert_eq!(dt.minute(), 30);
+    }
+
+    #[test]
+    fn test_parse_capture_time_valid_dash_format() {
+        let info = make_time_info(Some("2024-01-15 10:30:00"), Some("000000"), Some("+00:00"));
+        let dt = parse_capture_time(&info);
+        assert!(dt.is_some());
+    }
+
+    #[test]
+    fn test_parse_capture_time_missing_capture() {
+        let info = make_time_info(None, Some("000000"), Some("+00:00"));
+        assert!(parse_capture_time(&info).is_none());
+    }
+
+    #[test]
+    fn test_parse_capture_time_invalid_format() {
+        let info = make_time_info(Some("not a date"), Some("000000"), Some("+00:00"));
+        assert!(parse_capture_time(&info).is_none());
+    }
+
+    #[test]
+    fn test_parse_capture_time_default_sub_time() {
+        // When sub_time is None, defaults to "999999"
+        let info = make_time_info(Some("2024:01:15 10:30:00"), None, Some("+00:00"));
+        let dt = parse_capture_time(&info);
+        assert!(dt.is_some());
+        assert_eq!(dt.unwrap().timestamp_subsec_micros(), 999999);
+    }
+
+    #[test]
+    fn test_parse_capture_time_default_offset() {
+        let info = make_time_info(Some("2024:01:15 10:30:00"), Some("000000"), None);
+        let dt = parse_capture_time(&info);
+        assert!(dt.is_some());
+    }
+
+    fn name_photo(file_name: &str) -> ExifInfo {
+        ExifInfo {
+            file_path: format!("/test/{}", file_name),
+            file_name: file_name.to_string(),
+            capture_time: Some("2024:01:15 10:30:00".to_string()),
+            sub_time: Some("000000".to_string()),
+            offset_time_original: Some("+00:00".to_string()),
+            shutter_speed: None,
+            aperture: None,
+            iso: None,
+            exposure_compensation: None,
+            exposure_mode: None,
+            focal_length: None,
+            focus_distance: None,
+            camera_make: None,
+            camera_model: None,
+        }
+    }
+
+    #[test]
+    fn test_generate_group_name_focus_bracketing() {
+        let photos = vec![name_photo("IMG_0001.jpg")];
+        let name = generate_group_name(&GroupType::FocusBracketing, &photos, &Config::default());
+        assert_eq!(name, "FocusBracket_IMG_0001");
+    }
+
+    #[test]
+    fn test_generate_group_name_aeb() {
+        let photos = vec![name_photo("DSC_1234.jpg")];
+        let name = generate_group_name(&GroupType::AEB, &photos, &Config::default());
+        assert_eq!(name, "AEB_DSC_1234");
+    }
+
+    #[test]
+    fn test_generate_group_name_burst() {
+        let photos = vec![name_photo("burst_01.jpg")];
+        let name = generate_group_name(&GroupType::Burst, &photos, &Config::default());
+        assert_eq!(name, "Burst_burst_01");
+    }
+
+    #[test]
+    fn test_generate_group_name_single() {
+        let photos = vec![name_photo("single.jpg")];
+        let name = generate_group_name(&GroupType::Single, &photos, &Config::default());
+        assert_eq!(name, "single");
+    }
+
+    #[test]
+    fn test_generate_group_name_custom() {
+        let photos = vec![name_photo("photo.jpg")];
+        let name = generate_group_name(
+            &GroupType::Custom("MyPrefix_".to_string()),
+            &photos,
+            &Config::default(),
+        );
+        assert_eq!(name, "MyPrefix_photo");
+    }
+
+    #[test]
+    fn test_generate_group_name_no_extension() {
+        let photos = vec![name_photo("Makefile")];
+        let name = generate_group_name(&GroupType::AEB, &photos, &Config::default());
+        assert_eq!(name, "AEB_Makefile");
+    }
+
+    #[test]
+    fn test_generate_group_name_empty_photos() {
+        let photos: Vec<ExifInfo> = vec![];
+        let name = generate_group_name(&GroupType::Burst, &photos, &Config::default());
+        assert_eq!(name, "Burst_group");
+    }
+
+    fn fb_photo(
+        shutter: &str,
+        aperture: &str,
+        iso: &str,
+        ev: &str,
+        focal: &str,
+        focus_dist: Option<&str>,
+        exposure_mode: Option<u32>,
+        capture_time: &str,
+        sub_time: &str,
+    ) -> ExifInfo {
+        ExifInfo {
+            file_path: "/test/p.jpg".to_string(),
+            file_name: "p.jpg".to_string(),
+            capture_time: Some(capture_time.to_string()),
+            sub_time: Some(sub_time.to_string()),
+            offset_time_original: Some("+00:00".to_string()),
+            shutter_speed: Some(shutter.to_string()),
+            aperture: Some(aperture.to_string()),
+            iso: Some(iso.to_string()),
+            exposure_compensation: Some(ev.to_string()),
+            exposure_mode,
+            focal_length: Some(focal.to_string()),
+            focus_distance: focus_dist.map(|s| s.to_string()),
+            camera_make: Some("SONY".to_string()),
+            camera_model: Some("ILCE-7CM2".to_string()),
+        }
+    }
+
+    #[test]
+    fn test_is_focus_bracketing_basic() {
+        let groups = vec![
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("1.0"),
+                Some(0),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("1.5"),
+                Some(0),
+                "2024:01:15 10:30:00",
+                "100000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("2.0"),
+                Some(0),
+                "2024:01:15 10:30:00",
+                "200000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("2.5"),
+                Some(0),
+                "2024:01:15 10:30:00",
+                "300000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("3.0"),
+                Some(0),
+                "2024:01:15 10:30:00",
+                "400000",
+            ),
+        ];
+        let config = Config::default();
+        assert!(is_focus_bracketing(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_focus_bracketing_rejected_too_few() {
+        let groups = vec![fb_photo(
+            "1/125",
+            "f/8",
+            "400",
+            "0.0",
+            "50mm",
+            Some("1.0"),
+            Some(0),
+            "2024:01:15 10:30:00",
+            "000000",
+        )];
+        let config = Config::default();
+        assert!(!is_focus_bracketing(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_focus_bracketing_rejected_auto_exposure() {
+        let groups = vec![
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("1.0"),
+                Some(2),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("1.5"),
+                Some(2),
+                "2024:01:15 10:30:01",
+                "100000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("2.0"),
+                Some(2),
+                "2024:01:15 10:30:02",
+                "200000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("2.5"),
+                Some(2),
+                "2024:01:15 10:30:03",
+                "300000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("3.0"),
+                Some(2),
+                "2024:01:15 10:30:04",
+                "400000",
+            ),
+        ];
+        let config = Config::default();
+        assert!(!is_focus_bracketing(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_focus_bracketing_rejected_params_differ() {
+        let groups = vec![
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("1.0"),
+                Some(0),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            fb_photo(
+                "1/250",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("1.5"),
+                Some(0),
+                "2024:01:15 10:30:01",
+                "100000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("2.0"),
+                Some(0),
+                "2024:01:15 10:30:02",
+                "200000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("2.5"),
+                Some(0),
+                "2024:01:15 10:30:03",
+                "300000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("3.0"),
+                Some(0),
+                "2024:01:15 10:30:04",
+                "400000",
+            ),
+        ];
+        let config = Config::default();
+        assert!(!is_focus_bracketing(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_focus_bracketing_rejected_not_monotonic() {
+        let groups = vec![
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("1.0"),
+                Some(0),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("3.0"),
+                Some(0),
+                "2024:01:15 10:30:01",
+                "100000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("2.0"),
+                Some(0),
+                "2024:01:15 10:30:02",
+                "200000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("2.5"),
+                Some(0),
+                "2024:01:15 10:30:03",
+                "300000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("3.0"),
+                Some(0),
+                "2024:01:15 10:30:04",
+                "400000",
+            ),
+        ];
+        let config = Config::default();
+        assert!(!is_focus_bracketing(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_focus_bracketing_span_boundary() {
+        let groups = vec![
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("1.0"),
+                Some(0),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("1.5"),
+                Some(0),
+                "2024:01:15 10:30:00",
+                "200000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("2.0"),
+                Some(0),
+                "2024:01:15 10:30:00",
+                "400000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("2.5"),
+                Some(0),
+                "2024:01:15 10:30:00",
+                "600000",
+            ),
+            fb_photo(
+                "1/125",
+                "f/8",
+                "400",
+                "0.0",
+                "50mm",
+                Some("3.0"),
+                Some(0),
+                "2024:01:15 10:30:00",
+                "800000",
+            ),
+        ];
+        let config = Config::default();
+        assert!(is_focus_bracketing(&groups, &config));
+    }
+
+    fn aeb_photo(
+        shutter: &str,
+        aperture: &str,
+        iso: &str,
+        ev: &str,
+        focal: &str,
+        exposure_mode: Option<u32>,
+        capture_time: &str,
+        sub_time: &str,
+    ) -> ExifInfo {
+        ExifInfo {
+            file_path: "/test/p.jpg".to_string(),
+            file_name: "p.jpg".to_string(),
+            capture_time: Some(capture_time.to_string()),
+            sub_time: Some(sub_time.to_string()),
+            offset_time_original: Some("+00:00".to_string()),
+            shutter_speed: Some(shutter.to_string()),
+            aperture: Some(aperture.to_string()),
+            iso: Some(iso.to_string()),
+            exposure_compensation: Some(ev.to_string()),
+            exposure_mode,
+            focal_length: Some(focal.to_string()),
+            focus_distance: None,
+            camera_make: None,
+            camera_model: None,
+        }
+    }
+
+    #[test]
+    fn test_is_aeb_basic() {
+        let groups = vec![
+            aeb_photo(
+                "1/250",
+                "f/8",
+                "400",
+                "-2.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            aeb_photo(
+                "1/125",
+                "f/8",
+                "200",
+                "0.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "100000",
+            ),
+            aeb_photo(
+                "1/60",
+                "f/8",
+                "100",
+                "+2.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "200000",
+            ),
+        ];
+        let config = Config::default();
+        assert!(is_aeb(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_aeb_rejected_too_few() {
+        let groups = vec![aeb_photo(
+            "1/125",
+            "f/8",
+            "400",
+            "0.0",
+            "50mm",
+            Some(1),
+            "2024:01:15 10:30:00",
+            "000000",
+        )];
+        let config = Config::default();
+        assert!(!is_aeb(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_aeb_rejected_same_exposure_params() {
+        let groups = vec![
+            aeb_photo(
+                "1/125",
+                "f/8",
+                "200",
+                "-1.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            aeb_photo(
+                "1/125",
+                "f/8",
+                "200",
+                "0.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "100000",
+            ),
+            aeb_photo(
+                "1/125",
+                "f/8",
+                "200",
+                "+1.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "200000",
+            ),
+        ];
+        let config = Config::default();
+        assert!(!is_aeb(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_aeb_rejected_non_symmetric_ev() {
+        let groups = vec![
+            aeb_photo(
+                "1/250",
+                "f/8",
+                "400",
+                "-1.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            aeb_photo(
+                "1/125",
+                "f/8",
+                "200",
+                "0.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "100000",
+            ),
+            aeb_photo(
+                "1/60",
+                "f/8",
+                "100",
+                "+3.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "200000",
+            ),
+        ];
+        let config = Config::default();
+        assert!(!is_aeb(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_aeb_auto_bracket_only_flag() {
+        let groups = vec![
+            aeb_photo(
+                "1/250",
+                "f/2.8",
+                "400",
+                "-2.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            aeb_photo(
+                "1/125",
+                "f/2.8",
+                "200",
+                "0.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "100000",
+            ),
+            aeb_photo(
+                "1/60",
+                "f/2.8",
+                "100",
+                "+2.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "200000",
+            ),
+        ];
+        let mut config = Config::default();
+        config.aeb_settings.auto_bracket_only = true;
+        assert!(!is_aeb(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_aeb_auto_bracket_only_accepted() {
+        let groups = vec![
+            aeb_photo(
+                "1/250",
+                "f/8",
+                "400",
+                "-2.0",
+                "50mm",
+                Some(2),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            aeb_photo(
+                "1/125",
+                "f/8",
+                "200",
+                "0.0",
+                "50mm",
+                Some(2),
+                "2024:01:15 10:30:00",
+                "100000",
+            ),
+            aeb_photo(
+                "1/60",
+                "f/8",
+                "100",
+                "+2.0",
+                "50mm",
+                Some(2),
+                "2024:01:15 10:30:00",
+                "200000",
+            ),
+        ];
+        let mut config = Config::default();
+        config.aeb_settings.auto_bracket_only = true;
+        assert!(is_aeb(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_aeb_rejected_diff_focal() {
+        let groups = vec![
+            aeb_photo(
+                "1/250",
+                "f/8",
+                "400",
+                "-2.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            aeb_photo(
+                "1/125",
+                "f/8",
+                "200",
+                "0.0",
+                "55mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "100000",
+            ),
+            aeb_photo(
+                "1/60",
+                "f/8",
+                "100",
+                "+2.0",
+                "50mm",
+                Some(1),
+                "2024:01:15 10:30:00",
+                "200000",
+            ),
+        ];
+        let config = Config::default();
+        assert!(!is_aeb(&groups, &config));
+    }
+
+    fn burst_photo(
+        shutter: &str,
+        aperture: &str,
+        iso: &str,
+        ev: &str,
+        focal: &str,
+        focus_dist: Option<&str>,
+        capture_time: &str,
+        sub_time: &str,
+    ) -> ExifInfo {
+        ExifInfo {
+            file_path: "/test/p.jpg".to_string(),
+            file_name: "p.jpg".to_string(),
+            capture_time: Some(capture_time.to_string()),
+            sub_time: Some(sub_time.to_string()),
+            offset_time_original: Some("+00:00".to_string()),
+            shutter_speed: Some(shutter.to_string()),
+            aperture: Some(aperture.to_string()),
+            iso: Some(iso.to_string()),
+            exposure_compensation: Some(ev.to_string()),
+            exposure_mode: Some(2),
+            focal_length: Some(focal.to_string()),
+            focus_distance: focus_dist.map(|s| s.to_string()),
+            camera_make: None,
+            camera_model: None,
+        }
+    }
+
+    #[test]
+    fn test_is_burst_basic() {
+        let groups = vec![
+            burst_photo(
+                "1/500",
+                "f/5.6",
+                "200",
+                "0.0",
+                "50mm",
+                Some("5.0"),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            burst_photo(
+                "1/500",
+                "f/5.6",
+                "200",
+                "0.0",
+                "50mm",
+                Some("5.0"),
+                "2024:01:15 10:30:00",
+                "050000",
+            ),
+            burst_photo(
+                "1/500",
+                "f/5.6",
+                "200",
+                "0.0",
+                "50mm",
+                Some("5.0"),
+                "2024:01:15 10:30:00",
+                "100000",
+            ),
+        ];
+        let config = Config::default();
+        assert!(is_burst(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_burst_rejected_too_few() {
+        let groups = vec![burst_photo(
+            "1/500",
+            "f/5.6",
+            "200",
+            "0.0",
+            "50mm",
+            Some("5.0"),
+            "2024:01:15 10:30:00",
+            "000000",
+        )];
+        let config = Config::default();
+        assert!(!is_burst(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_burst_rejected_params_differ() {
+        let groups = vec![
+            burst_photo(
+                "1/500",
+                "f/5.6",
+                "200",
+                "0.0",
+                "50mm",
+                Some("5.0"),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            burst_photo(
+                "1/500",
+                "f/5.6",
+                "400",
+                "0.0",
+                "50mm",
+                Some("5.0"),
+                "2024:01:15 10:30:00",
+                "050000",
+            ),
+            burst_photo(
+                "1/500",
+                "f/5.6",
+                "200",
+                "0.0",
+                "50mm",
+                Some("5.0"),
+                "2024:01:15 10:30:00",
+                "100000",
+            ),
+        ];
+        let config = Config::default();
+        assert!(!is_burst(&groups, &config));
+    }
+
+    #[test]
+    fn test_is_burst_rejected_interval_too_long() {
+        let groups = vec![
+            burst_photo(
+                "1/500",
+                "f/5.6",
+                "200",
+                "0.0",
+                "50mm",
+                Some("5.0"),
+                "2024:01:15 10:30:00",
+                "000000",
+            ),
+            burst_photo(
+                "1/500",
+                "f/5.6",
+                "200",
+                "0.0",
+                "50mm",
+                Some("5.0"),
+                "2024:01:15 10:30:00",
+                "600000",
+            ),
+            burst_photo(
+                "1/500",
+                "f/5.6",
+                "200",
+                "0.0",
+                "50mm",
+                Some("5.0"),
+                "2024:01:15 10:30:00",
+                "1200000",
+            ),
+        ];
+        let config = Config::default();
+        assert!(!is_burst(&groups, &config));
+    }
 }

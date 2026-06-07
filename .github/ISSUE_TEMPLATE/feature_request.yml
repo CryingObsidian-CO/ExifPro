@@ -1,0 +1,28 @@
+name: "\U0001F4A1 功能请求 / Feature Request"
+description: 提交新功能或改进建议
+labels: [ "✨ 功能请求 | Feature Request" ]
+body:
+  - type: checkboxes
+    attributes:
+      label: "检查项 / Checklist"
+      description: "请确保已完成以下检查项 / Please ensure you have completed the following checks"
+      options:
+        - label: "我已查阅现有Issue，确保没有重复提交 / I have checked existing issues and confirmed there are no duplicates"
+          required: true
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: "功能描述 (Feature Description)"
+      description: "请用描述功能建议 | Please provide suggestions for describing the functionality"
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: "功能动机 (Motivation)"
+      description: "说明为何需要此功能 (这有助于开发者评估优先度） | Explain why this feature is needed (this helps developers prioritize)"
+  - type: textarea
+    id: design
+    attributes:
+      label: "实现建议 (Implementation Suggestions)"
+      description: "技术实现思路| Technical implementation ideas"

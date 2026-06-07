@@ -33,6 +33,7 @@ const handleInput = (e: Event) => {
     // 整数正则：允许空、负数、0，不允许小数点
     const integerReg = /^-?\d*$/;
     if (!integerReg.test(nextValue)) {
+      input.value = value.value as string;
       return;
     }
   }
@@ -67,35 +68,26 @@ const handleInput = (e: Event) => {
       :min="min"
       :max="max"
       @blur="handleInput"
-      class="win-input"
+      class="win-input glass-input"
   />
 </template>
 
 <style scoped>
 .win-input {
   width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  background-color: var(--color-bg-secondary);
-  color: var(--color-text);
-  font-size: 14px;
-  transition: all var(--transition-fast);
+  padding: 7px var(--prim-space-3);
+  border-radius: var(--prim-radius-md);
+  font-size: var(--prim-font-size-base);
   outline: none;
 }
 
-.win-input:hover:not(:disabled):not(:read-only) {
-  border-color: var(--color-border-hover);
-}
-
-.win-input:focus:not(:disabled):not(:read-only) {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-accent-light);
+.win-input::placeholder {
+  color: var(--input-placeholder);
 }
 
 .win-input:disabled,
 .win-input:read-only {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -111,6 +103,4 @@ const handleInput = (e: Event) => {
 .win-input::-webkit-inner-spin-button {
   opacity: 0.85;
 }
-
-
 </style>

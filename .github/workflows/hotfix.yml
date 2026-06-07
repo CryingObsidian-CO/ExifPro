@@ -1,0 +1,188 @@
+name: Hotfix
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - master
+
+concurrency:
+  group: hotfix-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  ci:
+    name: CI
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'hotfix/')
+    uses: ./.github/workflows/ci.yml
+
+  bump:
+    name: Bump Version
+    needs: ci
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'hotfix/')
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: master
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current version
+        id: current
+        run: |
+          VERSION=$(grep -E '^version = ' src-tauri/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Bump patch version
+        id: bump
+        run: |
+          CURRENT="${{ steps.current.outputs.version }}"
+          MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT" | cut -d. -f3)
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Bumped: $CURRENT → $NEW_VERSION"
+
+      - name: Update Cargo.toml
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+          sed -i "s/^version = \"${{ steps.current.outputs.version }}\"/version = \"${NEW_VERSION}\"/" src-tauri/Cargo.toml
+
+      - name: Update tauri.conf.json
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+          sed -i "s/\"version\"[[:space:]]*:[[:space:]]*\"${{ steps.current.outputs.version }}\"/\"version\": \"${NEW_VERSION}\"/" src-tauri/tauri.conf.json
+
+      - name: Setup GPG commit signing
+        id: gpg
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+          git_committer_name: ExifPro[bot]
+          git_committer_email: ExifPro[bot]@users.noreply.github.com
+
+      - name: Commit and push version bump
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: 'chore: bump version to ${{ steps.bump.outputs.new_version }} [skip ci]'
+          commit_user_name: ExifPro[bot]
+          commit_user_email: ExifPro[bot]@users.noreply.github.com
+          file_pattern: 'src-tauri/Cargo.toml src-tauri/tauri.conf.json'
+          branch: master
+
+  build:
+    name: Build Artifacts (${{ matrix.os }})
+    needs: bump
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'hotfix/')
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v6
+        with:
+          ref: master
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get version from Cargo.toml
+        id: version
+        run: |
+          VERSION=$(grep -E '^version = ' src-tauri/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: notes
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const newVersion = '${{ needs.bump.outputs.new_version }}';
+            const sourceBranch = '${{ github.event.pull_request.head.ref }}';
+            const prNumber = ${{ github.event.pull_request.number }};
+            const { data: commits } = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+            const notes = commits.map(c =>
+              `- ${c.commit.message.split('\n')[0]} (@${c.author?.login || 'unknown'})`
+            ).join('\n');
+            let oldVersion = '';
+            if (newVersion.includes('.')) {
+              const parts = newVersion.split('.');
+              parts[2] = String(Number(parts[2]) - 1);
+              oldVersion = parts.join('.');
+            }
+            return [
+              `## 紧急修复版本 v${newVersion}`,
+              '',
+              '### 修复来源',
+              `- 分支：\`${sourceBranch}\` → \`master\``,
+              `- PR：${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/pull/${prNumber}`,
+              '',
+              '### 修复内容',
+              notes || '无额外提交记录',
+              '',
+              '### 版本变更',
+              `v${oldVersion} → v${newVersion}`,
+            ].join('\n');
+
+      - name: Install system dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and release with tauri-action
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v${{ steps.version.outputs.version }}
+          releaseName: 'ExifPro v${{ steps.version.outputs.version }} (Hotfix)'
+          releaseBody: ${{ steps.notes.outputs.result }}
+          releaseDraft: false
+          prerelease: false
+          args: >
+            --bundles
+            ${{ matrix.os == 'ubuntu-latest' && 'deb,rpm' || 'msi,nsis' }}

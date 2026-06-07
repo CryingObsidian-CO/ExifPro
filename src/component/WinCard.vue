@@ -8,7 +8,7 @@ defineProps({
 </script>
 
 <template>
-  <div class="win-card">
+  <div class="win-card glass-card">
     <div v-if="title" class="card-header">
       <h3>{{ title }}</h3>
       <div class="card-header-extra">
@@ -23,33 +23,30 @@ defineProps({
 
 <style scoped>
 .win-card {
-  background-color: var(--color-bg-secondary);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-md);
   overflow: visible;
 }
 
 .card-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--color-border);
+  padding: var(--prim-space-4) var(--prim-space-5);
+  border-bottom: 1px solid var(--card-header-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
 .card-header h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--color-text);
+  font-size: var(--prim-font-size-md);
+  font-weight: var(--prim-font-weight-semibold);
+  color: var(--color-text-primary);
 }
 
 .card-header-extra {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--prim-space-2);
 }
 
 .card-content {
-  padding: 20px;
+  padding: var(--prim-space-5);
 }
 </style>

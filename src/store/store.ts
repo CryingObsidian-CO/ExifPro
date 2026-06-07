@@ -1,8 +1,9 @@
 import {AppState, Theme} from "../types";
 import {reactive, watch} from "vue";
-import {ExifInfo, Group} from "../types/photo.ts";
+import {ExifInfo, Group, GroupType} from "../types/photo.ts";
 import {Config} from "../types/config.ts";
 import {pluginManager} from "../composables/pluginManager.ts";
+import {formatError} from "../composables/logger";
 
 function getSystemTheme() {
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -42,6 +43,7 @@ export class Store {
     watch(() => this.state.theme, (newTheme) => {
           localStorage.setItem('theme', newTheme);
           applyTheme(newTheme);
+          console.info(`ui.store.theme: applied value=${newTheme}`);
         },
         {immediate: true});
 
@@ -158,33 +160,44 @@ export class Store {
     return this.state.groups.length;
   }
 
-  createGroup(name: string, id: string = `group_${name}`) {
-    const newGroup: Group = {
+  createGroup(name: string, id: string = `group_${name.trim()}`, groupType: GroupType = 'Single') {
+
+    if (this.findGroup(id)) {
+      return null;
+    }
+
+    let newGroup: Group = {
       id,
-      group_type: 'Single',
+      group_type: groupType,
       name,
       photos: [],
     };
 
+    newGroup = pluginManager.emitGroupCreated(newGroup);
     this.state.groups.push(newGroup);
     return newGroup;
   }
 
-  updateGroup(groupId: string, updates: Partial<Group>) {
+  updateGroup(groupId: string, updates: Partial<Group>): boolean {
     if (groupId === 'ungrouped') {
-      return;
+      return false;
     }
     const index = this.state.groups.findIndex((g) => g.id === groupId);
     if (index !== -1) {
-      this.state.groups[index] = {...this.state.groups[index], ...updates};
+      const {id: _, ...safeUpdates} = updates;
+      this.state.groups[index] = {...this.state.groups[index], ...safeUpdates};
+      pluginManager.emitGroupUpdated(this.state.groups[index], safeUpdates);
+      return true;
     }
+    return false;
   }
 
-  deleteGroup(groupId: string) {
+  deleteGroup(groupId: string): boolean {
     if (groupId === 'ungrouped') {
-      return;
+      return false;
     }
     this.state.groups = this.state.groups.filter((g) => g.id !== groupId);
+    return true;
   }
 
   private deleteGroups(groupIds: string[]) {
@@ -194,36 +207,46 @@ export class Store {
     });
   }
 
-  findGroup(groupId: string) {
+  findGroup(groupId: string): Group | undefined {
     return this.state.groups.find((g) => g.id === groupId);
   }
 
-  private findGroups(groupIds: string[]) {
+  private findGroups(groupIds: string[]): Group[] {
     return this.state.groups.filter((g) => groupIds.includes(g.id));
   }
 
-  movePhotoToGroup(photos: ExifInfo[], groupId: string) {
+  movePhotoToGroup(photos: ExifInfo[], groupId: string): boolean {
     const group = this.findGroup(groupId);
     if (!group) {
-      return;
+      return false;
     }
     group.photos.push(...photos);
     this.deletePhotosInAllGroups(photos, [groupId]);
+    pluginManager.emitMoveToGroup(group, photos);
+    return true;
   }
 
   mergeGroups(groupIds: string[], name: string) {
+    if (groupIds.includes('ungrouped')) {
+      console.warn("ui.store.merge_groups: rejected reason=includes_ungrouped");
+      return null;
+    }
     const groupsToMerge = this.findGroups(groupIds);
+    if (groupIds.length < 2 || groupsToMerge.length !== groupIds.length) {
+      return null;
+    }
+
     const allPhotos = groupsToMerge.flatMap((g) => g.photos);
 
-    const mergedGroup: Group = {
-      id: `group_${name.trim()}`,
-      group_type: 'Single',
-      name,
-      photos: allPhotos,
-    };
+    const mergedGroup = this.createGroup(name, `group_${name.trim()}`);
+    if (!mergedGroup) {
+      return null;
+    }
+    mergedGroup.photos = allPhotos;
 
-    this.state.groups.push(mergedGroup);
     this.deleteGroups(groupIds);
+
+    pluginManager.emitGroupMerge(groupsToMerge, mergedGroup);
 
     return mergedGroup;
   }
@@ -240,56 +263,64 @@ export class Store {
     });
   }
 
-  addToUngroupedPhotos(photos: ExifInfo[]) {
-    let ungroupedPhotos = this.findGroup('ungrouped');
-    if (!ungroupedPhotos) {
-      ungroupedPhotos = this.createGroup('未分组', 'ungrouped');
+  disbandGroup(groupId: string): boolean {
+    const group = this.findGroup(groupId);
+    if (!group) {
+      return false;
     }
-    ungroupedPhotos.photos.push(...photos);
+    if (!this.addToUngroupedPhotos(group.photos)) {
+      return false;
+    }
+    this.deleteGroup(groupId);
+    pluginManager.emitGroupDisband(group);
+    return true;
+  }
+
+  addToUngroupedPhotos(photos: ExifInfo[]): boolean {
+    let ungroupedGroup = this.findGroup('ungrouped');
+    if (!ungroupedGroup) {
+      const newUngroupedGroup = this.createGroup('未分组', 'ungrouped');
+      if (!newUngroupedGroup) {
+        return false;
+      }
+      ungroupedGroup = newUngroupedGroup as Group;
+    }
+    ungroupedGroup.photos.push(...photos);
+    return true;
   }
 
   async loadPlugins() {
     if (pluginManager.isInitialized) {
       return;
     }
+    console.info("ui.store.plugins: load start");
     try {
       await pluginManager.initialize();
+      console.info("ui.store.plugins: load complete");
     } catch (e) {
-      console.error('Failed to load plugins:', e);
+      console.error('ui.store.plugins: load failed err=' + formatError(e));
     }
   }
 
   async syncPluginsEnabled(enabledPluginIds: string[]) {
+    console.info(`ui.store.plugins: sync start target=${enabledPluginIds.length}`);
     const desired = new Set(enabledPluginIds);
     for (const plugin of this.plugins) {
       if (desired.has(plugin.manifest.id)) {
         if (!plugin.enabled) {
           await pluginManager.enablePlugin(plugin.manifest.id);
+        } else {
+          await pluginManager.updatePluginConfig(plugin.manifest.id);
         }
       } else if (plugin.enabled) {
         await pluginManager.disablePlugin(plugin.manifest.id);
       }
     }
+    console.info("ui.store.plugins: sync complete");
   }
 
   getPlugin(pluginId: string) {
     return this.plugins.find((p) => p.manifest.id === pluginId);
-  }
-
-  async enablePlugin(pluginId: string) {
-    try {
-      await pluginManager.enablePlugin(pluginId);
-    } catch (e) {
-      console.error('Failed to enable plugin:', e);
-    }
-  }
-
-  async disablePlugin(pluginId: string) {
-    try {
-      await pluginManager.disablePlugin(pluginId);
-    } catch (e) {
-      console.error('Failed to disable plugin:', e);
-    }
   }
 }
 
