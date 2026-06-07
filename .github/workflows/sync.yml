@@ -1,0 +1,95 @@
+name: Sync Master to Dev
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - master
+  workflow_run:
+    workflows:
+      - Release
+      - Hotfix
+    types:
+      - completed
+
+concurrency:
+  group: sync-master-to-dev
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Create sync PR (master → dev)
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'docs/')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: master
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "ExifPro[bot]"
+          git config user.email "ExifPro[bot]@users.noreply.github.com"
+
+      - name: Fetch dev and check diff
+        id: check
+        run: |
+          git fetch origin dev
+          AHEAD=$(git rev-list --count dev..master)
+          echo "ahead=$AHEAD" >> $GITHUB_OUTPUT
+          echo "Master is $AHEAD commit(s) ahead of dev"
+
+      - name: Generate PR body
+        if: steps.check.outputs.ahead > 0
+        run: |
+          cat > /tmp/pr-body.md <<- BODYEOF
+          🤖 自动同步：master → dev
+
+          此 PR 由 Sync Master to Dev 工作流自动创建。
+
+          ### 包含的提交
+          $(git log dev..master --oneline --no-decorate)
+
+          > 如果存在冲突，请手动解决后合并。
+          BODYEOF
+
+      - name: Create or update sync PR
+        if: steps.check.outputs.ahead > 0
+
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=$(gh pr list --base dev --head master --state open --json number --jq '.[0].number // empty')
+
+          if [ -n "$PR_NUMBER" ]; then
+            echo "Updating existing sync PR #$PR_NUMBER..."
+            gh pr edit "$PR_NUMBER" --body-file /tmp/pr-body.md
+          else
+            echo "Creating new sync PR..."
+            gh pr create \
+              --base dev \
+              --head master \
+              --title "chore: sync master to dev" \
+              --body-file /tmp/pr-body.md \
+              --label "sync"
+
+            PR_NUMBER=$(gh pr list --base dev --head master --state open --json number --jq '.[0].number')
+            if [ -n "$PR_NUMBER" ]; then
+              echo "Enabling auto-merge for PR #$PR_NUMBER"
+              gh pr merge "$PR_NUMBER" --auto --squash || true
+            fi
+          fi
+
+      - name: No changes to sync
+        if: steps.check.outputs.ahead == 0
+        run: echo "Master is not ahead of dev, nothing to sync"

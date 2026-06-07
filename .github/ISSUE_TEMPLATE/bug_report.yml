@@ -1,0 +1,40 @@
+name: "\U0001F41B Bug 报告 / Bug Report"
+description: 提交系统异常或错误行为报告
+labels: [ "🐛 Bug 报告 | Bug Report" ]
+body:
+  - type: checkboxes
+    attributes:
+      label: "检查项 / Checklist"
+      description: "请确保已完成以下检查项 / Please ensure you have completed the following checks"
+      options:
+        - label: "我已查阅现有Issue，确保没有重复提交 / I have checked existing issues and confirmed there are no duplicates"
+          required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: "问题描述 / Issue Description"
+      description: "清晰准确地描述遇到的问题 / Clearly describe the encountered issue"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: "重现步骤 / Reproduction Steps"
+      description: "如何重现该问题的分步说明 / Step-by-step instructions to reproduce"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: "预期行为 / Expected Behavior"
+      description: "你期望发生的正确行为 / The correct behavior you expected"
+  - type: textarea
+    id: actual
+    attributes:
+      label: "实际行为 / Actual Behavior"
+      description: "实际发生的错误行为 / The erroneous behavior observed"
+  - type: textarea
+    id: logs
+    attributes:
+      label: "相关日志 / Relevant Logs"
+      description: "请附上最新的 ExifPro.log（位于 ExifPro/logs/） / Attach latest ExifPro.log (from ExifPro/logs/)"

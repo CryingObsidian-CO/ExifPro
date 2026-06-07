@@ -1,0 +1,79 @@
+# ================= 状态标签 Status ================= #
+- name: "⭕ 等待处理 | Pending"
+  color: "FF8C00"
+  description: "已确认，等待下一步处理 | Confirmed, awaiting next steps"
+
+- name: "💬 信息补充 | Needs Info"
+  color: "87CEEB"
+  description: "需要提交者提供更多相关信息 | Requires more information from submitter"
+
+- name: "💬 需要复现 | Needs Reproduction"
+  color: "87CEEB"
+  description: "需要除提交者以外的人复现 | Requires independent reproduction"
+
+- name: "🚧 正在处理 | In Progress"
+  color: "FFD700"
+  description: "开发者正在调查或处理该内容 | Under active investigation/development"
+
+- name: "👌 完成 | Resolved"
+  color: "00FF00"
+  description: "处理完毕，将在下次更新后实装 | Completed, will be implemented in next update"
+
+- name: "🕑 等待合并 | Awaiting Merge"
+  color: "0000FF"
+  description: "处理完毕，等待合并 | Processed, waiting for merge"
+
+- name: "💤 非活跃 | inactive"
+  color: "8D8D8D"
+  description: "超过30天无更新的问题或 PR | Issues/PRs inactive for 30+ days"
+
+- name: "💤 已存档 | Archived"
+  color: "FFFFFF"
+  description: "已完成讨论的旧议题 | Archived historical discussions"
+
+# ================= 关闭原因 Closure ================= #
+- name: "❌ 拒绝 | Rejected"
+  color: "B60205"
+  description: "拒绝/放弃该请求 | Request rejected/abandoned"
+
+- name: "❌ 重复 | Duplicate"
+  color: "B60205"
+  description: "已有相关 Issue/PR 提及此内容 | Duplicate of existing issue/PR"
+
+- name: "❌ 第三方 | Third Party"
+  color: "B60205"
+  description: "错误由第三方内容引发，无法修复 | Caused by third-party content"
+
+- name: "❌ 无计划 | Won't Fix"
+  color: "B60205"
+  description: "暂无计划实现此功能 | No implementation plan"
+
+- name: "❌ 已过时 | Obsolete"
+  color: "B60205"
+  description: "内容不再适用当前版本 | No longer applicable to current version"
+
+# ================= 问题类型 Type ================= #
+- name: "🐛 Bug 报告 | Bug Report"
+  color: "D4C5F9"
+  description: "系统异常或错误行为报告 | System anomalies or bug reports"
+
+- name: "✨ 功能请求 | Feature Request"
+  color: "D4C5F9"
+  description: "新功能或改进建议 | New feature or improvement suggestions"
+
+- name: "📚 文档相关 | Documentation"
+  color: "D4C5F9"
+  description: "文档改进或翻译问题 | Documentation improvements or translation issues"
+
+# ================= 特殊标签 Special ================= #
+- name: "👍 优质内容 | Quality"
+  color: "FFD700"
+  description: "高质量 Issue/PR | High-quality contribution"
+
+- name: "❗ 破坏性改动 | Breaking"
+  color: "B60205"
+  description: "包含不兼容的改动 | Contains breaking changes"
+
+- name: "🙋 需要帮助 | Help Wanted"
+  color: "008672"
+  description: "需要社区协助解决 | Requires community assistance"
