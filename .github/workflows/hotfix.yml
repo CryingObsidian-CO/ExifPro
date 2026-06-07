@@ -164,13 +164,25 @@ jobs:
           merge-multiple: true
           path: release-assets
 
+      - name: Setup GPG commit signing
+        id: gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+          git_committer_name: ExifPro[bot]
+          git_committer_email: ExifPro[bot]@users.noreply.github.com
+
       - name: Commit and push version bump
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src-tauri/Cargo.toml src-tauri/tauri.conf.json
-          git commit -m "chore: bump version to ${{ needs.bump.outputs.new_version }} [skip ci]"
-          git push origin master
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore: bump version to ${{ needs.bump.outputs.new_version }} [skip ci]'
+          commit_user_name: ExifPro[bot]
+          commit_user_email: ExifPro[bot]@users.noreply.github.com
+          file_pattern: 'src-tauri/Cargo.toml src-tauri/tauri.conf.json'
+          branch: master
 
       - name: Generate release notes
         id: notes
