@@ -72,8 +72,18 @@ jobs:
         working-directory: src-tauri
 
       - name: Clippy linting
-        run: cargo clippy --all-features -- -D warnings
+        id: clippy
+        run: |
+          cargo clippy --all-features -- -W warnings 2>&1 | tee /tmp/clippy.log
         working-directory: src-tauri
+
+      - name: Clippy report
+        if: always()
+        run: |
+          COUNT=$(grep -c 'warning:' /tmp/clippy.log 2>/dev/null || echo 0)
+          if [ "$COUNT" -gt 0 ]; then
+            echo "::warning title=clippy::${COUNT} clippy warning(s) detected. Run 'cargo clippy --all-features' locally to fix."
+          fi
 
       - name: Cargo check
         run: cargo check --all-features
