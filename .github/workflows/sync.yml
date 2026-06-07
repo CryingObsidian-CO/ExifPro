@@ -1,7 +1,11 @@
 name: Sync Master to Dev
 
 on:
-
+  pull_request:
+    types:
+      - closed
+    branches:
+      - master
   workflow_run:
     workflows:
       - Release
@@ -21,8 +25,8 @@ jobs:
   sync:
     name: Create sync PR (master → dev)
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'push' ||
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'docs/')) ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     steps:
       - name: Checkout master

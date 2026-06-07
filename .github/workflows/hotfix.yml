@@ -65,13 +65,25 @@ jobs:
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
           sed -i "s/\"version\"[[:space:]]*:[[:space:]]*\"${{ steps.current.outputs.version }}\"/\"version\": \"${NEW_VERSION}\"/" src-tauri/tauri.conf.json
 
-      - name: Upload bumped version files
-        uses: actions/upload-artifact@v7
+      - name: Setup GPG commit signing
+        id: gpg
+        uses: crazy-max/ghaction-import-gpg@v7
         with:
-          name: bumped-version
-          path: |
-            src-tauri/Cargo.toml
-            src-tauri/tauri.conf.json
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+          git_committer_name: ExifPro[bot]
+          git_committer_email: ExifPro[bot]@users.noreply.github.com
+
+      - name: Commit and push version bump
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: 'chore: bump version to ${{ steps.bump.outputs.new_version }} [skip ci]'
+          commit_user_name: ExifPro[bot]
+          commit_user_email: ExifPro[bot]@users.noreply.github.com
+          file_pattern: 'src-tauri/Cargo.toml src-tauri/tauri.conf.json'
+          branch: master
 
   build:
     name: Build Artifacts (${{ matrix.os }})
@@ -90,99 +102,11 @@ jobs:
           ref: master
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download bumped version files
-        uses: actions/download-artifact@v8
-        with:
-          name: bumped-version
-
-      - name: Install system dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Get version from Cargo.toml
+        id: version
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            libwebkit2gtk-4.1-dev \
-            librsvg2-dev \
-            patchelf
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '20.x'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build with tauri-action
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: >
-            --bundles
-            ${{ matrix.os == 'ubuntu-latest' && 'deb,rpm' || 'msi,nsis' }}
-
-      - name: Upload bundles
-        uses: actions/upload-artifact@v7
-        with:
-          name: bundles-${{ matrix.os }}
-          path: src-tauri/target/release/bundle/**/*
-
-  create-release:
-    name: Create Release
-    needs: [ bump, build ]
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'hotfix/')
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout master
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          ref: master
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download bumped version files
-        uses: actions/download-artifact@v8
-        with:
-          name: bumped-version
-
-      - name: Download all bundles
-        uses: actions/download-artifact@v8
-        with:
-          pattern: bundles-*
-          merge-multiple: true
-          path: release-assets
-
-      - name: Setup GPG commit signing
-        id: gpg
-        uses: crazy-max/ghaction-import-gpg@v7
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          git_user_signingkey: true
-          git_commit_gpgsign: true
-          git_committer_name: ExifPro[bot]
-          git_committer_email: ExifPro[bot]@users.noreply.github.com
-
-      - name: Commit and push version bump
-        uses: stefanzweifel/git-auto-commit-action@v7
-        with:
-          commit_message: 'chore: bump version to ${{ needs.bump.outputs.new_version }} [skip ci]'
-          commit_user_name: ExifPro[bot]
-          commit_user_email: ExifPro[bot]@users.noreply.github.com
-          file_pattern: 'src-tauri/Cargo.toml src-tauri/tauri.conf.json'
-          branch: master
+          VERSION=$(grep -E '^version = ' src-tauri/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
         id: notes
@@ -220,13 +144,44 @@ jobs:
               `v${oldVersion} → v${newVersion}`,
             ].join('\n');
 
-      - name: Create tag and release
-        uses: softprops/action-gh-release@v3
+      - name: Install system dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          tag_name: v${{ needs.bump.outputs.new_version }}
-          name: 'ExifPro v${{ needs.bump.outputs.new_version }} (Hotfix)'
-          body: ${{ steps.notes.outputs.result }}
-          files: release-assets/**
-          draft: false
+          workspaces: src-tauri
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and release with tauri-action
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v${{ steps.version.outputs.version }}
+          releaseName: 'ExifPro v${{ steps.version.outputs.version }} (Hotfix)'
+          releaseBody: ${{ steps.notes.outputs.result }}
+          releaseDraft: false
           prerelease: false
-          generate_release_notes: false
+          args: >
+            --bundles
+            ${{ matrix.os == 'ubuntu-latest' && 'deb,rpm' || 'msi,nsis' }}
