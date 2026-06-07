@@ -63,7 +63,7 @@ jobs:
       - name: Update tauri.conf.json
         run: |
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
-          sed -i "s/\"version\":\"${{ steps.current.outputs.version }}\"/\"version\": \"${NEW_VERSION}\"/" src-tauri/tauri.conf.json
+          sed -i "s/\"version\"[[:space:]]*:[[:space:]]*\"${{ steps.current.outputs.version }}\"/\"version\": \"${NEW_VERSION}\"/" src-tauri/tauri.conf.json
 
       - name: Upload bumped version files
         uses: actions/upload-artifact@v7

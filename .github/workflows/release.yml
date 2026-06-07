@@ -22,7 +22,7 @@ jobs:
     name: CI
     if: |
       startsWith(github.ref, 'refs/heads/release/v') ||
-      (github.event.pull_request.merged == false && startsWith(github.event.pull_request.head.ref, 'release/v'))
+      startsWith(github.event.pull_request.head.ref, 'release/v')
     uses: ./.github/workflows/ci.yml
 
   prerelease-build:
