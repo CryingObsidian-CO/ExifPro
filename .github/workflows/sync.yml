@@ -86,7 +86,7 @@ jobs:
             PR_NUMBER=$(gh pr list --base dev --head master --state open --json number --jq '.[0].number')
             if [ -n "$PR_NUMBER" ]; then
               echo "Enabling auto-merge for PR #$PR_NUMBER"
-              gh pr merge "$PR_NUMBER" --auto --squash
+              gh pr merge "$PR_NUMBER" --auto --squash || true
             fi
           fi
 
