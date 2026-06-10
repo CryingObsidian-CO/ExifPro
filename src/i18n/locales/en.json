@@ -225,10 +225,7 @@
     "failed": "Selection failed, please try again.",
     "failed_title": "Selection Failed",
     "engine": "Detection Engine",
-    "method_label": "Method",
-    "method_BlurDetection": "Blur Detection",
-    "method_OnnxDetection": "ONNX Detection",
-    "algorithm_label": "Algorithm",
+    "algorithm_label": "Blur Algorithm",
     "algorithm_LaplacianVariance": "Laplacian Variance",
     "algorithm_Tenengrad": "Tenengrad",
     "algorithm_Brenner": "Brenner",
@@ -244,7 +241,9 @@
     "tab_passed": "Passed",
     "tab_eliminated": "Eliminated",
     "tab_unrated": "Unrated",
-    "eliminated": "Eliminated"
+    "eliminated": "Eliminated",
+    "methodShort_BlurDetection": "Blur",
+    "methodShort_OnnxDetection": "ONNX"
   },
   "common": {
     "confirm": "Confirm",

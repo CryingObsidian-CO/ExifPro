@@ -6,6 +6,7 @@ export interface PhotoItem {
   filePath: string;
   fileName: string;
   score: number;
+  scoreDetails: Array<[string, number]>;
   stars: number;
   passed: boolean;
   eliminatedBy: string[];
@@ -95,6 +96,7 @@ const isLoaded = (path: string) => {
           :file-path="photo.filePath"
           :file-name="photo.fileName"
           :score="photo.score"
+          :score-details="photo.scoreDetails"
           :stars="photo.stars"
           :passed="photo.passed"
           :eliminated-by="photo.eliminatedBy"

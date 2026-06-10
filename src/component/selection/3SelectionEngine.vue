@@ -6,12 +6,11 @@ import WinButton from '../WinButton.vue';
 import WinSelect from '../WinSelect.vue';
 import type {SelectOption} from '../WinSelect.vue';
 import WinSlider from '../WinSlider.vue';
-import {SelectionMethod, BlurAlgorithm} from '../../types/selection.ts';
+import {BlurAlgorithm} from '../../types/selection.ts';
 
 const {t} = useI18n();
 
 const props = defineProps<{
-  method: SelectionMethod;
   algorithm: BlurAlgorithm;
   threshold: number;
   isRunning: boolean;
@@ -19,44 +18,26 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'update:method', v: SelectionMethod): void;
   (e: 'update:algorithm', v: BlurAlgorithm): void;
   (e: 'update:threshold', v: number): void;
   (e: 'start'): void;
   (e: 'stop'): void;
 }>();
 
-const methodOptions = computed<SelectOption[]>(() => [
+const algorithmOptions = computed<SelectOption[]>(() => [
   {
-    value: SelectionMethod.BlurDetection,
-    label: t('selection.method_' + SelectionMethod.BlurDetection)
+    value: BlurAlgorithm.LaplacianVariance,
+    label: t('selection.algorithm_' + BlurAlgorithm.LaplacianVariance),
+  },
+  {
+    value: BlurAlgorithm.Tenengrad,
+    label: t('selection.algorithm_' + BlurAlgorithm.Tenengrad),
+  },
+  {
+    value: BlurAlgorithm.Brenner,
+    label: t('selection.algorithm_' + BlurAlgorithm.Brenner),
   },
 ]);
-
-const algorithmOptions = computed<SelectOption[]>(() => {
-  if (props.method === SelectionMethod.BlurDetection) {
-    return [
-      {
-        value: BlurAlgorithm.LaplacianVariance,
-        label: t('selection.algorithm_' + BlurAlgorithm.LaplacianVariance),
-      },
-      {
-        value: BlurAlgorithm.Tenengrad,
-        label: t('selection.algorithm_' + BlurAlgorithm.Tenengrad),
-      },
-      {
-        value: BlurAlgorithm.Brenner,
-        label: t('selection.algorithm_' + BlurAlgorithm.Brenner),
-      },
-    ];
-  }
-  return [];
-});
-
-const methodModel = computed({
-  get: () => props.method,
-  set: (v: SelectionMethod) => emit('update:method', v),
-});
 
 const algorithmModel = computed({
   get: () => props.algorithm,
@@ -72,13 +53,6 @@ const thresholdPercent = computed({
 <template>
   <WinCard :title="t('selection.engine')">
     <div class="engine-form">
-      <div class="form-group">
-        <label class="form-label">{{ t('selection.method_label') }}</label>
-        <WinSelect
-            v-model="methodModel"
-            :options="methodOptions"
-        />
-      </div>
       <div class="form-group">
         <label class="form-label">{{ t('selection.algorithm_label') }}</label>
         <WinSelect

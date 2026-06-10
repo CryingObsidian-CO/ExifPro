@@ -5,6 +5,7 @@ export interface OverlayPhoto {
   filePath: string;
   fileName: string;
   score: number;
+  scoreDetails: Array<[string, number]>;
   stars: number;
   passed: boolean;
   thumbnailUrl: string | null;
@@ -72,6 +73,13 @@ watch(visible, (v) => {
               <div class="score-fill" :style="{ width: Math.round(photo.score * 100) + '%' }"></div>
             </div>
             <span class="overlay-score">{{ Math.round(photo.score * 100) }}%</span>
+            <div v-if="photo.scoreDetails.length > 0" class="overlay-method-scores">
+              <span v-for="[method, s] in photo.scoreDetails" :key="method"
+                    class="overlay-method-score"
+                    :class="{ fail: !photo.passed }">
+                {{ method }}: {{ Math.round(s * 100) }}%
+              </span>
+            </div>
             <div class="overlay-stars" @mouseleave="starHover = 0">
               <span
                   v-for="i in 5"
@@ -267,7 +275,22 @@ watch(visible, (v) => {
 
 .overlay-eliminated {
   color: var(--color-danger);
-  font-size: var(--prim-font-size-sm);
+  font-size: var(--font-size-sm);
+}
+
+.overlay-method-scores {
+  display: flex;
+  gap: var(--prim-space-2);
+}
+
+.overlay-method-score {
+  font-size: var(--prim-font-size-xs);
+  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+.overlay-method-score.fail {
+  color: var(--color-danger);
 }
 
 .overlay-enter-active,

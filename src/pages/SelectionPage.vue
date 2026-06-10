@@ -14,7 +14,7 @@ import SelectionTabs from '../component/selection/SelectionTabs.vue';
 import PhotoGrid from '../component/selection/PhotoGrid.vue';
 import PhotoOverlay from '../component/selection/PhotoOverlay.vue';
 import type {OverlayPhoto} from '../component/selection/PhotoOverlay.vue';
-import {SelectionMethod, BlurAlgorithm} from '../types/selection.ts';
+import {BlurAlgorithm} from '../types/selection.ts';
 
 const {t} = useI18n();
 const tauriImpl = useTauri();
@@ -24,7 +24,6 @@ const selectionDir = ref('');
 const includeSubdirs = ref(true);
 const hasDirectory = computed(() => selectionDir.value.length > 0);
 
-const method = ref<SelectionMethod>(SelectionMethod.BlurDetection);
 const algorithm = ref<BlurAlgorithm>(BlurAlgorithm.LaplacianVariance);
 const threshold = ref(0.5);
 const isRunning = ref(false);
@@ -42,6 +41,7 @@ interface PhotoState {
   filePath: string;
   fileName: string;
   score: number;
+  scoreDetails: Array<[string, number]>;
   stars: number;
   passed: boolean;
   eliminatedBy: string[];
@@ -88,6 +88,7 @@ const overlayPhoto = computed<OverlayPhoto | null>(() => {
     filePath: p.filePath,
     fileName: p.fileName,
     score: p.score,
+    scoreDetails: p.scoreDetails,
     stars: p.stars,
     passed: p.passed,
     thumbnailUrl: thumbnailCache[p.filePath] ?? null,
@@ -183,12 +184,10 @@ watch(activeTab, () => {
           </div>
         </WinCard>
         <SelectionEngine
-            :method="method"
             :algorithm="algorithm"
             :threshold="threshold"
             :is-running="isRunning"
             :has-directory="hasDirectory"
-            @update:method="method = $event"
             @update:algorithm="algorithm = $event"
             @update:threshold="threshold = $event"
             @start="handleStart"

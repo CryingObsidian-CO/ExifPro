@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import {ref, computed} from 'vue';
+import {useI18n} from 'vue-i18n';
+
+const {t} = useI18n();
 
 const props = defineProps<{
   filePath: string;
   fileName: string;
   score: number;
+  scoreDetails: Array<[string, number]>;
   stars: number;
   passed: boolean;
   eliminatedBy: string[];
@@ -60,6 +64,12 @@ const displayStars = computed(() => starHover.value || props.stars);
                :style="{ width: scorePercent + '%', background: scoreColor }"></div>
         </div>
         <span class="card-score" :style="{ color: scoreColor }">{{ scorePercent }}%</span>
+      </div>
+      <div v-if="scoreDetails.length > 0" class="card-score-details">
+        <span v-for="[method, s] in scoreDetails" :key="method" class="method-score"
+              :class="{ fail: !passed && eliminatedBy.includes(method) }">
+          {{ t('selection.methodShort_' + method) }}: {{ Math.round(s * 100) }}%
+        </span>
       </div>
       <div class="card-stars" @click.stop @mouseleave="starHover = 0">
         <span
@@ -187,6 +197,22 @@ const displayStars = computed(() => starHover.value || props.stars);
   display: flex;
   gap: 1px;
   justify-content: flex-start;
+}
+
+.card-score-details {
+  display: flex;
+  gap: var(--prim-space-2);
+  flex-wrap: wrap;
+}
+
+.method-score {
+  font-size: var(--prim-font-size-xs);
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.method-score.fail {
+  color: var(--color-danger);
 }
 
 .star-btn {
