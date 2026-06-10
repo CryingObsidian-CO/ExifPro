@@ -137,10 +137,10 @@ const thresholdPercent = computed({
 
 .form-range {
   width: 100%;
-  height: 6px;
+  height: var(--prim-space-1);
   appearance: none;
   background: var(--color-border-default);
-  border-radius: 3px;
+  border-radius: var(--prim-radius-sm);
   outline: none;
   cursor: pointer;
 }
@@ -151,7 +151,7 @@ const thresholdPercent = computed({
   height: 16px;
   border-radius: 50%;
   background: var(--color-brand);
-  border: 2px solid var(--color-surface);
+  border: 2px solid var(--color-bg-surface);
   cursor: pointer;
   transition: transform var(--prim-duration-fast) var(--prim-ease-out);
 }

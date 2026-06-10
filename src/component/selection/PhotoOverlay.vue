@@ -49,14 +49,18 @@ watch(visible, (v) => {
         <div class="overlay-backdrop"></div>
         <div class="overlay-content">
           <button class="overlay-close" @click="emit('close')">✕</button>
-          <button class="overlay-nav overlay-prev" @click="emit('prev')" :disabled="!photo.hasPrev">‹</button>
-          <button class="overlay-nav overlay-next" @click="emit('next')" :disabled="!photo.hasNext">›</button>
+          <button class="overlay-nav overlay-prev" @click="emit('prev')" :disabled="!photo.hasPrev">
+            ‹
+          </button>
+          <button class="overlay-nav overlay-next" @click="emit('next')" :disabled="!photo.hasNext">
+            ›
+          </button>
           <div class="overlay-image-wrap">
             <img
-              v-if="photo.thumbnailUrl"
-              :src="photo.thumbnailUrl"
-              :alt="photo.fileName"
-              class="overlay-image"
+                v-if="photo.thumbnailUrl"
+                :src="photo.thumbnailUrl"
+                :alt="photo.fileName"
+                class="overlay-image"
             />
             <div v-else class="overlay-image overlay-placeholder">
               <span>?</span>
@@ -70,15 +74,17 @@ watch(visible, (v) => {
             <span class="overlay-score">{{ Math.round(photo.score * 100) }}%</span>
             <div class="overlay-stars" @mouseleave="starHover = 0">
               <span
-                v-for="i in 5"
-                :key="i"
-                class="overlay-star"
-                :class="{ filled: i <= (starHover || photo.stars) }"
-                @mouseenter="starHover = i"
-                @click="emit('rate', i)"
+                  v-for="i in 5"
+                  :key="i"
+                  class="overlay-star"
+                  :class="{ filled: i <= (starHover || photo.stars) }"
+                  @mouseenter="starHover = i"
+                  @click="emit('rate', i)"
               >★</span>
             </div>
-            <span v-if="!photo.passed" class="overlay-eliminated">✗ {{ 'selection.eliminated' }}</span>
+            <span v-if="!photo.passed" class="overlay-eliminated">✗ {{
+                'selection.eliminated'
+              }}</span>
           </div>
         </div>
       </div>
@@ -90,7 +96,7 @@ watch(visible, (v) => {
 .photo-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--prim-z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -100,7 +106,7 @@ watch(visible, (v) => {
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(var(--prim-glass-blur-sm));
 }
 
 .overlay-content {
@@ -114,12 +120,12 @@ watch(visible, (v) => {
 
 .overlay-close {
   position: absolute;
-  top: -36px;
+  top: calc(-1 * var(--prim-space-10));
   right: 0;
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 24px;
+  font-size: var(--prim-font-size-2xl);
   cursor: pointer;
   z-index: 10;
   padding: 4px 8px;
@@ -137,9 +143,9 @@ watch(visible, (v) => {
   background: rgba(0, 0, 0, 0.4);
   border: none;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 36px;
-  width: 48px;
-  height: 48px;
+  font-size: var(--prim-font-size-4xl);
+  width: var(--prim-space-12);
+  height: var(--prim-space-12);
   border-radius: 50%;
   cursor: pointer;
   z-index: 10;
@@ -159,8 +165,13 @@ watch(visible, (v) => {
   cursor: not-allowed;
 }
 
-.overlay-prev { left: -64px; }
-.overlay-next { right: -64px; }
+.overlay-prev {
+  left: calc(-1 * var(--prim-space-16));
+}
+
+.overlay-next {
+  right: calc(-1 * var(--prim-space-16));
+}
 
 .overlay-image-wrap {
   max-width: 80vw;
@@ -188,7 +199,7 @@ watch(visible, (v) => {
   align-items: center;
   justify-content: center;
   color: rgba(255, 255, 255, 0.3);
-  font-size: 48px;
+  font-size: var(--prim-space-12);
 }
 
 .overlay-footer {
@@ -212,7 +223,7 @@ watch(visible, (v) => {
 }
 
 .overlay-score-bar {
-  width: 80px;
+  width: var(--prim-space-20);
   height: 4px;
   background: rgba(255, 255, 255, 0.15);
   border-radius: 2px;
@@ -230,7 +241,7 @@ watch(visible, (v) => {
   font-size: var(--prim-font-size-sm);
   font-weight: var(--prim-font-weight-semibold);
   font-variant-numeric: tabular-nums;
-  min-width: 36px;
+  min-width: var(--prim-space-10);
 }
 
 .overlay-stars {

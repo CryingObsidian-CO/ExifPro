@@ -147,7 +147,7 @@ const isLoaded = (path: string) => {
 }
 
 .skeleton-line {
-  height: 10px;
+  height: var(--prim-space-2);
   background: var(--color-border-default);
   border-radius: var(--prim-radius-xs);
   animation: pulse 1.5s ease-in-out infinite;

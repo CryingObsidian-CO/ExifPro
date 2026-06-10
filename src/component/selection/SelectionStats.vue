@@ -95,7 +95,7 @@ const maxStarCount = computed(() =>
 .eliminated-bar {
   height: 4px;
   background: var(--color-border-default);
-  border-radius: 2px;
+  border-radius: var(--prim-radius-xs);
   overflow: hidden;
   margin-bottom: var(--prim-space-4);
 }
@@ -103,7 +103,7 @@ const maxStarCount = computed(() =>
 .eliminated-bar-fill {
   height: 100%;
   background: var(--color-danger);
-  border-radius: 2px;
+  border-radius: var(--prim-radius-xs);
   transition: width var(--prim-duration-normal) var(--prim-ease-out);
 }
 
@@ -122,14 +122,14 @@ const maxStarCount = computed(() =>
 .histogram-star {
   font-size: var(--prim-font-size-sm);
   color: var(--color-text-secondary);
-  width: 28px;
+  width: var(--prim-space-8);
   flex-shrink: 0;
   text-align: right;
 }
 
 .histogram-track {
   flex: 1;
-  height: 12px;
+  height: var(--prim-space-3);
   background: var(--color-border-default);
   border-radius: var(--prim-radius-xs);
   overflow: hidden;
@@ -146,7 +146,7 @@ const maxStarCount = computed(() =>
 .histogram-count {
   font-size: var(--prim-font-size-xs);
   color: var(--color-text-tertiary);
-  width: 24px;
+  width: var(--prim-space-6);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }

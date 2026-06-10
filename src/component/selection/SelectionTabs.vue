@@ -39,7 +39,7 @@ const tabs = [
 <style scoped>
 .selection-tabs {
   display: flex;
-  gap: 2px;
+  gap: var(--prim-space-1);
   padding: var(--prim-space-2);
   background: var(--color-glass-bg);
   border-radius: var(--prim-radius-md);
@@ -50,7 +50,7 @@ const tabs = [
   display: flex;
   align-items: center;
   gap: var(--prim-space-1);
-  padding: 5px var(--prim-space-3);
+  padding: var(--prim-space-1) var(--prim-space-3);
   border: none;
   background: transparent;
   color: var(--color-text-secondary);
@@ -77,7 +77,7 @@ const tabs = [
 }
 
 .tab-icon {
-  font-size: 12px;
+  font-size: var(--prim-font-size-sm);
   line-height: 1;
 }
 
@@ -90,10 +90,10 @@ const tabs = [
   font-variant-numeric: tabular-nums;
   background: var(--color-border-default);
   color: var(--color-text-tertiary);
-  padding: 0 5px;
+  padding: var(--prim-space-0) var(--prim-space-1);
   border-radius: var(--prim-radius-xs);
   min-width: 18px;
   text-align: center;
-  line-height: 1.6;
+  line-height: var(--prim-line-height-relaxed);
 }
 </style>

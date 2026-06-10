@@ -234,7 +234,7 @@ watch(activeTab, () => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg);
+  background: var(--color-bg-app);
 }
 
 .selection-body {

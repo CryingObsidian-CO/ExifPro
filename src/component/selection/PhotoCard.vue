@@ -90,11 +90,11 @@ const displayStars = computed(() => starHover.value || props.stars);
 }
 
 .photo-card.eliminated {
-  opacity: 0.65;
+  opacity: var(--prim-opacity-62);
 }
 
 .photo-card.eliminated:hover {
-  opacity: 0.9;
+  opacity: var(--prim-opacity-82);
 }
 
 .card-thumb-wrap {
@@ -116,15 +116,15 @@ const displayStars = computed(() => starHover.value || props.stars);
   align-items: center;
   justify-content: center;
   color: var(--color-text-tertiary);
-  font-size: 24px;
+  font-size: var(--prim-font-size-2xl);
 }
 
 .eliminated-badge {
   position: absolute;
   top: var(--prim-space-1);
   right: var(--prim-space-1);
-  width: 20px;
-  height: 20px;
+  width: var(--prim-space-5);
+  height: var(--prim-space-5);
   border-radius: 50%;
   background: var(--color-danger);
   display: flex;
@@ -133,9 +133,9 @@ const displayStars = computed(() => starHover.value || props.stars);
 }
 
 .badge-icon {
-  color: white;
-  font-size: 11px;
-  font-weight: bold;
+  color: var(--color-text-inverse);
+  font-size: var(--prim-font-size-xs);
+  font-weight: var(--prim-font-weight-bold);
   line-height: 1;
 }
 
@@ -165,13 +165,13 @@ const displayStars = computed(() => starHover.value || props.stars);
   flex: 1;
   height: 4px;
   background: var(--color-border-default);
-  border-radius: 2px;
+  border-radius: var(--prim-radius-xs);
   overflow: hidden;
 }
 
 .score-fill {
   height: 100%;
-  border-radius: 2px;
+  border-radius: var(--prim-radius-xs);
   transition: width var(--prim-duration-normal) var(--prim-ease-out);
 }
 
@@ -179,7 +179,7 @@ const displayStars = computed(() => starHover.value || props.stars);
   font-size: var(--prim-font-size-xs);
   font-weight: var(--prim-font-weight-semibold);
   font-variant-numeric: tabular-nums;
-  min-width: 32px;
+  min-width: var(--prim-space-8);
   text-align: right;
 }
 
@@ -190,7 +190,7 @@ const displayStars = computed(() => starHover.value || props.stars);
 }
 
 .star-btn {
-  font-size: 14px;
+  font-size: var(--prim-font-size-md);
   cursor: pointer;
   color: var(--color-text-tertiary);
   transition: color var(--prim-duration-fast) var(--prim-ease-out);
