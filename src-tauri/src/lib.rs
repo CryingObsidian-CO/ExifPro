@@ -1,10 +1,13 @@
 pub mod config;
+pub mod database;
 pub mod exif;
 pub mod file_ops;
 pub mod grouping;
 pub mod plugin;
+pub mod selection;
 
 use crate::config::Config;
+use crate::database::Database;
 use crate::exif::{get_thumbnail_data, parse_exif, ExifInfo};
 use crate::file_ops::{create_dirs_if_not_exist, safe_copy, safe_move, scan_directory};
 use crate::grouping::{group_photos, Group, GroupType};
@@ -14,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::env::current_exe;
 use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::Manager;
 use tauri_plugin_log::{log, Target, TargetKind};
 
 fn ensure_valid_plugin_id(plugin_id: &str) -> Result<(), String> {
@@ -383,7 +387,7 @@ pub fn run() {
         }
     };
     let exe_dir = match exe_path.parent() {
-        Some(dir) => dir,
+        Some(dir) => dir.to_path_buf(),
         None => {
             log::error!("app.startup: failed exe parent directory");
             return;
@@ -397,7 +401,7 @@ pub fn run() {
             tauri_plugin_log::Builder::new()
                 .clear_targets()
                 .target(Target::new(TargetKind::Folder {
-                    path: PathBuf::from(exe_dir.join("logs")),
+                    path: exe_dir.join("logs"),
                     file_name: None,
                 }))
                 .level(log::LevelFilter::Info)
@@ -405,7 +409,7 @@ pub fn run() {
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
                 .build(),
         )
-        .setup(|_app| {
+        .setup(move |app| {
             let timestamp_ms = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
@@ -417,6 +421,14 @@ pub fn run() {
                 timestamp_ms
             );
             log::info!("============================================================");
+
+            let db_dir = exe_dir.join("data");
+            create_dirs_if_not_exist(&db_dir).expect("Failed to create database directory");
+            let db_path = db_dir.join("exifPro.db");
+            let db = tauri::async_runtime::block_on(Database::new(&db_path, 4))
+                .expect("Failed to initialize database");
+            app.manage(db);
+
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
