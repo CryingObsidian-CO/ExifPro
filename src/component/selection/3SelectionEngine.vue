@@ -3,6 +3,9 @@ import {computed} from 'vue';
 import {useI18n} from 'vue-i18n';
 import WinCard from '../WinCard.vue';
 import WinButton from '../WinButton.vue';
+import WinSelect from '../WinSelect.vue';
+import type {SelectOption} from '../WinSelect.vue';
+import WinSlider from '../WinSlider.vue';
 import {SelectionMethod, BlurAlgorithm} from '../../types/selection.ts';
 
 const {t} = useI18n();
@@ -23,13 +26,41 @@ const emit = defineEmits<{
   (e: 'stop'): void;
 }>();
 
-const methods = [SelectionMethod.BlurDetection];
+const methodOptions = computed<SelectOption[]>(() => [
+  {
+    value: SelectionMethod.BlurDetection,
+    label: t('selection.method_' + SelectionMethod.BlurDetection)
+  },
+]);
 
-const algorithms = computed(() => {
+const algorithmOptions = computed<SelectOption[]>(() => {
   if (props.method === SelectionMethod.BlurDetection) {
-    return [BlurAlgorithm.LaplacianVariance, BlurAlgorithm.Tenengrad, BlurAlgorithm.Brenner];
+    return [
+      {
+        value: BlurAlgorithm.LaplacianVariance,
+        label: t('selection.algorithm_' + BlurAlgorithm.LaplacianVariance),
+      },
+      {
+        value: BlurAlgorithm.Tenengrad,
+        label: t('selection.algorithm_' + BlurAlgorithm.Tenengrad),
+      },
+      {
+        value: BlurAlgorithm.Brenner,
+        label: t('selection.algorithm_' + BlurAlgorithm.Brenner),
+      },
+    ];
   }
   return [];
+});
+
+const methodModel = computed({
+  get: () => props.method,
+  set: (v: SelectionMethod) => emit('update:method', v),
+});
+
+const algorithmModel = computed({
+  get: () => props.algorithm,
+  set: (v: BlurAlgorithm) => emit('update:algorithm', v),
 });
 
 const thresholdPercent = computed({
@@ -43,33 +74,28 @@ const thresholdPercent = computed({
     <div class="engine-form">
       <div class="form-group">
         <label class="form-label">{{ t('selection.method_label') }}</label>
-        <select class="form-select glass-input" :value="method"
-                @change="emit('update:method', ($event.target as HTMLSelectElement).value as SelectionMethod)">
-          <option v-for="m in methods" :key="m" :value="m">{{ t('selection.method_' + m) }}</option>
-        </select>
+        <WinSelect
+            v-model="methodModel"
+            :options="methodOptions"
+        />
       </div>
       <div class="form-group">
         <label class="form-label">{{ t('selection.algorithm_label') }}</label>
-        <select class="form-select glass-input" :value="algorithm"
-                @change="emit('update:algorithm', ($event.target as HTMLSelectElement).value as BlurAlgorithm)">
-          <option v-for="a in algorithms" :key="a" :value="a">{{
-              t('selection.algorithm_' + a)
-            }}
-          </option>
-        </select>
+        <WinSelect
+            v-model="algorithmModel"
+            :options="algorithmOptions"
+        />
       </div>
       <div class="form-group">
         <label class="form-label">
           {{ t('selection.threshold_label') }}:
           <span class="threshold-value">{{ thresholdPercent }}%</span>
         </label>
-        <input
-            type="range"
-            class="form-range"
+        <WinSlider
+            v-model="thresholdPercent"
             :min="0"
             :max="100"
-            :value="thresholdPercent"
-            @input="thresholdPercent = parseInt(($event.target as HTMLInputElement).value)"
+            :label="t('selection.threshold_label')"
         />
         <div class="range-labels">
           <span>{{ t('selection.threshold_blurry') }}</span>
@@ -120,52 +146,10 @@ const thresholdPercent = computed({
   font-weight: var(--prim-font-weight-medium);
 }
 
-.form-select {
-  padding: 6px var(--prim-space-3);
-  border-radius: var(--prim-radius-md);
-  font-size: var(--prim-font-size-base);
-  outline: none;
-  appearance: auto;
-  cursor: pointer;
-}
-
 .threshold-value {
   color: var(--color-brand);
   font-weight: var(--prim-font-weight-semibold);
   font-variant-numeric: tabular-nums;
-}
-
-.form-range {
-  width: 100%;
-  height: var(--prim-space-1);
-  appearance: none;
-  background: var(--color-border-default);
-  border-radius: var(--prim-radius-sm);
-  outline: none;
-  cursor: pointer;
-}
-
-.form-range::-webkit-slider-thumb {
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--color-brand);
-  border: 2px solid var(--color-bg-surface);
-  cursor: pointer;
-  transition: transform var(--prim-duration-fast) var(--prim-ease-out);
-}
-
-.form-range::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-}
-
-.form-range::-webkit-slider-thumb:active {
-  transform: scale(0.9);
-}
-
-.form-range:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 2px var(--color-border-focus);
 }
 
 .range-labels {
