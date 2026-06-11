@@ -249,6 +249,7 @@
     "tab_eliminated": "已淘汰",
     "tab_unrated": "未评分",
     "eliminated": "已淘汰",
+    "manual_pass": "手动通过",
     "methodShort_BlurDetection": "模糊",
     "methodShort_OnnxDetection": "ONNX",
     "noise_bias_label": "噪声基底补偿",

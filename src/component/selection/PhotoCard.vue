@@ -12,12 +12,14 @@ const props = defineProps<{
   stars: number;
   passed: boolean;
   eliminatedBy: string[];
+  manualPass: boolean;
   thumbnailUrl: string | null;
 }>();
 
 const emit = defineEmits<{
   (e: 'click'): void;
   (e: 'rate', stars: number): void;
+  (e: 'toggle-pass'): void;
 }>();
 
 const scorePercent = computed(() => Math.round(props.score * 100));
@@ -35,7 +37,7 @@ const displayStars = computed(() => starHover.value || props.stars);
 <template>
   <div
       class="photo-card glass-card"
-      :class="{ eliminated: !passed, selected: false }"
+      :class="{ eliminated: !manualPass, selected: false }"
       @mouseenter="isHovered = true"
       @mouseleave="isHovered = false"
       @click="emit('click')"
@@ -51,9 +53,13 @@ const displayStars = computed(() => starHover.value || props.stars);
       <div v-else class="card-thumb card-thumb-placeholder">
         <span>?</span>
       </div>
-      <div v-if="!passed" class="eliminated-badge">
+      <div v-if="!manualPass" class="badge badge-eliminated" @click.stop="emit('toggle-pass')">
         <span class="badge-icon">✗</span>
       </div>
+      <div v-else-if="!passed" class="badge badge-manual" @click.stop="emit('toggle-pass')">
+        <span class="badge-icon">👍</span>
+      </div>
+
     </div>
     <div class="card-info">
       <span class="card-name" :title="fileName">{{ fileName }}</span>
@@ -79,6 +85,8 @@ const displayStars = computed(() => starHover.value || props.stars);
             @mouseenter="starHover = i"
             @click="emit('rate', i)"
         >{{ i <= displayStars ? '★' : '☆' }}</span>
+        <span v-if="passed" class="eliminate-btn" title="0-star eliminate"
+              @click="emit('toggle-pass')">✗</span>
       </div>
     </div>
   </div>
@@ -128,17 +136,26 @@ const displayStars = computed(() => starHover.value || props.stars);
   font-size: var(--prim-font-size-2xl);
 }
 
-.eliminated-badge {
+.badge {
   position: absolute;
   top: var(--prim-space-1);
   right: var(--prim-space-1);
   width: var(--prim-space-5);
   height: var(--prim-space-5);
   border-radius: 50%;
-  background: var(--color-danger);
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.badge-eliminated {
+  background: var(--color-danger);
+}
+
+.badge-manual {
+  background: var(--color-success);
 }
 
 .badge-icon {
@@ -228,6 +245,21 @@ const displayStars = computed(() => starHover.value || props.stars);
 }
 
 .star-btn:hover {
+  transform: scale(1.2);
+}
+
+.eliminate-btn {
+  font-size: var(--prim-font-size-sm);
+  cursor: pointer;
+  color: var(--color-text-tertiary);
+  line-height: 1;
+  user-select: none;
+  margin-left: auto;
+  padding: 0 2px;
+  transition: color var(--prim-duration-fast) var(--prim-ease-out);
+}
+.eliminate-btn:hover {
+  color: var(--color-danger);
   transform: scale(1.2);
 }
 </style>

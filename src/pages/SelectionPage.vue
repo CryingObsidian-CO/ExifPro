@@ -53,15 +53,22 @@ onMounted(async () => {
       noiseBiasSdr.value = cfg.selection_config.noise_bias_sdr_gamma;
       noiseBiasHdr.value = cfg.selection_config.noise_bias_hdr_linear;
     }
-  } catch {}
+  } catch {
+  }
 });
 
 function applyDefaultThreshold() {
   const cfg = selectionConfig.value;
   switch (algorithm.value) {
-    case BlurAlgorithm.LaplacianVariance: threshold.value = cfg.threshold_laplacian; break;
-    case BlurAlgorithm.Tenengrad: threshold.value = cfg.threshold_tenengrad; break;
-    case BlurAlgorithm.Brenner: threshold.value = cfg.threshold_brenner; break;
+    case BlurAlgorithm.LaplacianVariance:
+      threshold.value = cfg.threshold_laplacian;
+      break;
+    case BlurAlgorithm.Tenengrad:
+      threshold.value = cfg.threshold_tenengrad;
+      break;
+    case BlurAlgorithm.Brenner:
+      threshold.value = cfg.threshold_brenner;
+      break;
   }
 }
 
@@ -82,6 +89,7 @@ interface PhotoState {
   stars: number;
   passed: boolean;
   eliminatedBy: string[];
+  manualPass: boolean;
 }
 
 const photos = ref<PhotoState[]>([]);
@@ -90,18 +98,18 @@ const thumbnailCache = reactive<Record<string, string | null>>({});
 const filteredPhotos = computed(() => {
   return photos.value.filter(p => {
     if (activeTab.value === 'all') return true;
-    if (activeTab.value === 'passed') return p.passed;
-    if (activeTab.value === 'eliminated') return !p.passed;
-    if (activeTab.value === 'unrated') return p.stars === 0 && p.passed;
+    if (activeTab.value === 'passed') return p.manualPass;
+    if (activeTab.value === 'eliminated') return !p.manualPass;
+    if (activeTab.value === 'unrated') return p.stars === 0 && p.manualPass;
     return true;
   });
 });
 
 const tabCounts = computed(() => {
   const all = photos.value.length;
-  const passed = photos.value.filter(p => p.passed).length;
-  const eliminated = photos.value.filter(p => !p.passed).length;
-  const unrated = photos.value.filter(p => p.stars === 0 && p.passed).length;
+  const passed = photos.value.filter(p => p.manualPass).length;
+  const eliminated = photos.value.filter(p => !p.manualPass).length;
+  const unrated = photos.value.filter(p => p.stars === 0 && p.manualPass).length;
   return {all, passed, eliminated, unrated};
 });
 
@@ -128,6 +136,8 @@ const overlayPhoto = computed<OverlayPhoto | null>(() => {
     scoreDetails: p.scoreDetails,
     stars: p.stars,
     passed: p.passed,
+    eliminatedBy: p.eliminatedBy,
+    manualPass: p.manualPass,
     thumbnailUrl: thumbnailCache[p.filePath] ?? null,
     hasPrev: idx > 0,
     hasNext: idx < photos.value.length - 1,
@@ -146,6 +156,12 @@ const loadThumbnail = async (filePath: string) => {
 const handleSelectPhoto = (path: string) => {
   selectedPhotoPath.value = path;
 };
+const handleTogglePass = (path: string) => {
+  const p = photos.value.find(ph => ph.filePath === path);
+  if (!p) return;
+  p.manualPass = !p.manualPass;
+  p.stars = 0;
+};
 
 const handleRatePhoto = (path: string, stars: number) => {
   const p = photos.value.find(ph => ph.filePath === path);
@@ -155,8 +171,7 @@ const handleRatePhoto = (path: string, stars: number) => {
   } else {
     p.stars = stars;
     if (!p.passed) {
-      p.passed = true;
-      p.eliminatedBy = [];
+      p.manualPass = true;
     }
   }
 };
@@ -212,6 +227,7 @@ const handleStart = async () => {
       stars: 0,
       passed: r.passed,
       eliminatedBy: r.eliminated_by,
+      manualPass: r.passed, // algorithm-passed starts trusted
     }));
   } catch (err) {
     await showAlert(t('selection.failed'), {
@@ -229,7 +245,7 @@ const handleStop = () => {
 
 watch(filteredPhotos, (list) => {
   list.forEach(p => loadThumbnail(p.filePath));
-}, { immediate: true });
+}, {immediate: true});
 </script>
 
 <template>
@@ -290,6 +306,7 @@ watch(filteredPhotos, (list) => {
               :thumbnails="thumbnailCache"
               @select-photo="handleSelectPhoto"
               @rate-photo="handleRatePhoto"
+              @toggle-pass="handleTogglePass"
           />
         </div>
       </main>
@@ -298,6 +315,7 @@ watch(filteredPhotos, (list) => {
         :photo="overlayPhoto"
         @close="handleCloseOverlay"
         @rate="handleOverlayRate"
+        @toggle-pass="handleTogglePass(selectedPhotoPath!)"
         @prev="handleOverlayPrev"
         @next="handleOverlayNext"
     />

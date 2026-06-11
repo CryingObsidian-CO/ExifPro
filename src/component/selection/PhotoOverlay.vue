@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
+import {useI18n} from 'vue-i18n';
+
+const {t} = useI18n();
 
 export interface OverlayPhoto {
   filePath: string;
@@ -8,6 +11,8 @@ export interface OverlayPhoto {
   scoreDetails: Array<[string, number]>;
   stars: number;
   passed: boolean;
+  eliminatedBy: string[];
+  manualPass: boolean;
   thumbnailUrl: string | null;
   hasPrev: boolean;
   hasNext: boolean;
@@ -20,6 +25,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'rate', stars: number): void;
+  (e: 'toggle-pass'): void;
   (e: 'prev'): void;
   (e: 'next'): void;
 }>();
@@ -89,10 +95,15 @@ watch(visible, (v) => {
                   @mouseenter="starHover = i"
                   @click="emit('rate', i)"
               >★</span>
+              <span v-if="photo.passed" class="overlay-eliminate-btn"
+                    @click="emit('toggle-pass')">✗</span>
             </div>
-            <span v-if="!photo.passed" class="overlay-eliminated">✗ {{
-                'selection.eliminated'
-              }}</span>
+            <span v-if="!photo.manualPass"
+                  class="overlay-badge overlay-badge-eliminated"
+                  @click="emit('toggle-pass')">✗ {{ t('selection.eliminated') }}</span>
+            <span v-else-if="!photo.passed"
+                  class="overlay-badge overlay-badge-manual"
+                  @click="emit('toggle-pass')">👍 {{ t('selection.manual_pass') }}</span>
           </div>
         </div>
       </div>
@@ -273,9 +284,36 @@ watch(visible, (v) => {
   transform: scale(1.2);
 }
 
-.overlay-eliminated {
+.overlay-eliminate-btn {
+  font-size: 18px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.3);
+  line-height: 1;
+  user-select: none;
+  margin-left: auto;
+  padding: 0 4px;
+  transition: color var(--prim-duration-fast) var(--prim-ease-out);
+}
+.overlay-eliminate-btn:hover {
   color: var(--color-danger);
+  transform: scale(1.2);
+}
+
+.overlay-badge {
+  cursor: pointer;
   font-size: var(--font-size-sm);
+  padding: 2px 8px;
+  border-radius: var(--prim-radius-sm);
+}
+
+.overlay-badge-eliminated {
+  color: var(--color-danger);
+  background: rgba(255, 0, 0, 0.1);
+}
+
+.overlay-badge-manual {
+  color: var(--color-success);
+  background: rgba(0, 255, 0, 0.1);
 }
 
 .overlay-method-scores {

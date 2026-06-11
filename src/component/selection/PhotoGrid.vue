@@ -9,6 +9,7 @@ export interface PhotoItem {
   stars: number;
   passed: boolean;
   eliminatedBy: string[];
+  manualPass: boolean;
 }
 
 const props = defineProps<{
@@ -19,27 +20,30 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select-photo', path: string): void;
   (e: 'rate-photo', path: string, stars: number): void;
+  (e: 'toggle-pass', path: string): void;
 }>();
 </script>
 
 <template>
   <div class="photo-grid">
     <div
-      v-for="photo in photos"
-      :key="photo.filePath"
-      class="grid-cell"
+        v-for="photo in photos"
+        :key="photo.filePath"
+        class="grid-cell"
     >
       <PhotoCard
-        :file-path="photo.filePath"
-        :file-name="photo.fileName"
-        :score="photo.score"
-        :score-details="photo.scoreDetails"
-        :stars="photo.stars"
-        :passed="photo.passed"
-        :eliminated-by="photo.eliminatedBy"
-        :thumbnail-url="thumbnails[photo.filePath] ?? null"
-        @click="emit('select-photo', photo.filePath)"
-        @rate="(s: number) => emit('rate-photo', photo.filePath, s)"
+          :file-path="photo.filePath"
+          :file-name="photo.fileName"
+          :score="photo.score"
+          :score-details="photo.scoreDetails"
+          :stars="photo.stars"
+          :passed="photo.passed"
+          :eliminated-by="photo.eliminatedBy"
+          :manual-pass="photo.manualPass"
+          :thumbnail-url="thumbnails[photo.filePath] ?? null"
+          @click="emit('select-photo', photo.filePath)"
+          @rate="(s: number) => emit('rate-photo', photo.filePath, s)"
+          @toggle-pass="emit('toggle-pass', photo.filePath)"
       />
     </div>
   </div>
