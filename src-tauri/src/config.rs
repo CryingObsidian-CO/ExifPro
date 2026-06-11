@@ -9,6 +9,7 @@ pub struct Config {
     pub focus_bracket_settings: FocusBracketSettings,
     pub burst_settings: BurstSettings,
     pub naming_rules: NamingRules,
+    pub selection_config: SelectionConfig,
     pub preview_max_mb: u64,
     #[serde(default)]
     pub sub_second_digits: u8,
@@ -16,6 +17,16 @@ pub struct Config {
     pub plugin_settings: HashMap<String, serde_json::Value>,
     #[serde(default)]
     pub enabled_plugins: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SelectionConfig {
+    pub threshold_laplacian: f32,
+    pub threshold_tenengrad: f32,
+    pub threshold_brenner: f32,
+    pub noise_bias_raw: f32,
+    pub noise_bias_sdr_gamma: f32,
+    pub noise_bias_hdr_linear: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,6 +68,7 @@ impl Default for Config {
             focus_bracket_settings: FocusBracketSettings::default(),
             burst_settings: BurstSettings::default(),
             naming_rules: NamingRules::default(),
+            selection_config: SelectionConfig::default(),
             preview_max_mb: 8,
             sub_second_digits: 3,
             plugin_settings: HashMap::new(),
@@ -106,6 +118,19 @@ impl Default for NamingRules {
             aeb_prefix: "AEB_".to_string(),
             burst_prefix: "Burst_".to_string(),
             single_prefix: "".to_string(),
+        }
+    }
+}
+
+impl Default for SelectionConfig {
+    fn default() -> Self {
+        Self {
+            threshold_laplacian: 0.30,
+            threshold_tenengrad: 0.25,
+            threshold_brenner: 0.35,
+            noise_bias_raw: 0.02,
+            noise_bias_sdr_gamma: 0.05,
+            noise_bias_hdr_linear: 0.01,
         }
     }
 }

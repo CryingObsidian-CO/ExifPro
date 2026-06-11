@@ -191,12 +191,16 @@ export function useTauri() {
     );
   }
 
-  async function detect(path: string, recursive: boolean, algorithm: string, threshold: number) {
+  async function detect(path: string, recursive: boolean, algorithm: string, threshold: number, noiseBias: {
+    raw: number,
+    sdr_gamma: number,
+    hdr_linear: number
+  }) {
     return await invokeWithLog<SelectionResult[]>(
         "detect",
         'detect_command',
-        {path, recursive, algorithm, threshold},
-        `path=${path} algorithm=${algorithm} threshold=${threshold}`
+        {path, recursive, algorithm, threshold, noiseBias},
+        `path=${path} algorithm=${algorithm} threshold=${threshold} noiseBias=${JSON.stringify(noiseBias)}`
     );
   }
 

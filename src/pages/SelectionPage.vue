@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, ref, reactive, watch} from 'vue';
+import {computed, ref, reactive, watch, onMounted} from 'vue';
 import {useI18n} from 'vue-i18n';
 import {useTauri} from "../composables/tauri.ts";
 import {useDialog} from "../composables/dialog.ts";
@@ -15,6 +15,7 @@ import PhotoGrid from '../component/selection/PhotoGrid.vue';
 import PhotoOverlay from '../component/selection/PhotoOverlay.vue';
 import type {OverlayPhoto} from '../component/selection/PhotoOverlay.vue';
 import {BlurAlgorithm} from '../types/selection.ts';
+import type {SelectionConfig} from '../types/config.ts';
 
 const {t} = useI18n();
 const tauriImpl = useTauri();
@@ -25,10 +26,46 @@ const includeSubdirs = ref(true);
 const hasDirectory = computed(() => selectionDir.value.length > 0);
 
 const algorithm = ref<BlurAlgorithm>(BlurAlgorithm.LaplacianVariance);
-const threshold = ref(0.5);
+const threshold = ref(0.30);
+const noiseBiasRaw = ref(0.02);
+const noiseBiasSdr = ref(0.05);
+const noiseBiasHdr = ref(0.01);
 const isRunning = ref(false);
 const activeTab = ref('all');
 const selectedPhotoPath = ref<string | null>(null);
+
+const selectionConfig = ref<SelectionConfig>({
+  threshold_laplacian: 0.30,
+  threshold_tenengrad: 0.25,
+  threshold_brenner: 0.35,
+  noise_bias_raw: 0.02,
+  noise_bias_sdr_gamma: 0.05,
+  noise_bias_hdr_linear: 0.01,
+});
+
+onMounted(async () => {
+  try {
+    const cfg = await tauriImpl.loadConfig();
+    if (cfg?.selection_config) {
+      selectionConfig.value = cfg.selection_config;
+      applyDefaultThreshold();
+      noiseBiasRaw.value = cfg.selection_config.noise_bias_raw;
+      noiseBiasSdr.value = cfg.selection_config.noise_bias_sdr_gamma;
+      noiseBiasHdr.value = cfg.selection_config.noise_bias_hdr_linear;
+    }
+  } catch {}
+});
+
+function applyDefaultThreshold() {
+  const cfg = selectionConfig.value;
+  switch (algorithm.value) {
+    case BlurAlgorithm.LaplacianVariance: threshold.value = cfg.threshold_laplacian; break;
+    case BlurAlgorithm.Tenengrad: threshold.value = cfg.threshold_tenengrad; break;
+    case BlurAlgorithm.Brenner: threshold.value = cfg.threshold_brenner; break;
+  }
+}
+
+watch(algorithm, () => applyDefaultThreshold());
 
 async function selectDir() {
   const path = await tauriImpl.selectDirectory();
@@ -157,6 +194,7 @@ const handleStart = async () => {
         includeSubdirs.value,
         algorithm.value,
         threshold.value,
+        {raw: noiseBiasRaw.value, sdr_gamma: noiseBiasSdr.value, hdr_linear: noiseBiasHdr.value},
     );
     Object.keys(thumbnailCache).forEach(k => delete thumbnailCache[k]);
     photos.value = results.map(r => ({
@@ -211,10 +249,16 @@ watch(activeTab, () => {
         <SelectionEngine
             :algorithm="algorithm"
             :threshold="threshold"
+            :noise-bias-raw="noiseBiasRaw"
+            :noise-bias-sdr="noiseBiasSdr"
+            :noise-bias-hdr="noiseBiasHdr"
             :is-running="isRunning"
             :has-directory="hasDirectory"
             @update:algorithm="algorithm = $event"
             @update:threshold="threshold = $event"
+            @update:noise-bias-raw="noiseBiasRaw = $event"
+            @update:noise-bias-sdr="noiseBiasSdr = $event"
+            @update:noise-bias-hdr="noiseBiasHdr = $event"
             @start="handleStart"
             @stop="handleStop"
         />

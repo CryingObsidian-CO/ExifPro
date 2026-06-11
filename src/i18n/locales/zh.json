@@ -124,7 +124,14 @@
     "unsaved_changes": "设置已修改，是否保存后再离开？",
     "unsaved_title": "未保存的更改",
     "save_leave": "保存并离开",
-    "leave_without_save": "不保存直接离开"
+    "leave_without_save": "不保存直接离开",
+    "selection_config": "选片检测",
+    "threshold_laplacian": "阈值 (Laplacian)",
+    "threshold_tenengrad": "阈值 (Tenengrad)",
+    "threshold_brenner": "阈值 (Brenner)",
+    "noise_bias_raw": "噪声补偿 (RAW)",
+    "noise_bias_sdr_gamma": "噪声补偿 (SDR Gamma)",
+    "noise_bias_hdr_linear": "噪声补偿 (HDR Linear)"
   },
   "edit": {
     "title": "编辑分组",
@@ -226,7 +233,7 @@
     "failed_title": "选片失败",
     "engine": "检测引擎",
     "algorithm_label": "模糊算法",
-    "algorithm_LaplacianVariance": "拉普拉斯方差",
+    "algorithm_LaplacianVariance": "Laplacian Variance",
     "algorithm_Tenengrad": "Tenengrad",
     "algorithm_Brenner": "Brenner",
     "threshold_label": "清晰度阈值",
@@ -243,7 +250,11 @@
     "tab_unrated": "未评分",
     "eliminated": "已淘汰",
     "methodShort_BlurDetection": "模糊",
-    "methodShort_OnnxDetection": "ONNX"
+    "methodShort_OnnxDetection": "ONNX",
+    "noise_bias_label": "噪声基底补偿",
+    "noise_bias_raw": "RAW",
+    "noise_bias_sdr": "SDR Gamma",
+    "noise_bias_hdr": "HDR Linear"
   },
   "common": {
     "confirm": "确定",

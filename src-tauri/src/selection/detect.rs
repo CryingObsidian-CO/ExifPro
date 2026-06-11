@@ -1,4 +1,4 @@
-use super::blur;
+use super::blur::{self, Luma16Image};
 use super::pipeline::{self, ImageSource, NoiseBias};
 use super::{BlurAlgorithm, SelectionMethod, SelectionResult};
 use std::path::PathBuf;
@@ -8,8 +8,8 @@ pub fn process_images(
     files: Vec<PathBuf>,
     algorithm: BlurAlgorithm,
     threshold: f32,
+    noise_bias: NoiseBias,
 ) -> Vec<SelectionResult> {
-    let noise_bias = NoiseBias::default();
     let mut results = Vec::with_capacity(files.len());
 
     for file_path in files {
@@ -50,8 +50,8 @@ pub fn process_images(
             eliminated_by,
         });
 
-        log::debug!(
-            "{}: score_norm={}, compensated={}, passed={}",
+        log::info!(
+            "{}: score_norm={:.6}, compensated={:.6}, passed={}",
             file_path.display(),
             score_norm,
             compensated,

@@ -9,6 +9,7 @@ import {CAPABILITY_INFO, CapabilityType, PluginCapabilities} from "../types/plug
 import {onMounted, ref} from "vue";
 import WinInput from "../component/WinInput.vue";
 import WinToggle from "../component/WinToggle.vue";
+import WinSlider from "../component/WinSlider.vue";
 import {onBeforeRouteLeave} from "vue-router";
 import {useI18n} from "vue-i18n";
 import {setLocale, getCurrentLocale, type SupportedLocale} from "../i18n";
@@ -40,6 +41,16 @@ function normalizeConfig(config: Config) {
   }
   if (!config.enabled_plugins) {
     config.enabled_plugins = [];
+  }
+  if (!config.selection_config) {
+    config.selection_config = {
+      threshold_laplacian: 0.30,
+      threshold_tenengrad: 0.25,
+      threshold_brenner: 0.35,
+      noise_bias_raw: 0.02,
+      noise_bias_sdr_gamma: 0.05,
+      noise_bias_hdr_linear: 0.01,
+    };
   }
 }
 
@@ -605,6 +616,101 @@ function currentLanguage(): SupportedLocale {
         </div>
       </WinCard>
 
+      <WinCard :title="t('settings.selection_config')">
+        <div class="settings-grid">
+          <div class="setting-item">
+            <label class="setting-label">{{ t('settings.threshold_laplacian') }}</label>
+            <div class="slider-row">
+              <WinSlider
+                  :min="0"
+                  :max="100"
+                  :modelValue="Math.round((store.config?.selection_config.threshold_laplacian ?? 0.30) * 100)"
+                  @update:modelValue="(v) => updateField(store.config?.selection_config, 'threshold_laplacian', (v as number) / 100)"
+                  :label="t('settings.threshold_laplacian')"
+              />
+              <span class="slider-value">{{
+                  Math.round((store.config?.selection_config.threshold_laplacian ?? 0.30) * 100)
+                }}%</span>
+            </div>
+          </div>
+          <div class="setting-item">
+            <label class="setting-label">{{ t('settings.threshold_tenengrad') }}</label>
+            <div class="slider-row">
+              <WinSlider
+                  :min="0"
+                  :max="100"
+                  :modelValue="Math.round((store.config?.selection_config.threshold_tenengrad ?? 0.25) * 100)"
+                  @update:modelValue="(v) => updateField(store.config?.selection_config, 'threshold_tenengrad', (v as number) / 100)"
+                  :label="t('settings.threshold_tenengrad')"
+              />
+              <span class="slider-value">{{
+                  Math.round((store.config?.selection_config.threshold_tenengrad ?? 0.25) * 100)
+                }}%</span>
+            </div>
+          </div>
+          <div class="setting-item">
+            <label class="setting-label">{{ t('settings.threshold_brenner') }}</label>
+            <div class="slider-row">
+              <WinSlider
+                  :min="0"
+                  :max="100"
+                  :modelValue="Math.round((store.config?.selection_config.threshold_brenner ?? 0.35) * 100)"
+                  @update:modelValue="(v) => updateField(store.config?.selection_config, 'threshold_brenner', (v as number) / 100)"
+                  :label="t('settings.threshold_brenner')"
+              />
+              <span class="slider-value">{{
+                  Math.round((store.config?.selection_config.threshold_brenner ?? 0.35) * 100)
+                }}%</span>
+            </div>
+          </div>
+          <div class="setting-item">
+            <label class="setting-label">{{ t('settings.noise_bias_raw') }}</label>
+            <div class="slider-row">
+              <WinSlider
+                  :min="0"
+                  :max="200"
+                  :modelValue="Math.round((store.config?.selection_config.noise_bias_raw ?? 0.02) * 1000)"
+                  @update:modelValue="(v: number) => updateField(store.config?.selection_config, 'noise_bias_raw', v / 1000)"
+                  :label="t('settings.noise_bias_raw')"
+              />
+              <span class="slider-value">{{
+                  ((store.config?.selection_config.noise_bias_raw ?? 0.02) * 100).toFixed(1)
+                }}%</span>
+            </div>
+          </div>
+          <div class="setting-item">
+            <label class="setting-label">{{ t('settings.noise_bias_sdr_gamma') }}</label>
+            <div class="slider-row">
+              <WinSlider
+                  :min="0"
+                  :max="200"
+                  :modelValue="Math.round((store.config?.selection_config.noise_bias_sdr_gamma ?? 0.05) * 1000)"
+                  @update:modelValue="(v: number) => updateField(store.config?.selection_config, 'noise_bias_sdr_gamma', v / 1000)"
+                  :label="t('settings.noise_bias_sdr_gamma')"
+              />
+              <span class="slider-value">{{
+                  ((store.config?.selection_config.noise_bias_sdr_gamma ?? 0.05) * 100).toFixed(1)
+                }}%</span>
+            </div>
+          </div>
+          <div class="setting-item">
+            <label class="setting-label">{{ t('settings.noise_bias_hdr_linear') }}</label>
+            <div class="slider-row">
+              <WinSlider
+                  :min="0"
+                  :max="200"
+                  :modelValue="Math.round((store.config?.selection_config.noise_bias_hdr_linear ?? 0.01) * 1000)"
+                  @update:modelValue="(v: number) => updateField(store.config?.selection_config, 'noise_bias_hdr_linear', v / 1000)"
+                  :label="t('settings.noise_bias_hdr_linear')"
+              />
+              <span class="slider-value">{{
+                  ((store.config?.selection_config.noise_bias_hdr_linear ?? 0.01) * 100).toFixed(1)
+                }}%</span>
+            </div>
+          </div>
+        </div>
+      </WinCard>
+
       <WinCard :title="t('settings.plugin_management')">
         <template #header-extra>
           <span class="card-type-badge plugin-badge">{{ t('settings.plugin_badge') }}</span>
@@ -621,7 +727,8 @@ function currentLanguage(): SupportedLocale {
             <p class="plugin-hint">{{ t('settings.plugin_hint') }}</p>
           </div>
           <div v-else class="plugin-list">
-            <div v-for="plugin in getSortedPlugins()" :key="plugin.manifest.id" class="plugin-item glass-surface">
+            <div v-for="plugin in getSortedPlugins()" :key="plugin.manifest.id"
+                 class="plugin-item glass-surface">
               <div class="plugin-info">
                 <div class="plugin-header">
                   <span class="plugin-name">{{ plugin.manifest.name }}</span>
@@ -1004,5 +1111,23 @@ function currentLanguage(): SupportedLocale {
   .settings-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: var(--prim-space-2);
+}
+
+.slider-row :deep(.win-slider) {
+  flex: 1;
+}
+
+.slider-value {
+  font-size: var(--prim-font-size-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 3.5em;
+  text-align: right;
 }
 </style>

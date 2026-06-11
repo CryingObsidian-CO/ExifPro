@@ -2,19 +2,23 @@ use super::BlurAlgorithm;
 
 pub type Luma16Image = image::ImageBuffer<image::Luma<u16>, Vec<u16>>;
 
+// TODO 进一步优化上限，当前上限难以决定
 pub fn detect_blur(img: &Luma16Image, algorithm: BlurAlgorithm) -> f32 {
     match algorithm {
         BlurAlgorithm::LaplacianVariance => {
             let score = laplacian_variance(img);
-            normalize_score(score, 0.0, 1048576.0 * 16.0)
+            log::debug!("LaplacianVariance: score={}", score);
+            normalize_score(score, 0.0, 800000.0)
         }
         BlurAlgorithm::Tenengrad => {
             let score = tenengrad(img);
-            normalize_score(score, 0.0, 2097152.0 * 16.0)
+            log::debug!("Tenengrad: score={}", score);
+            normalize_score(score, 0.0, 3000000.0)
         }
         BlurAlgorithm::Brenner => {
             let score = brenner(img);
-            normalize_score(score, 0.0, 65536.0 * 256.0)
+            log::debug!("Brenner: score={}", score);
+            normalize_score(score, 0.0, 250000.0)
         }
     }
 }
@@ -59,7 +63,7 @@ fn tenengrad(img: &Luma16Image) -> f32 {
     let sobel_x: [[i32; 3]; 3] = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
     let sobel_y: [[i32; 3]; 3] = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
 
-    let mut sum: i64 = 0;
+    let mut sum: f64 = 0.0;
     let count = (w.saturating_sub(2)) * (h.saturating_sub(2));
     for y in 1..h.saturating_sub(1) {
         for x in 1..w.saturating_sub(1) {
@@ -72,13 +76,14 @@ fn tenengrad(img: &Luma16Image) -> f32 {
                     gy += px * sobel_y[ky][kx] as i64;
                 }
             }
-            sum += gx * gx + gy * gy;
+            let magnitude = ((gx * gx + gy * gy) as f64).sqrt();
+            sum += magnitude;
         }
     }
     if count == 0 {
         return 0.0;
     }
-    sum as f32 / count as f32
+    (sum / count as f64) as f32
 }
 
 fn brenner(img: &Luma16Image) -> f32 {

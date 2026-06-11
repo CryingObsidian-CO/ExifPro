@@ -1,5 +1,6 @@
 use super::blur::Luma16Image;
 use image::{DynamicImage, ImageBuffer};
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -12,21 +13,11 @@ pub enum ImageSource {
     HdrLinear,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct NoiseBias {
     pub raw: f32,
     pub sdr_gamma: f32,
     pub hdr_linear: f32,
-}
-
-impl Default for NoiseBias {
-    fn default() -> Self {
-        Self {
-            raw: 0.02,
-            sdr_gamma: 0.05,
-            hdr_linear: 0.01,
-        }
-    }
 }
 
 pub fn load_detection_image(path: &Path) -> Option<(Luma16Image, ImageSource)> {

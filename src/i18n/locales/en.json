@@ -124,7 +124,14 @@
     "unsaved_changes": "Settings have been modified. Save before leaving?",
     "unsaved_title": "Unsaved Changes",
     "save_leave": "Save & Leave",
-    "leave_without_save": "Leave Without Saving"
+    "leave_without_save": "Leave Without Saving",
+    "selection_config": "Selection Detection",
+    "threshold_laplacian": "Threshold (Laplacian)",
+    "threshold_tenengrad": "Threshold (Tenengrad)",
+    "threshold_brenner": "Threshold (Brenner)",
+    "noise_bias_raw": "Noise Bias (RAW)",
+    "noise_bias_sdr_gamma": "Noise Bias (SDR Gamma)",
+    "noise_bias_hdr_linear": "Noise Bias (HDR Linear)"
   },
   "edit": {
     "title": "Edit Groups",
@@ -243,7 +250,11 @@
     "tab_unrated": "Unrated",
     "eliminated": "Eliminated",
     "methodShort_BlurDetection": "Blur",
-    "methodShort_OnnxDetection": "ONNX"
+    "methodShort_OnnxDetection": "ONNX",
+    "noise_bias_label": "Noise Bias Compensation",
+    "noise_bias_raw": "RAW",
+    "noise_bias_sdr": "SDR Gamma",
+    "noise_bias_hdr": "HDR Linear"
   },
   "common": {
     "confirm": "Confirm",
