@@ -151,6 +151,31 @@ const handleStart = async () => {
     return;
   }
   isRunning.value = true;
+  try {
+    const results = await tauriImpl.detect(
+        selectionDir.value,
+        includeSubdirs.value,
+        algorithm.value,
+        threshold.value,
+    );
+    Object.keys(thumbnailCache).forEach(k => delete thumbnailCache[k]);
+    photos.value = results.map(r => ({
+      filePath: r.file_path,
+      fileName: r.file_name,
+      score: r.score,
+      scoreDetails: r.score_details,
+      stars: 0,
+      passed: r.passed,
+      eliminatedBy: r.eliminated_by,
+    }));
+  } catch (err) {
+    await showAlert(t('selection.failed'), {
+      title: t('selection.failed_title'),
+      tone: 'error',
+    });
+  } finally {
+    isRunning.value = false;
+  }
 };
 
 const handleStop = () => {

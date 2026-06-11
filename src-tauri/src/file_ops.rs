@@ -85,17 +85,27 @@ fn scan_directory_sync(dir: &Path, recursive: bool) -> Result<Vec<PathBuf>, Stri
     Ok(image_paths)
 }
 
+pub fn is_debayered_ext(ext: &str) -> bool {
+    matches!(
+        ext,
+        "jpg" | "jpeg" | "png" | "gif" | "bmp" | "tif" | "tiff" | "webp" | "heic" | "heif"
+    )
+}
+
+pub fn is_raw_ext(ext: &str) -> bool {
+    matches!(
+        ext,
+        "arw" | "cr2" | "cr3" | "nef" | "dng" | "raf" | "rw2" | "orf" | "srw" | "pef" | "x3f"
+    )
+}
+
 fn is_image_file(path: &Path) -> bool {
     let ext = path
         .extension()
         .and_then(|s| s.to_str())
         .unwrap_or("")
         .to_lowercase();
-    let allowed_exts = [
-        "jpg", "jpeg", "png", "gif", "bmp", "tif", "tiff", "webp", "heic", "heif", "arw", "cr2",
-        "cr3", "nef", "dng", "raf", "rw2", "orf", "srw", "pef", "x3f",
-    ];
-    allowed_exts.contains(&ext.as_str())
+    is_debayered_ext(&ext) || is_raw_ext(&ext)
 }
 
 pub fn safe_copy(src: &Path, dest: &Path, overwrite: bool) -> Result<(), String> {

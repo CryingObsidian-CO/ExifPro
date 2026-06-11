@@ -3,6 +3,7 @@ import {ExifInfo, Group} from "../types/photo.ts";
 import {invoke} from "@tauri-apps/api/core";
 import {Config} from "../types/config.ts";
 import {PluginInfo} from "../types/plugin.ts";
+import {SelectionResult} from "../types/selection.ts";
 import {formatError} from "./logger";
 import {pluginManager} from "./pluginManager.ts";
 
@@ -190,6 +191,15 @@ export function useTauri() {
     );
   }
 
+  async function detect(path: string, recursive: boolean, algorithm: string, threshold: number) {
+    return await invokeWithLog<SelectionResult[]>(
+        "detect",
+        'detect_command',
+        {path, recursive, algorithm, threshold},
+        `path=${path} algorithm=${algorithm} threshold=${threshold}`
+    );
+  }
+
   return {
     selectDirectory,
     groupPhotos,
@@ -207,5 +217,6 @@ export function useTauri() {
     readPluginBinary,
     pluginFileOp,
     getThumbnail,
+    detect,
   }
 }

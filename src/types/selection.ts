@@ -11,6 +11,7 @@ export enum BlurAlgorithm {
 
 export interface SelectionResult {
   file_path: string;
+  file_name: string;
   score: number;
   score_details: Array<[SelectionMethod, number]>;
   passed: boolean;

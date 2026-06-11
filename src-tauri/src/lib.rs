@@ -10,7 +10,7 @@ use crate::config::Config;
 use crate::database::Database;
 use crate::exif::{get_thumbnail_data, parse_exif, ExifInfo};
 use crate::file_ops::{create_dirs_if_not_exist, safe_copy, safe_move, scan_directory};
-use crate::grouping::{group_photos, Group, GroupType};
+use crate::grouping::{group_photos, Group};
 use crate::plugin::loader::PluginLoader;
 use crate::plugin::manifest::PluginInfo;
 use serde::{Deserialize, Serialize};
@@ -369,6 +369,35 @@ async fn frontend_log_command(
     Ok(())
 }
 
+#[tauri::command]
+async fn detect_command(
+    path: String,
+    recursive: bool,
+    algorithm: String,
+    threshold: f32,
+) -> Result<Vec<selection::SelectionResult>, String> {
+    log::info!(
+        "command.detect: start path={} recursive={} algorithm={} threshold={}",
+        path,
+        recursive,
+        algorithm,
+        threshold
+    );
+    let dir = PathBuf::from(&path);
+    let alg = selection::convert_algorithm(&algorithm)?;
+    let files = scan_directory(&dir, recursive).await?;
+    log::info!("command.detect: scanned {} files", files.len());
+
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        selection::detect::process_images(files, alg, threshold)
+    })
+    .await
+    .map_err(|e| format!("Failed to join detection task: {}", e))?;
+
+    log::info!("command.detect: complete results={}", result.len());
+    Ok(result)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScriptResult {
     pub exit_code: i32,
@@ -404,7 +433,7 @@ pub fn run() {
                     path: exe_dir.join("logs"),
                     file_name: None,
                 }))
-                .level(log::LevelFilter::Info)
+                .level(log::LevelFilter::Trace)
                 .max_file_size(5_000_000 /* bytes */)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
                 .build(),
@@ -436,6 +465,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scan_directory_command,
             get_thumbnail_command,
+            detect_command,
             group_photos_command,
             save_config_command,
             load_config_command,
@@ -458,6 +488,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::grouping::GroupType;
     use std::io::Write;
     use std::sync::Mutex;
 
