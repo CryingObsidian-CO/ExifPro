@@ -1,4 +1,4 @@
-use super::blur::{self, Luma16Image};
+use super::blur;
 use super::pipeline::{self, ImageSource, NoiseBias};
 use super::{BlurAlgorithm, SelectionMethod, SelectionResult};
 use std::path::PathBuf;
