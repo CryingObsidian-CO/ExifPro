@@ -31,7 +31,7 @@ const noiseBiasRaw = ref(0.02);
 const noiseBiasSdr = ref(0.05);
 const noiseBiasHdr = ref(0.01);
 const isRunning = ref(false);
-const activeTab = ref('all');
+const activeTab = ref('unrated');
 const selectedPhotoPath = ref<string | null>(null);
 
 const selectionConfig = ref<SelectionConfig>({
@@ -90,7 +90,7 @@ const thumbnailCache = reactive<Record<string, string | null>>({});
 const filteredPhotos = computed(() => {
   return photos.value.filter(p => {
     if (activeTab.value === 'all') return true;
-    if (activeTab.value === 'passed') return p.passed && p.stars === 0;
+    if (activeTab.value === 'passed') return p.passed;
     if (activeTab.value === 'eliminated') return !p.passed;
     if (activeTab.value === 'unrated') return p.stars === 0 && p.passed;
     return true;
@@ -99,7 +99,7 @@ const filteredPhotos = computed(() => {
 
 const tabCounts = computed(() => {
   const all = photos.value.length;
-  const passed = photos.value.filter(p => p.passed && p.stars === 0).length;
+  const passed = photos.value.filter(p => p.passed).length;
   const eliminated = photos.value.filter(p => !p.passed).length;
   const unrated = photos.value.filter(p => p.stars === 0 && p.passed).length;
   return {all, passed, eliminated, unrated};
@@ -149,8 +149,15 @@ const handleSelectPhoto = (path: string) => {
 
 const handleRatePhoto = (path: string, stars: number) => {
   const p = photos.value.find(ph => ph.filePath === path);
-  if (p) {
-    p.stars = p.stars === stars ? 0 : stars;
+  if (!p) return;
+  if (p.stars === stars) {
+    p.stars = 0;
+  } else {
+    p.stars = stars;
+    if (!p.passed) {
+      p.passed = true;
+      p.eliminatedBy = [];
+    }
   }
 };
 
@@ -220,9 +227,9 @@ const handleStop = () => {
   isRunning.value = false;
 };
 
-watch(activeTab, () => {
-  filteredPhotos.value.forEach(p => loadThumbnail(p.filePath));
-});
+watch(filteredPhotos, (list) => {
+  list.forEach(p => loadThumbnail(p.filePath));
+}, { immediate: true });
 </script>
 
 <template>

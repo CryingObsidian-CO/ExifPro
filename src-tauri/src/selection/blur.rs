@@ -29,7 +29,7 @@ pub fn detect_blur(img: &Luma16Image, algorithm: BlurAlgorithm) -> f32 {
                 s,
                 ratio
             );
-            normalize_score(ratio, 0.0, 20.0)
+            normalize_score(ratio, 0.0, 4.0)
         }
         BlurAlgorithm::Brenner => {
             let m = mean_brenner(&mild);
@@ -41,7 +41,7 @@ pub fn detect_blur(img: &Luma16Image, algorithm: BlurAlgorithm) -> f32 {
                 s,
                 ratio
             );
-            normalize_score(ratio, 0.0, 15.0)
+            normalize_score(ratio, 0.0, 4.0)
         }
     }
 }

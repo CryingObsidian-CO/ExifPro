@@ -22,9 +22,8 @@ const emit = defineEmits<{
 
 const scorePercent = computed(() => Math.round(props.score * 100));
 const scoreColor = computed(() => {
-  if (props.score >= 0.7) return 'var(--color-success)';
-  if (props.score >= 0.4) return 'var(--color-warning)';
-  return 'var(--color-danger)';
+  const hue = Math.round(props.score * 120);
+  return `hsl(${hue}, 80%, 45%)`;
 });
 
 const isHovered = ref(false);

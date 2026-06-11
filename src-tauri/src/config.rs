@@ -125,9 +125,9 @@ impl Default for NamingRules {
 impl Default for SelectionConfig {
     fn default() -> Self {
         Self {
-            threshold_laplacian: 0.30,
-            threshold_tenengrad: 0.25,
-            threshold_brenner: 0.35,
+            threshold_laplacian: 0.40,
+            threshold_tenengrad: 0.40,
+            threshold_brenner: 0.45,
             noise_bias_raw: 0.02,
             noise_bias_sdr_gamma: 0.05,
             noise_bias_hdr_linear: 0.01,
