@@ -127,11 +127,19 @@
     "leave_without_save": "Leave Without Saving",
     "selection_config": "Selection Detection",
     "threshold_laplacian": "Threshold (Laplacian)",
+    "threshold_laplacian_tooltip": "Laplacian variance threshold. Photos scoring below this are marked as blurry. Higher values apply stricter criteria.",
     "threshold_tenengrad": "Threshold (Tenengrad)",
+    "threshold_tenengrad_tooltip": "Tenengrad gradient threshold. Photos scoring below this are marked as blurry.",
     "threshold_brenner": "Threshold (Brenner)",
+    "threshold_brenner_tooltip": "Brenner gradient threshold. Photos scoring below this are marked as blurry.",
     "noise_bias_raw": "Noise Bias (RAW)",
+    "noise_bias_raw_tooltip": "Subtracts sensor noise from RAW scores before threshold comparison. Reduces false positives from noisy captures.",
     "noise_bias_sdr_gamma": "Noise Bias (SDR Gamma)",
-    "noise_bias_hdr_linear": "Noise Bias (HDR Linear)"
+    "noise_bias_sdr_gamma_tooltip": "Noise compensation applied to standard SDR images (JPEG/PNG/TIFF with gamma curve).",
+    "noise_bias_hdr_linear": "Noise Bias (HDR Linear)",
+    "noise_bias_hdr_linear_tooltip": "Noise compensation for linear HDR images (32-bit float or linear TIFFs).",
+    "max_parallel": "Max Parallel Threads",
+    "max_parallel_tooltip": "Maximum CPU threads for parallel detection. 0 = auto (uses 1/4 of available CPU cores)."
   },
   "edit": {
     "title": "Edit Groups",

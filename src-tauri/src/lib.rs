@@ -376,14 +376,16 @@ async fn detect_command(
     algorithm: String,
     threshold: f32,
     noise_bias: selection::NoiseBias,
+    max_parallel: u32,
 ) -> Result<Vec<selection::SelectionResult>, String> {
     log::info!(
-        "command.detect: start path={} recursive={} algorithm={} threshold={} noise_bias={:?}",
+        "command.detect: start path={} recursive={} algorithm={} threshold={} noise_bias={:?} max_parallel={}",
         path,
         recursive,
         algorithm,
         threshold,
-        noise_bias
+        noise_bias,
+        max_parallel,
     );
     let dir = PathBuf::from(&path);
     let alg = selection::convert_algorithm(&algorithm)?;
@@ -391,7 +393,7 @@ async fn detect_command(
     log::info!("command.detect: scanned {} files", files.len());
 
     let result = tauri::async_runtime::spawn_blocking(move || {
-        selection::detect::process_images(files, alg, threshold, noise_bias)
+        selection::detect::process_images(files, alg, threshold, noise_bias, max_parallel)
     })
     .await
     .map_err(|e| format!("Failed to join detection task: {}", e))?;

@@ -27,6 +27,7 @@ pub struct SelectionConfig {
     pub noise_bias_raw: f32,
     pub noise_bias_sdr_gamma: f32,
     pub noise_bias_hdr_linear: f32,
+    pub max_parallel: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,6 +132,7 @@ impl Default for SelectionConfig {
             noise_bias_raw: 0.02,
             noise_bias_sdr_gamma: 0.05,
             noise_bias_hdr_linear: 0.01,
+            max_parallel: 0,
         }
     }
 }

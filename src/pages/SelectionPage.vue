@@ -41,6 +41,7 @@ const selectionConfig = ref<SelectionConfig>({
   noise_bias_raw: 0.02,
   noise_bias_sdr_gamma: 0.05,
   noise_bias_hdr_linear: 0.01,
+  max_parallel: 0,
 });
 
 onMounted(async () => {
@@ -217,6 +218,7 @@ const handleStart = async () => {
         algorithm.value,
         threshold.value,
         {raw: noiseBiasRaw.value, sdr_gamma: noiseBiasSdr.value, hdr_linear: noiseBiasHdr.value},
+        selectionConfig.value.max_parallel ?? 0,
     );
     Object.keys(thumbnailCache).forEach(k => delete thumbnailCache[k]);
     photos.value = results.map(r => ({

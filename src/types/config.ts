@@ -46,4 +46,5 @@ export interface SelectionConfig {
   noise_bias_raw: number;
   noise_bias_sdr_gamma: number;
   noise_bias_hdr_linear: number;
+  max_parallel: number;
 }

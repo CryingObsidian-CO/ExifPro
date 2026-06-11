@@ -50,6 +50,7 @@ function normalizeConfig(config: Config) {
       noise_bias_raw: 0.02,
       noise_bias_sdr_gamma: 0.05,
       noise_bias_hdr_linear: 0.01,
+      max_parallel: 0,
     };
   }
 }
@@ -619,7 +620,9 @@ function currentLanguage(): SupportedLocale {
       <WinCard :title="t('settings.selection_config')">
         <div class="settings-grid">
           <div class="setting-item">
-            <label class="setting-label">{{ t('settings.threshold_laplacian') }}</label>
+            <label class="setting-label has-tooltip"
+                   :data-tooltip="t('settings.threshold_laplacian_tooltip')"
+            >{{ t('settings.threshold_laplacian') }}</label>
             <div class="slider-row">
               <WinSlider
                   :min="0"
@@ -634,7 +637,9 @@ function currentLanguage(): SupportedLocale {
             </div>
           </div>
           <div class="setting-item">
-            <label class="setting-label">{{ t('settings.threshold_tenengrad') }}</label>
+            <label class="setting-label has-tooltip"
+                   :data-tooltip="t('settings.threshold_tenengrad_tooltip')"
+            >{{ t('settings.threshold_tenengrad') }}</label>
             <div class="slider-row">
               <WinSlider
                   :min="0"
@@ -649,7 +654,9 @@ function currentLanguage(): SupportedLocale {
             </div>
           </div>
           <div class="setting-item">
-            <label class="setting-label">{{ t('settings.threshold_brenner') }}</label>
+            <label class="setting-label has-tooltip"
+                   :data-tooltip="t('settings.threshold_brenner_tooltip')"
+            >{{ t('settings.threshold_brenner') }}</label>
             <div class="slider-row">
               <WinSlider
                   :min="0"
@@ -664,7 +671,9 @@ function currentLanguage(): SupportedLocale {
             </div>
           </div>
           <div class="setting-item">
-            <label class="setting-label">{{ t('settings.noise_bias_raw') }}</label>
+            <label class="setting-label has-tooltip"
+                   :data-tooltip="t('settings.noise_bias_raw_tooltip')"
+            >{{ t('settings.noise_bias_raw') }}</label>
             <div class="slider-row">
               <WinSlider
                   :min="0"
@@ -679,7 +688,9 @@ function currentLanguage(): SupportedLocale {
             </div>
           </div>
           <div class="setting-item">
-            <label class="setting-label">{{ t('settings.noise_bias_sdr_gamma') }}</label>
+            <label class="setting-label has-tooltip"
+                   :data-tooltip="t('settings.noise_bias_sdr_gamma_tooltip')"
+            >{{ t('settings.noise_bias_sdr_gamma') }}</label>
             <div class="slider-row">
               <WinSlider
                   :min="0"
@@ -694,7 +705,9 @@ function currentLanguage(): SupportedLocale {
             </div>
           </div>
           <div class="setting-item">
-            <label class="setting-label">{{ t('settings.noise_bias_hdr_linear') }}</label>
+            <label class="setting-label has-tooltip"
+                   :data-tooltip="t('settings.noise_bias_hdr_linear_tooltip')"
+            >{{ t('settings.noise_bias_hdr_linear') }}</label>
             <div class="slider-row">
               <WinSlider
                   :min="0"
@@ -706,6 +719,23 @@ function currentLanguage(): SupportedLocale {
               <span class="slider-value">{{
                   ((store.config?.selection_config.noise_bias_hdr_linear ?? 0.01) * 100).toFixed(1)
                 }}%</span>
+            </div>
+          </div>
+          <div class="setting-item">
+            <label class="setting-label has-tooltip"
+                   :data-tooltip="t('settings.max_parallel_tooltip')"
+            >{{ t('settings.max_parallel') }}</label>
+            <div class="slider-row">
+              <WinSlider
+                  :min="0"
+                  :max="64"
+                  :modelValue="store.config?.selection_config.max_parallel ?? 0"
+                  @update:modelValue="(v: number) => updateField(store.config?.selection_config, 'max_parallel', v)"
+                  :label="t('settings.max_parallel')"
+              />
+              <span class="slider-value">{{
+                  store.config?.selection_config.max_parallel ?? 0
+                }}</span>
             </div>
           </div>
         </div>

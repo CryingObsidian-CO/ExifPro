@@ -127,11 +127,19 @@
     "leave_without_save": "不保存直接离开",
     "selection_config": "选片检测",
     "threshold_laplacian": "阈值 (Laplacian)",
+    "threshold_laplacian_tooltip": "拉普拉斯方差阈值。低于此分数的照片会被标记为模糊。值越高筛选越严格。",
     "threshold_tenengrad": "阈值 (Tenengrad)",
+    "threshold_tenengrad_tooltip": "Tenengrad 梯度阈值。低于此分数的照片会被标记为模糊。",
     "threshold_brenner": "阈值 (Brenner)",
+    "threshold_brenner_tooltip": "Brenner 梯度阈值。低于此分数的照片会被标记为模糊。",
     "noise_bias_raw": "噪声补偿 (RAW)",
+    "noise_bias_raw_tooltip": "从 RAW 文件的得分中减去传感器噪声再比较阈值。减少噪点导致的误判。",
     "noise_bias_sdr_gamma": "噪声补偿 (SDR Gamma)",
-    "noise_bias_hdr_linear": "噪声补偿 (HDR Linear)"
+    "noise_bias_sdr_gamma_tooltip": "对标准 SDR 图像（JPEG/PNG/带伽马曲线的 TIFF）应用的噪声补偿。",
+    "noise_bias_hdr_linear": "噪声补偿 (HDR Linear)",
+    "noise_bias_hdr_linear_tooltip": "对线性 HDR 图像（32 位浮点或线性 TIFF）的噪声补偿。",
+    "max_parallel": "最大并行线程数",
+    "max_parallel_tooltip": "并行检测的最大 CPU 线程数。0 = 自动（使用所有可用核心的四分之一）。"
   },
   "edit": {
     "title": "编辑分组",
