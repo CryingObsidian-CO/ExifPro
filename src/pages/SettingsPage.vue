@@ -42,17 +42,6 @@ function normalizeConfig(config: Config) {
   if (!config.enabled_plugins) {
     config.enabled_plugins = [];
   }
-  if (!config.selection_config) {
-    config.selection_config = {
-      threshold_laplacian: 0.30,
-      threshold_tenengrad: 0.25,
-      threshold_brenner: 0.35,
-      noise_bias_raw: 0.02,
-      noise_bias_sdr_gamma: 0.05,
-      noise_bias_hdr_linear: 0.01,
-      max_parallel: 0,
-    };
-  }
 }
 
 // NOTE 确保存在插件配置对象，暂时保留
@@ -736,6 +725,32 @@ function currentLanguage(): SupportedLocale {
               <span class="slider-value">{{
                   store.config?.selection_config.max_parallel ?? 0
                 }}</span>
+            </div>
+          </div>
+          <div class="setting-item">
+            <label class="setting-label has-tooltip"
+                   :data-tooltip="t('settings.onnx_enabled_tooltip')"
+            >{{ t('settings.onnx_enabled') }}</label>
+            <WinToggle
+                :modelValue="store.config?.selection_config.onnx_enabled || false"
+                @update:modelValue="(v) => updateField(store.config?.selection_config, 'onnx_enabled', v)"
+            />
+          </div>
+          <div v-if="store.config?.selection_config.onnx_enabled" class="setting-item">
+            <label class="setting-label has-tooltip"
+                   :data-tooltip="t('settings.threshold_onnx_tooltip')"
+            >{{ t('settings.threshold_onnx') }}</label>
+            <div class="slider-row">
+              <WinSlider
+                  :min="0"
+                  :max="100"
+                  :modelValue="Math.round((store.config?.selection_config.threshold_onnx ?? 0.50) * 100)"
+                  @update:modelValue="(v: number) => updateField(store.config?.selection_config, 'threshold_onnx', v / 100)"
+                  :label="t('settings.threshold_onnx')"
+              />
+              <span class="slider-value">{{
+                  Math.round((store.config?.selection_config.threshold_onnx ?? 0.50) * 100)
+                }}%</span>
             </div>
           </div>
         </div>

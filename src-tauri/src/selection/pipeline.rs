@@ -20,24 +20,23 @@ pub struct NoiseBias {
     pub hdr_linear: f32,
 }
 
-pub fn load_detection_image(path: &Path) -> Option<(Luma16Image, ImageSource)> {
+pub struct DetectionImage {
+    pub raw: DynamicImage,
+    pub luma: Luma16Image,
+    pub source: ImageSource,
+}
+
+pub fn load_detection_image(path: &Path) -> Option<DetectionImage> {
     let ext = path.extension()?.to_str()?.to_lowercase();
 
     if crate::file_ops::is_raw_ext(&ext) {
         load_raw(path)
-    } else if crate::file_ops::is_debayered_ext(&ext) {
-        load_standard(path)
     } else {
-        log::warn!(
-            "pipeline: unknown_extension ext={} path={}",
-            ext,
-            path.display()
-        );
-        None
+        load_standard(path)
     }
 }
 
-fn load_raw(path: &Path) -> Option<(Luma16Image, ImageSource)> {
+fn load_raw(path: &Path) -> Option<DetectionImage> {
     log::debug!("pipeline.raw: start path={}", path.display());
 
     let raw = rawler::decode_file(path).ok()?;
@@ -89,10 +88,16 @@ fn load_raw(path: &Path) -> Option<(Luma16Image, ImageSource)> {
         w,
         h
     );
-    Some((luma, ImageSource::Raw))
+
+    let raw_img = DynamicImage::ImageLuma16(luma.clone());
+    Some(DetectionImage {
+        raw: raw_img,
+        luma,
+        source: ImageSource::Raw,
+    })
 }
 
-fn load_standard(path: &Path) -> Option<(Luma16Image, ImageSource)> {
+fn load_standard(path: &Path) -> Option<DetectionImage> {
     log::debug!("pipeline.standard: start path={}", path.display());
 
     let img = image::ImageReader::open(path).ok()?.decode().ok()?;
@@ -100,14 +105,19 @@ fn load_standard(path: &Path) -> Option<(Luma16Image, ImageSource)> {
     let ext = path.extension()?.to_str()?.to_lowercase();
 
     let source = classify_source(&img, &ext, path)?;
-    let luma = unify_image(img, w, h, source);
+
+    let luma = unify_image(img.clone(), w, h, source);
 
     log::debug!(
         "pipeline.standard: complete path={} source={:?}",
         path.display(),
         source
     );
-    Some((luma, source))
+    Some(DetectionImage {
+        raw: img,
+        luma,
+        source,
+    })
 }
 
 fn classify_source(img: &DynamicImage, ext: &str, path: &Path) -> Option<ImageSource> {
@@ -120,7 +130,6 @@ fn classify_source(img: &DynamicImage, ext: &str, path: &Path) -> Option<ImageSo
         | DynamicImage::ImageRgb16(_)
         | DynamicImage::ImageRgba16(_) => {
             if ext == "tif" || ext == "tiff" {
-                // TODO 进一步优化 tiff 识别逻辑
                 probe_tiff_color(path)
             } else {
                 Some(ImageSource::SdrGamma)

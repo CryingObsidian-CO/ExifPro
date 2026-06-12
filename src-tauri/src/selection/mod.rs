@@ -1,5 +1,6 @@
 pub mod blur;
 pub mod detect;
+pub mod onnx;
 pub mod pipeline;
 
 use serde::{Deserialize, Serialize};

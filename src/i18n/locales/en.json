@@ -139,7 +139,11 @@
     "noise_bias_hdr_linear": "Noise Bias (HDR Linear)",
     "noise_bias_hdr_linear_tooltip": "Noise compensation for linear HDR images (32-bit float or linear TIFFs).",
     "max_parallel": "Max Parallel Threads",
-    "max_parallel_tooltip": "Maximum CPU threads for parallel detection. 0 = auto (uses 1/4 of available CPU cores)."
+    "max_parallel_tooltip": "Maximum CPU threads for parallel detection. 0 = auto (uses all available cores).",
+    "onnx_enabled": "ONNX AI Scoring",
+    "onnx_enabled_tooltip": "Enable ONNX neural network for image quality assessment alongside blur detection.",
+    "threshold_onnx": "Threshold (ONNX)",
+    "threshold_onnx_tooltip": "ONNX quality score threshold. Photos scoring below this are marked as low quality. 0 = always pass."
   },
   "edit": {
     "title": "Edit Groups",

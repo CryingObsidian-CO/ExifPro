@@ -195,12 +195,12 @@ export function useTauri() {
     raw: number,
     sdr_gamma: number,
     hdr_linear: number
-  }, maxParallel: number) {
+  }, maxParallel: number, onnxEnabled: boolean, thresholdOnnx: number) {
     return await invokeWithLog<SelectionResult[]>(
         "detect",
         'detect_command',
-        {path, recursive, algorithm, threshold, noiseBias, maxParallel},
-        `path=${path} algorithm=${algorithm} threshold=${threshold} noiseBias=${JSON.stringify(noiseBias)} maxParallel=${maxParallel}`
+        {path, recursive, algorithm, threshold, noiseBias, maxParallel, onnxEnabled, thresholdOnnx},
+        `path=${path} algorithm=${algorithm} threshold=${threshold} noiseBias=${JSON.stringify(noiseBias)} maxParallel=${maxParallel} onnx=${onnxEnabled}`
     );
   }
 

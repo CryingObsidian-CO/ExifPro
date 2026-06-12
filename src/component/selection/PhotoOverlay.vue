@@ -301,7 +301,7 @@ watch(visible, (v) => {
 
 .overlay-badge {
   cursor: pointer;
-  font-size: var(--font-size-sm);
+  font-size: var(--prim-font-size-sm);
   padding: 2px 8px;
   border-radius: var(--prim-radius-sm);
 }

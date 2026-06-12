@@ -1,4 +1,5 @@
 use super::blur;
+use super::onnx::OnnxDetector;
 use super::pipeline::{self, ImageSource, NoiseBias};
 use super::{BlurAlgorithm, SelectionMethod, SelectionResult};
 use rayon::prelude::*;
@@ -11,13 +12,27 @@ pub fn process_images(
     threshold: f32,
     noise_bias: NoiseBias,
     max_parallel: u32,
+    onnx_model_path: &str,
+    threshold_onnx: f32,
 ) -> Vec<SelectionResult> {
     let num_threads = if max_parallel > 0 {
         max_parallel as usize
     } else {
         std::thread::available_parallelism()
-            .map(|n| n.get() / 4)
+            .map(|n| n.get())
             .unwrap_or(4)
+    };
+
+    let onnx_detector = if !onnx_model_path.is_empty() {
+        match OnnxDetector::new(std::path::Path::new(onnx_model_path)) {
+            Ok(d) => Some(d),
+            Err(e) => {
+                log::warn!("ONNX detector init failed, skipping: {}", e);
+                None
+            }
+        }
+    } else {
+        None
     };
 
     let pool = rayon::ThreadPoolBuilder::new()
@@ -28,7 +43,16 @@ pub fn process_images(
     pool.install(|| {
         let results: Vec<Option<SelectionResult>> = files
             .par_iter()
-            .map(|file_path| process_one(file_path, &algorithm, threshold, &noise_bias))
+            .map(|file_path| {
+                process_one(
+                    file_path,
+                    &algorithm,
+                    threshold,
+                    &noise_bias,
+                    &onnx_detector,
+                    threshold_onnx,
+                )
+            })
             .collect();
         results.into_iter().filter_map(|r| r).collect()
     })
@@ -39,31 +63,70 @@ fn process_one(
     algorithm: &BlurAlgorithm,
     threshold: f32,
     noise_bias: &NoiseBias,
+    onnx_detector: &Option<OnnxDetector>,
+    threshold_onnx: f32,
 ) -> Option<SelectionResult> {
-    let (luma16, source) = pipeline::load_detection_image(file_path)?;
+    let det_img = pipeline::load_detection_image(file_path)?;
 
-    let score_norm = blur::detect_blur(&luma16, algorithm.clone());
+    // ---- Blur detection ----
+    let score_norm = blur::detect_blur(&det_img.luma, algorithm.clone());
 
-    let bias = match source {
+    let bias = match det_img.source {
         ImageSource::Raw => noise_bias.raw,
         ImageSource::SdrGamma => noise_bias.sdr_gamma,
         ImageSource::HdrLinear => noise_bias.hdr_linear,
     };
-    let compensated = (score_norm - bias).max(0.0);
-    let passed = compensated >= threshold;
+    let blur_compensated = (score_norm - bias).max(0.0);
+    let blur_passed = blur_compensated >= threshold;
 
-    let method = SelectionMethod::BlurDetection(algorithm.clone());
-    let eliminated_by = if !passed {
-        vec![method.clone()]
-    } else {
-        vec![]
-    };
+    let mut score_details: Vec<(SelectionMethod, f32)> = Vec::new();
+    let mut eliminated_by: Vec<SelectionMethod> = Vec::new();
+
+    score_details.push((
+        SelectionMethod::BlurDetection(algorithm.clone()),
+        blur_compensated,
+    ));
+    if !blur_passed {
+        eliminated_by.push(SelectionMethod::BlurDetection(algorithm.clone()));
+    }
+
+    // ---- ONNX detection ----
+    if let Some(ref detector) = onnx_detector {
+        match detector.predict(&det_img.raw) {
+            Ok(onnx_score) => {
+                let onnx_passed = onnx_score >= threshold_onnx;
+                score_details.push((SelectionMethod::OnnxDetection, onnx_score));
+                if !onnx_passed {
+                    eliminated_by.push(SelectionMethod::OnnxDetection);
+                }
+                log::info!(
+                    "{}: onnx_score={:.4}, passed={}",
+                    file_path.display(),
+                    onnx_score,
+                    onnx_passed
+                );
+            }
+            Err(e) => {
+                log::warn!("ONNX predict failed for {}: {}", file_path.display(), e);
+            }
+        }
+    }
+
+    let passed = eliminated_by.is_empty();
+    let overall_score = score_details
+        .iter()
+        .map(|(_, s)| *s)
+        .fold(f32::MAX, f32::min);
 
     log::info!(
-        "{}: score_norm={:.6}, compensated={:.6}, passed={}",
+        "{}: blur={:.4} onnx={} passed={}",
         file_path.display(),
-        score_norm,
-        compensated,
+        blur_compensated,
+        if score_details.len() > 1 {
+            format!("{:.4}", score_details[1].1)
+        } else {
+            "N/A".to_string()
+        },
         passed
     );
 
@@ -73,8 +136,8 @@ fn process_one(
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default(),
-        score: compensated,
-        score_details: vec![(method, compensated)],
+        score: overall_score,
+        score_details,
         passed,
         eliminated_by,
     })

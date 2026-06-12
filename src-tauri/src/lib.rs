@@ -371,29 +371,56 @@ async fn frontend_log_command(
 
 #[tauri::command]
 async fn detect_command(
+    app_handle: tauri::AppHandle,
     path: String,
     recursive: bool,
     algorithm: String,
     threshold: f32,
     noise_bias: selection::NoiseBias,
     max_parallel: u32,
+    onnx_enabled: bool,
+    threshold_onnx: f32,
 ) -> Result<Vec<selection::SelectionResult>, String> {
     log::info!(
-        "command.detect: start path={} recursive={} algorithm={} threshold={} noise_bias={:?} max_parallel={}",
+        "command.detect: start path={} recursive={} algorithm={} threshold={} noise_bias={:?} max_parallel={} onnx={}",
         path,
         recursive,
         algorithm,
         threshold,
         noise_bias,
         max_parallel,
+        onnx_enabled,
     );
     let dir = PathBuf::from(&path);
     let alg = selection::convert_algorithm(&algorithm)?;
     let files = scan_directory(&dir, recursive).await?;
     log::info!("command.detect: scanned {} files", files.len());
 
+    let onnx_model_path = if onnx_enabled {
+        let resource_path = app_handle
+            .path()
+            .resolve(
+                "resources/nima-mobilenet-quality.onnx",
+                tauri::path::BaseDirectory::Resource,
+            )
+            .map_err(|e| format!("Failed to resolve ONNX model path: {}", e))?;
+        let s = resource_path.to_string_lossy().to_string();
+        log::info!("command.detect: onnx_model_path={}", s);
+        s
+    } else {
+        String::new()
+    };
+
     let result = tauri::async_runtime::spawn_blocking(move || {
-        selection::detect::process_images(files, alg, threshold, noise_bias, max_parallel)
+        selection::detect::process_images(
+            files,
+            alg,
+            threshold,
+            noise_bias,
+            max_parallel,
+            &onnx_model_path,
+            threshold_onnx,
+        )
     })
     .await
     .map_err(|e| format!("Failed to join detection task: {}", e))?;
