@@ -400,7 +400,7 @@ async fn detect_command(
         let resource_path = app_handle
             .path()
             .resolve(
-                "resources/nima-mobilenet-quality.onnx",
+                "resources/nima_mobilenet_aesthetic.onnx",
                 tauri::path::BaseDirectory::Resource,
             )
             .map_err(|e| format!("Failed to resolve ONNX model path: {}", e))?;
@@ -464,7 +464,7 @@ pub fn run() {
                     path: exe_dir.join("logs"),
                     file_name: None,
                 }))
-                .level(log::LevelFilter::Trace)
+                .level(log::LevelFilter::Info)
                 .max_file_size(5_000_000 /* bytes */)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
                 .build(),

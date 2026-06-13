@@ -94,8 +94,8 @@ fn process_one(
     if let Some(ref detector) = onnx_detector {
         match detector.predict(&det_img.raw) {
             Ok(onnx_score) => {
-                let onnx_passed = onnx_score >= threshold_onnx;
                 score_details.push((SelectionMethod::OnnxDetection, onnx_score));
+                let onnx_passed = onnx_score >= threshold_onnx;
                 if !onnx_passed {
                     eliminated_by.push(SelectionMethod::OnnxDetection);
                 }
