@@ -752,14 +752,15 @@ function currentLanguage(): SupportedLocale {
             <div class="slider-row">
               <WinSlider
                   :min="0"
-                  :max="100"
-                  :modelValue="Math.round((store.config?.selection_config.threshold_onnx ?? 0.50) * 100)"
-                  @update:modelValue="(v: number) => updateField(store.config?.selection_config, 'threshold_onnx', v / 100)"
+                  :max="5"
+                  :step="0.1"
+                  :modelValue="store.config?.selection_config.threshold_onnx ?? 3.0"
+                  @update:modelValue="(v: number) => updateField(store.config?.selection_config, 'threshold_onnx', v)"
                   :label="t('settings.threshold_onnx')"
               />
               <span class="slider-value">{{
-                  Math.round((store.config?.selection_config.threshold_onnx ?? 0.50) * 100)
-                }}%</span>
+                  (store.config?.selection_config.threshold_onnx ?? 3.0).toFixed(1)
+                }}★</span>
             </div>
           </div>
         </div>

@@ -83,7 +83,7 @@ watch(visible, (v) => {
               <span v-for="[method, s] in photo.scoreDetails" :key="method"
                     class="overlay-method-score"
                     :class="{ fail: !photo.passed }">
-                {{ method }}: {{ Math.round(s * 100) }}%
+                {{ method }}: {{ method === 'OnnxDetection' ? s.toFixed(2) + '★' : Math.round(s * 100) + '%' }}
               </span>
             </div>
             <div class="overlay-stars" @mouseleave="starHover = 0">

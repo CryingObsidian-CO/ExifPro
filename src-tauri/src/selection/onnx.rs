@@ -25,19 +25,19 @@ impl OnnxDetector {
             .map_err(|e| format!("ORT output read failed: {}", e))?;
 
         let vals: Vec<String> = data.iter().map(|v| format!("{:.4}", v)).collect();
-        // TODO 提供一个更合适的评分方案
-        let quality: f32 = data
+        let mean: f32 = data
             .iter()
             .enumerate()
-            .filter(|(i, _)| *i >= 4)
-            .map(|(_, p)| p)
+            .map(|(i, p)| (i as f32 + 1.0) * p)
             .sum();
+        let stars = ((mean - 1.0) * 5.0 / 9.0 * 100.0).round() / 100.0;
         log::info!(
-            "onnx.output: values=[{}], p(>=5)={:.4}",
+            "onnx.output: values=[{}], mean={:.4}, stars={:.2}",
             vals.join(", "),
-            quality
+            mean,
+            stars
         );
-        Ok(quality)
+        Ok(stars)
     }
 
     fn preprocess(&self, img: &DynamicImage) -> Result<Array4<f32>, String> {

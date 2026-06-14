@@ -29,7 +29,7 @@ const valuetext = computed(() => {
 });
 
 const handleInput = (e: Event) => {
-  const val = parseInt((e.target as HTMLInputElement).value);
+  const val = parseFloat((e.target as HTMLInputElement).value);
   emit('update:modelValue', val);
 };
 </script>

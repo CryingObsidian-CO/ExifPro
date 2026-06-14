@@ -143,7 +143,7 @@
     "onnx_enabled": "ONNX AI 评分",
     "onnx_enabled_tooltip": "启用 ONNX 神经网络对图像进行质量评分，与模糊检测同时运行。",
     "threshold_onnx": "阈值 (ONNX)",
-    "threshold_onnx_tooltip": "ONNX 质量分数阈值。低于此分数的照片被标记为低质量。0 = 永远通过。",
+    "threshold_onnx_tooltip": "ONNX 质量分数阈值 (0-5 星)。低于此分数的照片被标记为低质量。0 = 永不淘汰。",
     "onnx_gpu": "GPU 加速",
     "onnx_gpu_tooltip": "使用 GPU (DirectML) 加速 ONNX 推理。不可用时自动回退到 CPU。"
   },

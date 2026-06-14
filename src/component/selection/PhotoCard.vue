@@ -73,7 +73,7 @@ const displayStars = computed(() => starHover.value || props.stars);
       <div v-if="scoreDetails.length > 0" class="card-score-details">
         <span v-for="[method, s] in scoreDetails" :key="method" class="method-score"
               :class="{ fail: !passed && eliminatedBy.includes(method) }">
-          {{ t('selection.methodShort_' + method) }}: {{ Math.round(s * 100) }}%
+          {{ t('selection.methodShort_' + method) }}: {{ method === 'OnnxDetection' ? s.toFixed(2) + '★' : Math.round(s * 100) + '%' }}
         </span>
       </div>
       <div class="card-stars" @click.stop @mouseleave="starHover = 0">

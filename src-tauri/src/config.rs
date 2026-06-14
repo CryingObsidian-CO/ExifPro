@@ -137,7 +137,7 @@ impl Default for SelectionConfig {
             noise_bias_hdr_linear: 0.01,
             max_parallel: 0,
             onnx_enabled: true,
-            threshold_onnx: 0.50,
+            threshold_onnx: 3.0,
             onnx_gpu: true,
         }
     }

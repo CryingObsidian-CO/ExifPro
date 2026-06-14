@@ -162,7 +162,7 @@ fn process_one(
                     eliminated_by.push(SelectionMethod::OnnxDetection);
                 }
                 log::info!(
-                    "{}: onnx_score={:.4}, passed={}",
+                    "{}: onnx_stars={:.2}, passed={}",
                     file_path.display(),
                     onnx_score,
                     onnx_passed
@@ -177,7 +177,10 @@ fn process_one(
     let passed = eliminated_by.is_empty();
     let overall_score = score_details
         .iter()
-        .map(|(_, s)| *s)
+        .map(|(m, s)| match m {
+            SelectionMethod::OnnxDetection => s / 5.0,
+            _ => *s,
+        })
         .fold(f32::MAX, f32::min);
 
     log::info!(
@@ -185,7 +188,7 @@ fn process_one(
         file_path.display(),
         blur_compensated,
         if score_details.len() > 1 {
-            format!("{:.4}", score_details[1].1)
+            format!("{:.2}", score_details[1].1)
         } else {
             "N/A".to_string()
         },

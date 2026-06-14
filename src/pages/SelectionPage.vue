@@ -34,17 +34,7 @@ const isRunning = ref(false);
 const activeTab = ref('unrated');
 const selectedPhotoPath = ref<string | null>(null);
 
-const selectionConfig = ref<SelectionConfig>({
-  threshold_laplacian: 0.30,
-  threshold_tenengrad: 0.25,
-  threshold_brenner: 0.35,
-  noise_bias_raw: 0.02,
-  noise_bias_sdr_gamma: 0.05,
-  noise_bias_hdr_linear: 0.01,
-  max_parallel: 0,
-  onnx_enabled: false,
-  threshold_onnx: 0.50,
-});
+const selectionConfig = ref<SelectionConfig>();
 
 onMounted(async () => {
   try {
@@ -222,7 +212,7 @@ const handleStart = async () => {
         {raw: noiseBiasRaw.value, sdr_gamma: noiseBiasSdr.value, hdr_linear: noiseBiasHdr.value},
         selectionConfig.value.max_parallel ?? 0,
         selectionConfig.value.onnx_enabled ?? false,
-        selectionConfig.value.threshold_onnx ?? 0.50,
+        selectionConfig.value.threshold_onnx ?? 3.0,
         selectionConfig.value.onnx_gpu ?? false
     );
     Object.keys(thumbnailCache).forEach(k => delete thumbnailCache[k]);
@@ -259,7 +249,7 @@ watch(filteredPhotos, (list) => {
   <div class="selection-page">
     <SelectionBar :dir-path="selectionDir"/>
     <div class="selection-body">
-      <aside class="selection-sidebar">
+      <aside class="selection-sidebar glass-scrollbar">
         <WinCard :title="t('selection.source_dir')">
           <div class="path-input">
             <input type="text"

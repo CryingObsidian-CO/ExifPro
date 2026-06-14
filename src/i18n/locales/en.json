@@ -143,7 +143,7 @@
     "onnx_enabled": "ONNX AI Scoring",
     "onnx_enabled_tooltip": "Enable ONNX neural network for image quality assessment alongside blur detection.",
     "threshold_onnx": "Threshold (ONNX)",
-    "threshold_onnx_tooltip": "ONNX quality score threshold. Photos scoring below this are marked as low quality. 0 = always pass.",
+    "threshold_onnx_tooltip": "ONNX quality score threshold (0-5 stars). Photos below this are marked as low quality. 0 = never eliminate.",
     "onnx_gpu": "GPU Acceleration",
     "onnx_gpu_tooltip": "Use GPU (DirectML) for ONNX inference. Falls back to CPU if unavailable."
   },
