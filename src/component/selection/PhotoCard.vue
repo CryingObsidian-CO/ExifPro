@@ -1,0 +1,265 @@
+<script setup lang="ts">
+import {ref, computed} from 'vue';
+import {useI18n} from 'vue-i18n';
+
+const {t} = useI18n();
+
+const props = defineProps<{
+  filePath: string;
+  fileName: string;
+  score: number;
+  scoreDetails: Array<[string, number]>;
+  stars: number;
+  passed: boolean;
+  eliminatedBy: string[];
+  manualPass: boolean;
+  thumbnailUrl: string | null;
+}>();
+
+const emit = defineEmits<{
+  (e: 'click'): void;
+  (e: 'rate', stars: number): void;
+  (e: 'toggle-pass'): void;
+}>();
+
+const scorePercent = computed(() => Math.round(props.score * 100));
+const scoreColor = computed(() => {
+  const hue = Math.round(props.score * 120);
+  return `hsl(${hue}, 80%, 45%)`;
+});
+
+const isHovered = ref(false);
+const starHover = ref(0);
+
+const displayStars = computed(() => starHover.value || props.stars);
+</script>
+
+<template>
+  <div
+      class="photo-card glass-card"
+      :class="{ eliminated: !manualPass, selected: false }"
+      @mouseenter="isHovered = true"
+      @mouseleave="isHovered = false"
+      @click="emit('click')"
+  >
+    <div class="card-thumb-wrap">
+      <img
+          v-if="thumbnailUrl"
+          :src="thumbnailUrl"
+          :alt="fileName"
+          class="card-thumb"
+          loading="lazy"
+      />
+      <div v-else class="card-thumb card-thumb-placeholder">
+        <span>?</span>
+      </div>
+      <div v-if="!manualPass" class="badge badge-eliminated" @click.stop="emit('toggle-pass')">
+        <span class="badge-icon">✗</span>
+      </div>
+      <div v-else-if="!passed" class="badge badge-manual" @click.stop="emit('toggle-pass')">
+        <span class="badge-icon">👍</span>
+      </div>
+
+    </div>
+    <div class="card-info">
+      <span class="card-name" :title="fileName">{{ fileName }}</span>
+      <div class="card-score-row">
+        <div class="card-score-bar">
+          <div class="score-fill"
+               :style="{ width: scorePercent + '%', background: scoreColor }"></div>
+        </div>
+        <span class="card-score" :style="{ color: scoreColor }">{{ scorePercent }}%</span>
+      </div>
+      <div v-if="scoreDetails.length > 0" class="card-score-details">
+        <span v-for="[method, s] in scoreDetails" :key="method" class="method-score"
+              :class="{ fail: !passed && eliminatedBy.includes(method) }">
+          {{ t('selection.methodShort_' + method) }}: {{ method === 'OnnxDetection' ? s.toFixed(2) + '★' : Math.round(s * 100) + '%' }}
+        </span>
+      </div>
+      <div class="card-stars" @click.stop @mouseleave="starHover = 0">
+        <span
+            v-for="i in 5"
+            :key="i"
+            class="star-btn"
+            :class="{ filled: i <= displayStars }"
+            @mouseenter="starHover = i"
+            @click="emit('rate', i)"
+        >{{ i <= displayStars ? '★' : '☆' }}</span>
+        <span v-if="passed" class="eliminate-btn" title="0-star eliminate"
+              @click="emit('toggle-pass')">✗</span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.photo-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--prim-duration-fast) var(--prim-ease-out);
+}
+
+.photo-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--prim-shadow-md);
+}
+
+.photo-card.eliminated {
+  opacity: var(--prim-opacity-62);
+}
+
+.photo-card.eliminated:hover {
+  opacity: var(--prim-opacity-82);
+}
+
+.card-thumb-wrap {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--color-glass-bg);
+}
+
+.card-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.card-thumb-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  font-size: var(--prim-font-size-2xl);
+}
+
+.badge {
+  position: absolute;
+  top: var(--prim-space-1);
+  right: var(--prim-space-1);
+  width: var(--prim-space-5);
+  height: var(--prim-space-5);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.badge-eliminated {
+  background: var(--color-danger);
+}
+
+.badge-manual {
+  background: var(--color-success);
+}
+
+.badge-icon {
+  color: var(--color-text-inverse);
+  font-size: var(--prim-font-size-xs);
+  font-weight: var(--prim-font-weight-bold);
+  line-height: 1;
+}
+
+.card-info {
+  padding: var(--prim-space-2) var(--prim-space-2) var(--prim-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--prim-space-1);
+}
+
+.card-name {
+  font-size: var(--prim-font-size-xs);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--prim-font-weight-medium);
+}
+
+.card-score-row {
+  display: flex;
+  align-items: center;
+  gap: var(--prim-space-2);
+}
+
+.card-score-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--color-border-default);
+  border-radius: var(--prim-radius-xs);
+  overflow: hidden;
+}
+
+.score-fill {
+  height: 100%;
+  border-radius: var(--prim-radius-xs);
+  transition: width var(--prim-duration-normal) var(--prim-ease-out);
+}
+
+.card-score {
+  font-size: var(--prim-font-size-xs);
+  font-weight: var(--prim-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  min-width: var(--prim-space-8);
+  text-align: right;
+}
+
+.card-stars {
+  display: flex;
+  gap: 1px;
+  justify-content: flex-start;
+}
+
+.card-score-details {
+  display: flex;
+  gap: var(--prim-space-2);
+  flex-wrap: wrap;
+}
+
+.method-score {
+  font-size: var(--prim-font-size-xs);
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.method-score.fail {
+  color: var(--color-danger);
+}
+
+.star-btn {
+  font-size: var(--prim-font-size-md);
+  cursor: pointer;
+  color: var(--color-text-tertiary);
+  transition: color var(--prim-duration-fast) var(--prim-ease-out);
+  line-height: 1;
+  user-select: none;
+}
+
+.star-btn.filled {
+  color: var(--color-warning);
+}
+
+.star-btn:hover {
+  transform: scale(1.2);
+}
+
+.eliminate-btn {
+  font-size: var(--prim-font-size-sm);
+  cursor: pointer;
+  color: var(--color-text-tertiary);
+  line-height: 1;
+  user-select: none;
+  margin-left: auto;
+  padding: 0 2px;
+  transition: color var(--prim-duration-fast) var(--prim-ease-out);
+}
+.eliminate-btn:hover {
+  color: var(--color-danger);
+  transform: scale(1.2);
+}
+</style>

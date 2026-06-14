@@ -1,19 +1,23 @@
 pub mod config;
+pub mod database;
 pub mod exif;
 pub mod file_ops;
 pub mod grouping;
 pub mod plugin;
+pub mod selection;
 
 use crate::config::Config;
+use crate::database::Database;
 use crate::exif::{get_thumbnail_data, parse_exif, ExifInfo};
 use crate::file_ops::{create_dirs_if_not_exist, safe_copy, safe_move, scan_directory};
-use crate::grouping::{group_photos, Group, GroupType};
+use crate::grouping::{group_photos, Group};
 use crate::plugin::loader::PluginLoader;
 use crate::plugin::manifest::PluginInfo;
 use serde::{Deserialize, Serialize};
 use std::env::current_exe;
 use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::Manager;
 use tauri_plugin_log::{log, Target, TargetKind};
 
 fn ensure_valid_plugin_id(plugin_id: &str) -> Result<(), String> {
@@ -365,6 +369,69 @@ async fn frontend_log_command(
     Ok(())
 }
 
+#[tauri::command]
+async fn detect_command(
+    app_handle: tauri::AppHandle,
+    path: String,
+    recursive: bool,
+    algorithm: String,
+    threshold: f32,
+    noise_bias: selection::NoiseBias,
+    max_parallel: u32,
+    onnx_enabled: bool,
+    threshold_onnx: f32,
+    onnx_gpu: bool,
+) -> Result<Vec<selection::SelectionResult>, String> {
+    log::info!(
+        "command.detect: start path={} recursive={} algorithm={} threshold={} noise_bias={:?} max_parallel={} onnx={} gpu={}",
+        path,
+        recursive,
+        algorithm,
+        threshold,
+        noise_bias,
+        max_parallel,
+        onnx_enabled,
+        onnx_gpu,
+    );
+    let dir = PathBuf::from(&path);
+    let alg = selection::convert_algorithm(&algorithm)?;
+    let files = scan_directory(&dir, recursive).await?;
+    log::info!("command.detect: scanned {} files", files.len());
+
+    let onnx_model_path = if onnx_enabled {
+        let resource_path = app_handle
+            .path()
+            .resolve(
+                "resources/nima_mobilenet_aesthetic.onnx",
+                tauri::path::BaseDirectory::Resource,
+            )
+            .map_err(|e| format!("Failed to resolve ONNX model path: {}", e))?;
+        let s = resource_path.to_string_lossy().to_string();
+        log::info!("command.detect: onnx_model_path={}", s);
+        s
+    } else {
+        String::new()
+    };
+
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        selection::detect::process_images(
+            files,
+            alg,
+            threshold,
+            noise_bias,
+            max_parallel,
+            &onnx_model_path,
+            threshold_onnx,
+            onnx_gpu,
+        )
+    })
+    .await
+    .map_err(|e| format!("Failed to join detection task: {}", e))?;
+
+    log::info!("command.detect: complete results={}", result.len());
+    Ok(result)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScriptResult {
     pub exit_code: i32,
@@ -383,7 +450,7 @@ pub fn run() {
         }
     };
     let exe_dir = match exe_path.parent() {
-        Some(dir) => dir,
+        Some(dir) => dir.to_path_buf(),
         None => {
             log::error!("app.startup: failed exe parent directory");
             return;
@@ -397,7 +464,7 @@ pub fn run() {
             tauri_plugin_log::Builder::new()
                 .clear_targets()
                 .target(Target::new(TargetKind::Folder {
-                    path: PathBuf::from(exe_dir.join("logs")),
+                    path: exe_dir.join("logs"),
                     file_name: None,
                 }))
                 .level(log::LevelFilter::Info)
@@ -405,7 +472,7 @@ pub fn run() {
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
                 .build(),
         )
-        .setup(|_app| {
+        .setup(move |app| {
             let timestamp_ms = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
@@ -417,6 +484,14 @@ pub fn run() {
                 timestamp_ms
             );
             log::info!("============================================================");
+
+            let db_dir = exe_dir.join("data");
+            create_dirs_if_not_exist(&db_dir).expect("Failed to create database directory");
+            let db_path = db_dir.join("exifPro.db");
+            let db = tauri::async_runtime::block_on(Database::new(&db_path, 4))
+                .expect("Failed to initialize database");
+            app.manage(db);
+
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
@@ -424,6 +499,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scan_directory_command,
             get_thumbnail_command,
+            detect_command,
             group_photos_command,
             save_config_command,
             load_config_command,
@@ -446,6 +522,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::grouping::GroupType;
     use std::io::Write;
     use std::sync::Mutex;
 

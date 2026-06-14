@@ -127,7 +127,7 @@ fn extract_file_preview(file_path: &Path, max_preview_bytes: u64) -> Option<Stri
     Some(format!("data:{};base64,{}", mime, encoded))
 }
 
-fn extract_thumbnail(file_path: &Path, exif: &Exif, ifd: In) -> Option<String> {
+fn extract_raw_jpeg(exif: &Exif, ifd: In) -> Option<Vec<u8>> {
     let thumb_offset = exif.get_field(Tag::JPEGInterchangeFormat, ifd)?;
     let thumb_length = exif.get_field(Tag::JPEGInterchangeFormatLength, ifd)?;
 
@@ -135,46 +135,27 @@ fn extract_thumbnail(file_path: &Path, exif: &Exif, ifd: In) -> Option<String> {
     let length = thumb_length.value.get_uint(0)? as usize;
 
     if length == 0 || offset == 0 {
-        log::warn!(
-            "exif.thumbnail: invalid_offset_length file={} offset={} length={}",
-            file_path.display(),
-            offset,
-            length
-        );
         return None;
     }
 
     let exif_buf = exif.buf();
     let end = offset.saturating_add(length);
     if end > exif_buf.len() {
-        log::warn!(
-            "exif.thumbnail: out_of_range file={} ifd={:?} offset={} length={} buf_len={}",
-            file_path.display(),
-            ifd,
-            offset,
-            length,
-            exif_buf.len()
-        );
         return None;
     }
 
-    log::debug!(
-        "exif.thumbnail: start file={} ifd={:?} offset={} length={} buf_len={}",
-        file_path.display(),
-        ifd,
-        offset,
-        length,
-        exif_buf.len()
-    );
+    Some(exif_buf[offset..end].to_vec())
+}
 
-    let buf = &exif_buf[offset..end];
-    let mime = detect_mime_type(buf);
-    let encoded = BASE64.encode(buf);
+fn extract_thumbnail(file_path: &Path, exif: &Exif, ifd: In) -> Option<String> {
+    let jpeg_data = extract_raw_jpeg(exif, ifd)?;
+    let mime = detect_mime_type(&jpeg_data);
+    let encoded = BASE64.encode(&jpeg_data);
     log::debug!(
         "exif.thumbnail: complete file={} ifd={:?} size={}",
         file_path.display(),
         ifd,
-        buf.len()
+        jpeg_data.len()
     );
     Some(format!("data:{};base64,{}", mime, encoded))
 }
@@ -201,7 +182,7 @@ fn enhance_prase_focus_distance(exif: &Exif, camera_make: &str) -> Option<String
     log::debug!("exif.focus_distance: enhance make={}", camera_make);
     match camera_make {
         "SONY" => {
-            let makernote = get_field_value(&exif, Tag::MakerNote, In::PRIMARY)?;
+            let _makernote = get_field_value(&exif, Tag::MakerNote, In::PRIMARY)?;
             // TODO 去除这一部分改为插件实现了对焦距离解析
             None
         }
@@ -286,6 +267,33 @@ pub fn parse_exif(file_path: &Path) -> Result<ExifInfo, Error> {
 
     log::debug!("exif.parse: complete file={}", file_path.display());
     Ok(exif_info)
+}
+
+pub fn get_thumbnail_data(file_path: &Path, level: &str, max_preview_bytes: u64) -> Option<String> {
+    let file = File::open(file_path).ok()?;
+    let mut buf_reader = BufReader::new(file);
+
+    let (primary_thumb, small_thumb) = exif::Reader::new()
+        .read_from_container(&mut buf_reader)
+        .ok()
+        .map(|exif_data| {
+            let primary = extract_thumbnail(file_path, &exif_data, In::PRIMARY);
+            let small = extract_thumbnail(file_path, &exif_data, In::THUMBNAIL);
+            (primary, small)
+        })
+        .unwrap_or((None, None));
+
+    // NOTE 这么设计回退的目的是确保能拿到不低于要求级别的缩率图
+    match level {
+        "small" => small_thumb
+            .or(primary_thumb)
+            .or_else(|| extract_file_preview(file_path, max_preview_bytes)),
+        "large" => primary_thumb.or_else(|| extract_file_preview(file_path, u64::MAX)),
+        _ => {
+            log::warn!("exif.thumbnail: unknown_level level={}", level);
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -572,31 +580,5 @@ mod tests {
         let path = dir.create_file("test.jpg", &[0xFF, 0xD8, 0xFF]);
         let result = get_thumbnail_data(&path, "small", 0);
         assert!(result.is_none());
-    }
-}
-
-pub fn get_thumbnail_data(file_path: &Path, level: &str, max_preview_bytes: u64) -> Option<String> {
-    let file = File::open(file_path).ok()?;
-    let mut buf_reader = BufReader::new(file);
-
-    let (primary_thumb, small_thumb) = exif::Reader::new()
-        .read_from_container(&mut buf_reader)
-        .ok()
-        .map(|exif_data| {
-            let primary = extract_thumbnail(file_path, &exif_data, In::PRIMARY);
-            let small = extract_thumbnail(file_path, &exif_data, In::THUMBNAIL);
-            (primary, small)
-        })
-        .unwrap_or((None, None));
-
-    match level {
-        "small" => small_thumb
-            .or(primary_thumb)
-            .or_else(|| extract_file_preview(file_path, max_preview_bytes)),
-        "large" => primary_thumb.or_else(|| extract_file_preview(file_path, u64::MAX)),
-        _ => {
-            log::warn!("exif.thumbnail: unknown_level level={}", level);
-            None
-        }
     }
 }
