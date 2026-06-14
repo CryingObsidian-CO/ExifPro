@@ -139,11 +139,13 @@
     "noise_bias_hdr_linear": "噪声补偿 (HDR Linear)",
     "noise_bias_hdr_linear_tooltip": "对线性 HDR 图像（32 位浮点或线性 TIFF）的噪声补偿。",
     "max_parallel": "最大并行线程数",
-    "max_parallel_tooltip": "并行检测的最大 CPU 线程数。0 = 自动（使用所有可用核心）。",
+    "max_parallel_tooltip": "并行检测的最大 CPU 线程数。0 = 自动（使用所有可用核心）。CPU 模式：每线程额外 ~30MB RAM 用于 ONNX。GPU 模式：单共享 Session。",
     "onnx_enabled": "ONNX AI 评分",
     "onnx_enabled_tooltip": "启用 ONNX 神经网络对图像进行质量评分，与模糊检测同时运行。",
     "threshold_onnx": "阈值 (ONNX)",
-    "threshold_onnx_tooltip": "ONNX 质量分数阈值。低于此分数的照片被标记为低质量。0 = 永远通过。"
+    "threshold_onnx_tooltip": "ONNX 质量分数阈值。低于此分数的照片被标记为低质量。0 = 永远通过。",
+    "onnx_gpu": "GPU 加速",
+    "onnx_gpu_tooltip": "使用 GPU (DirectML) 加速 ONNX 推理。不可用时自动回退到 CPU。"
   },
   "edit": {
     "title": "编辑分组",

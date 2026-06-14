@@ -49,4 +49,5 @@ export interface SelectionConfig {
   max_parallel: number;
   onnx_enabled: boolean;
   threshold_onnx: number;
+  onnx_gpu: boolean;
 }

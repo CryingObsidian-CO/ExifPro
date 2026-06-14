@@ -380,9 +380,10 @@ async fn detect_command(
     max_parallel: u32,
     onnx_enabled: bool,
     threshold_onnx: f32,
+    onnx_gpu: bool,
 ) -> Result<Vec<selection::SelectionResult>, String> {
     log::info!(
-        "command.detect: start path={} recursive={} algorithm={} threshold={} noise_bias={:?} max_parallel={} onnx={}",
+        "command.detect: start path={} recursive={} algorithm={} threshold={} noise_bias={:?} max_parallel={} onnx={} gpu={}",
         path,
         recursive,
         algorithm,
@@ -390,6 +391,7 @@ async fn detect_command(
         noise_bias,
         max_parallel,
         onnx_enabled,
+        onnx_gpu,
     );
     let dir = PathBuf::from(&path);
     let alg = selection::convert_algorithm(&algorithm)?;
@@ -420,6 +422,7 @@ async fn detect_command(
             max_parallel,
             &onnx_model_path,
             threshold_onnx,
+            onnx_gpu,
         )
     })
     .await

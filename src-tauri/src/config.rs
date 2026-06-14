@@ -30,6 +30,7 @@ pub struct SelectionConfig {
     pub max_parallel: u32,
     pub onnx_enabled: bool,
     pub threshold_onnx: f32,
+    pub onnx_gpu: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -135,8 +136,9 @@ impl Default for SelectionConfig {
             noise_bias_sdr_gamma: 0.05,
             noise_bias_hdr_linear: 0.01,
             max_parallel: 0,
-            onnx_enabled: false,
+            onnx_enabled: true,
             threshold_onnx: 0.50,
+            onnx_gpu: true,
         }
     }
 }

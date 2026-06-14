@@ -222,7 +222,8 @@ const handleStart = async () => {
         {raw: noiseBiasRaw.value, sdr_gamma: noiseBiasSdr.value, hdr_linear: noiseBiasHdr.value},
         selectionConfig.value.max_parallel ?? 0,
         selectionConfig.value.onnx_enabled ?? false,
-        selectionConfig.value.threshold_onnx ?? 0.50
+        selectionConfig.value.threshold_onnx ?? 0.50,
+        selectionConfig.value.onnx_gpu ?? false
     );
     Object.keys(thumbnailCache).forEach(k => delete thumbnailCache[k]);
     photos.value = results.map(r => ({

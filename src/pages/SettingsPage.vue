@@ -738,6 +738,15 @@ function currentLanguage(): SupportedLocale {
           </div>
           <div v-if="store.config?.selection_config.onnx_enabled" class="setting-item">
             <label class="setting-label has-tooltip"
+                   :data-tooltip="t('settings.onnx_gpu_tooltip')"
+            >{{ t('settings.onnx_gpu') }}</label>
+            <WinToggle
+                :modelValue="store.config?.selection_config.onnx_gpu || false"
+                @update:modelValue="(v) => updateField(store.config?.selection_config, 'onnx_gpu', v)"
+            />
+          </div>
+          <div v-if="store.config?.selection_config.onnx_enabled" class="setting-item">
+            <label class="setting-label has-tooltip"
                    :data-tooltip="t('settings.threshold_onnx_tooltip')"
             >{{ t('settings.threshold_onnx') }}</label>
             <div class="slider-row">
